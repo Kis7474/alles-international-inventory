@@ -1,0 +1,79 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// 품목 마스터
+model Item {
+  id          Int      @id @default(autoincrement())
+  code        String   @unique
+  name        String
+  unit        String   // 개, BOX, kg 등
+  note        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  lots        InventoryLot[]
+  movements   InventoryMovement[]
+}
+
+// LOT/입고 관리
+model InventoryLot {
+  id                Int      @id @default(autoincrement())
+  itemId            Int
+  item              Item     @relation(fields: [itemId], references: [id])
+  lotCode           String?  // BL번호, 참조번호 등
+  receivedDate      DateTime
+  quantityReceived  Float    // 입고 수량
+  quantityRemaining Float    // 현재 잔량
+  
+  goodsAmount       Float    // 물품대금
+  dutyAmount        Float    // 수입통관료
+  domesticFreight   Float    // 국내 입고운송료
+  otherCost         Float    @default(0) // 기타 비용
+  unitCost          Float    // 단가 (자동계산)
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  movements         InventoryMovement[]
+}
+
+// 입출고 이력
+model InventoryMovement {
+  id           Int      @id @default(autoincrement())
+  movementDate DateTime
+  itemId       Int
+  item         Item     @relation(fields: [itemId], references: [id])
+  lotId        Int?
+  lot          InventoryLot? @relation(fields: [lotId], references: [id])
+  type         String   // IN, OUT, ADJUST
+  quantity     Float
+  unitCost     Float
+  totalCost    Float    // quantity * unitCost
+  
+  refType      String?  // 참조 타입
+  refId        String?  // 참조 ID
+  
+  createdAt    DateTime @default(now())
+}
+
+// 창고료/기간비용
+model StorageExpense {
+  id          Int      @id @default(autoincrement())
+  period      String   // '2026-02' 형태
+  dateFrom    DateTime
+  dateTo      DateTime
+  warehouseId Int?     // 추후 확장용
+  amount      Float
+  memo        String?
+  
+  createdAt   DateTime @default(now())
+}
