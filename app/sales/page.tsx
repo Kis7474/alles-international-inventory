@@ -128,12 +128,20 @@ export default function SalesPage() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-900">매입매출 내역</h1>
-        <Link
-          href="/sales/new"
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-        >
-          + 매입매출 등록
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href="/master/upload"
+            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
+          >
+            📤 엑셀 업로드
+          </Link>
+          <Link
+            href="/sales/new"
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+          >
+            + 매입매출 등록
+          </Link>
+        </div>
       </div>
 
       {/* 필터 */}

@@ -21,17 +21,20 @@ interface Product {
   id: number
   name: string
   unit: string
-  prices: Array<{
+  categoryId: number | null
+  defaultPurchasePrice: number | null
+  defaultSalesPrice: number | null
+  category: {
     id: number
-    effectiveDate: string
-    purchasePrice: number
-    salesPrice: number
-  }>
+    code: string
+    nameKo: string
+  } | null
 }
 
 interface Vendor {
   id: number
   name: string
+  type: string
 }
 
 interface VendorPrice {
@@ -74,7 +77,7 @@ export default function NewSalesPage() {
       const [salespersonsRes, categoriesRes, productsRes, vendorsRes] = await Promise.all([
         fetch('/api/salesperson'),
         fetch('/api/categories'),
-        fetch('/api/sales-products'),
+        fetch('/api/products'),
         fetch('/api/vendors'),
       ])
 
@@ -86,45 +89,50 @@ export default function NewSalesPage() {
       setSalespersons(salespersonsData)
       setCategories(categoriesData)
       setProducts(productsData)
-      setVendors(vendorsData)
+      // Filter to show only DOMESTIC vendors for sales/purchase
+      setVendors(vendorsData.filter((v: Vendor) => v.type === 'DOMESTIC'))
     } catch (error) {
       console.error('Error fetching master data:', error)
       alert('기초 데이터 조회 중 오류가 발생했습니다.')
     }
   }
 
-  const calculateApplicablePrice = (product: Product, date: string, type: string): number => {
-    const transactionDate = new Date(date)
-    const applicablePrice = product.prices
-      .filter((p) => new Date(p.effectiveDate) <= transactionDate)
-      .sort((a, b) => new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime())[0]
-    
-    if (applicablePrice) {
-      return type === 'PURCHASE' ? applicablePrice.purchasePrice : applicablePrice.salesPrice
-    }
-    return 0
-  }
-
   const handleProductChange = (productId: string) => {
     if (productId) {
       const product = products.find((p) => p.id === parseInt(productId))
       if (product) {
+        // Auto-fill category from product
+        const categoryId = product.categoryId ? product.categoryId.toString() : ''
+        
+        // Auto-fill purchase price from product's defaultPurchasePrice
+        const purchasePrice = product.defaultPurchasePrice || 0
+        
         setFormData((prev) => ({ 
           ...prev, 
           productId, 
           itemName: product.name,
+          categoryId: categoryId,
+          cost: purchasePrice.toString(), // Set cost to purchase price
         }))
+        
         // Fetch vendor-specific price if vendor is selected
         if (formData.vendorId) {
           fetchVendorPrice(parseInt(productId), parseInt(formData.vendorId), formData.date, formData.type)
         } else {
-          // Use product's default price
-          const price = calculateApplicablePrice(product, formData.date, formData.type)
-          setFormData((prev) => ({ ...prev, productId, itemName: product.name, unitPrice: price.toString() }))
+          // Use product's default sales price if available
+          const salesPrice = product.defaultSalesPrice || 0
+          setFormData((prev) => ({ 
+            ...prev, 
+            productId, 
+            itemName: product.name, 
+            categoryId: categoryId,
+            cost: purchasePrice.toString(),
+            unitPrice: salesPrice.toString() 
+          }))
         }
       }
     } else {
-      setFormData((prev) => ({ ...prev, productId: '', itemName: '', unitPrice: '' }))
+      setFormData((prev) => ({ ...prev, productId: '', itemName: '', unitPrice: '', cost: '' }))
     }
   }
 
@@ -137,8 +145,8 @@ export default function NewSalesPage() {
       // Fall back to product's default price
       const product = products.find((p) => p.id === parseInt(formData.productId))
       if (product) {
-        const price = calculateApplicablePrice(product, formData.date, formData.type)
-        setFormData((prev) => ({ ...prev, vendorId, unitPrice: price.toString() }))
+        const salesPrice = product.defaultSalesPrice || 0
+        setFormData((prev) => ({ ...prev, vendorId, unitPrice: salesPrice.toString() }))
       }
     }
   }
@@ -167,16 +175,16 @@ export default function NewSalesPage() {
       // Fall back to product's default price
       const product = products.find((p) => p.id === productId)
       if (product) {
-        const price = calculateApplicablePrice(product, date, type)
-        setFormData((prev) => ({ ...prev, unitPrice: price.toString() }))
+        const salesPrice = product.defaultSalesPrice || 0
+        setFormData((prev) => ({ ...prev, unitPrice: salesPrice.toString() }))
       }
     } catch (error) {
       console.error('Error fetching vendor price:', error)
       // Fall back to product's default price
       const product = products.find((p) => p.id === productId)
       if (product) {
-        const price = calculateApplicablePrice(product, date, type)
-        setFormData((prev) => ({ ...prev, unitPrice: price.toString() }))
+        const salesPrice = product.defaultSalesPrice || 0
+        setFormData((prev) => ({ ...prev, unitPrice: salesPrice.toString() }))
       }
     }
   }
@@ -191,8 +199,8 @@ export default function NewSalesPage() {
       } else {
         const product = products.find((p) => p.id === parseInt(formData.productId))
         if (product) {
-          const price = calculateApplicablePrice(product, date, formData.type)
-          setFormData((prev) => ({ ...prev, date, unitPrice: price.toString() }))
+          const salesPrice = product.defaultSalesPrice || 0
+          setFormData((prev) => ({ ...prev, date, unitPrice: salesPrice.toString() }))
         }
       }
     }
@@ -208,8 +216,8 @@ export default function NewSalesPage() {
       } else {
         const product = products.find((p) => p.id === parseInt(formData.productId))
         if (product) {
-          const price = calculateApplicablePrice(product, formData.date, type)
-          setFormData((prev) => ({ ...prev, type, unitPrice: price.toString() }))
+          const salesPrice = product.defaultSalesPrice || 0
+          setFormData((prev) => ({ ...prev, type, unitPrice: salesPrice.toString() }))
         }
       }
     }
@@ -348,27 +356,6 @@ export default function NewSalesPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1 text-gray-700">
-                카테고리 *
-              </label>
-              <select
-                required
-                value={formData.categoryId}
-                onChange={(e) =>
-                  setFormData({ ...formData, categoryId: e.target.value })
-                }
-                className="w-full px-3 py-2 border rounded-lg text-gray-900"
-              >
-                <option value="">선택하세요</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.nameKo}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1 text-gray-700">
                 품목 선택
               </label>
               <select
@@ -380,6 +367,28 @@ export default function NewSalesPage() {
                 {products.map((product) => (
                   <option key={product.id} value={product.id}>
                     {product.name} ({product.unit})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1 text-gray-700">
+                카테고리 * {formData.productId && <span className="text-xs text-blue-600">(품목에서 자동 설정됨)</span>}
+              </label>
+              <select
+                required
+                value={formData.categoryId}
+                onChange={(e) =>
+                  setFormData({ ...formData, categoryId: e.target.value })
+                }
+                className="w-full px-3 py-2 border rounded-lg text-gray-900"
+                disabled={!!formData.productId}
+              >
+                <option value="">선택하세요</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.nameKo}
                   </option>
                 ))}
               </select>
@@ -478,7 +487,7 @@ export default function NewSalesPage() {
             {formData.type === 'SALES' && (
               <div>
                 <label className="block text-sm font-medium mb-1 text-gray-700">
-                  원가
+                  원가 {formData.productId && <span className="text-xs text-blue-600">(품목에서 자동 설정됨)</span>}
                 </label>
                 <input
                   type="number"
@@ -489,6 +498,7 @@ export default function NewSalesPage() {
                   }
                   className="w-full px-3 py-2 border rounded-lg text-gray-900"
                   placeholder="0"
+                  disabled={!!formData.productId}
                 />
               </div>
             )}

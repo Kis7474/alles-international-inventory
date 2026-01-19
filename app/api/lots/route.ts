@@ -8,6 +8,11 @@ export async function GET() {
     const lots = await prisma.inventoryLot.findMany({
       include: {
         item: true,
+        product: {
+          include: {
+            category: true,
+          },
+        },
       },
       orderBy: [
         { receivedDate: 'desc' },
@@ -30,6 +35,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const {
       itemId,
+      productId,
       lotCode,
       receivedDate,
       quantityReceived,
@@ -39,10 +45,17 @@ export async function POST(request: NextRequest) {
       otherCost = 0,
     } = body
 
-    // 유효성 검사
-    if (!itemId || !receivedDate || !quantityReceived) {
+    // 유효성 검사 - itemId 또는 productId 중 하나는 필수
+    if (!itemId && !productId) {
       return NextResponse.json(
-        { error: '품목, 입고일, 입고수량은 필수 항목입니다.' },
+        { error: '품목은 필수 항목입니다.' },
+        { status: 400 }
+      )
+    }
+
+    if (!receivedDate || !quantityReceived) {
+      return NextResponse.json(
+        { error: '입고일, 입고수량은 필수 항목입니다.' },
         { status: 400 }
       )
     }
@@ -74,7 +87,8 @@ export async function POST(request: NextRequest) {
     const lot = await prisma.$transaction(async (tx) => {
       const newLot = await tx.inventoryLot.create({
         data: {
-          itemId,
+          itemId: itemId || null,
+          productId: productId || null,
           lotCode: lotCode || null,
           receivedDate: new Date(receivedDate),
           quantityReceived,
@@ -87,20 +101,28 @@ export async function POST(request: NextRequest) {
         },
         include: {
           item: true,
+          product: {
+            include: {
+              category: true,
+            },
+          },
         },
       })
 
-      await tx.inventoryMovement.create({
-        data: {
-          movementDate: new Date(receivedDate),
-          itemId,
-          lotId: newLot.id,
-          type: 'IN',
-          quantity: quantityReceived,
-          unitCost,
-          totalCost: quantityReceived * unitCost,
-        },
-      })
+      // Only create movement if itemId exists (for backward compatibility)
+      if (itemId) {
+        await tx.inventoryMovement.create({
+          data: {
+            movementDate: new Date(receivedDate),
+            itemId,
+            lotId: newLot.id,
+            type: 'IN',
+            quantity: quantityReceived,
+            unitCost,
+            totalCost: quantityReceived * unitCost,
+          },
+        })
+      }
 
       return newLot
     })

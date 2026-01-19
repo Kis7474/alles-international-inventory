@@ -13,11 +13,11 @@ interface MenuItem {
 
 const menuItems: MenuItem[] = [
   {
-    label: '홈',
-    icon: '🏠',
+    label: '매입/매출',
+    icon: '💰',
     submenu: [
       { href: '/', label: '대시보드', icon: '📊' },
-      { href: '/sales', label: '매입매출장부', icon: '📝' },
+      { href: '/sales', label: '상세내역', icon: '📝' },
       {
         label: '리포트',
         icon: '📈',
@@ -52,11 +52,11 @@ const menuItems: MenuItem[] = [
     icon: '⚙️',
     submenu: [
       { href: '/master/products', label: '품목 관리', icon: '📦' },
-      { href: '/sales/product-status', label: '품목별 현황', icon: '📈' },
       { href: '/sales/vendors', label: '거래처 관리', icon: '🏢' },
       { href: '/salesperson', label: '담당자 관리', icon: '👤' },
       { href: '/categories', label: '카테고리 관리', icon: '📋' },
       { href: '/master/vendor-prices', label: '가격 관리', icon: '💰' },
+      { href: '/master/upload', label: '엑셀 업로드', icon: '📤' },
     ],
   },
 ]
@@ -64,7 +64,7 @@ const menuItems: MenuItem[] = [
 export default function Sidebar() {
   const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(false)
-  const [homeOpen, setHomeOpen] = useState(
+  const [salesOpen, setSalesOpen] = useState(
     pathname === '/' || pathname.startsWith('/sales')
   )
   const [importExportOpen, setImportExportOpen] = useState(
@@ -107,13 +107,13 @@ export default function Sidebar() {
               {menuItems.map((item) => {
                 if (item.submenu) {
                   // 서브메뉴가 있는 경우
-                  const isHome = item.label === '홈'
+                  const isSales = item.label === '매입/매출'
                   const isImportExport = item.label === '수입/수출'
                   const isWarehouse = item.label === '창고관리'
                   const isMaster = item.label === '마스터 관리'
-                  const isExpanded = isHome ? homeOpen : isImportExport ? importExportOpen : isWarehouse ? warehouseOpen : isMaster ? masterOpen : false
-                  const toggleFunc = isHome
-                    ? () => setHomeOpen(!homeOpen)
+                  const isExpanded = isSales ? salesOpen : isImportExport ? importExportOpen : isWarehouse ? warehouseOpen : isMaster ? masterOpen : false
+                  const toggleFunc = isSales
+                    ? () => setSalesOpen(!salesOpen)
                     : isImportExport
                     ? () => setImportExportOpen(!importExportOpen)
                     : isWarehouse 

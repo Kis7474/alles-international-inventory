@@ -3,11 +3,14 @@
 import { useEffect, useState } from 'react'
 import { formatNumber, calculateUnitCost } from '@/lib/utils'
 
-interface Item {
+interface Product {
   id: number
   code: string
   name: string
   unit: string
+  category: {
+    nameKo: string
+  } | null
 }
 
 interface Lot {
@@ -21,17 +24,23 @@ interface Lot {
   domesticFreight: number
   otherCost: number
   unitCost: number
-  item: Item
+  product: Product | null
+  item: {
+    id: number
+    code: string
+    name: string
+    unit: string
+  } | null
 }
 
 export default function LotsPage() {
   const [lots, setLots] = useState<Lot[]>([])
-  const [items, setItems] = useState<Item[]>([])
+  const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [deletingLotId, setDeletingLotId] = useState<number | null>(null)
   const [formData, setFormData] = useState({
-    itemId: '',
+    productId: '',
     lotCode: '',
     receivedDate: new Date().toISOString().split('T')[0],
     quantityReceived: '',
@@ -47,16 +56,16 @@ export default function LotsPage() {
 
   const fetchData = async () => {
     try {
-      const [lotsRes, itemsRes] = await Promise.all([
+      const [lotsRes, productsRes] = await Promise.all([
         fetch('/api/lots'),
-        fetch('/api/items'),
+        fetch('/api/products'),
       ])
-      const [lotsData, itemsData] = await Promise.all([
+      const [lotsData, productsData] = await Promise.all([
         lotsRes.json(),
-        itemsRes.json(),
+        productsRes.json(),
       ])
       setLots(lotsData)
-      setItems(itemsData)
+      setProducts(productsData)
     } catch (error) {
       console.error('Error fetching data:', error)
       alert('데이터 조회 중 오류가 발생했습니다.')
@@ -69,7 +78,7 @@ export default function LotsPage() {
     e.preventDefault()
 
     const data = {
-      itemId: parseInt(formData.itemId),
+      productId: parseInt(formData.productId),
       lotCode: formData.lotCode || null,
       receivedDate: formData.receivedDate,
       quantityReceived: parseFloat(formData.quantityReceived),
@@ -96,7 +105,7 @@ export default function LotsPage() {
       alert('입고가 등록되었습니다.')
       setShowForm(false)
       setFormData({
-        itemId: '',
+        productId: '',
         lotCode: '',
         receivedDate: new Date().toISOString().split('T')[0],
         quantityReceived: '',
@@ -179,16 +188,16 @@ export default function LotsPage() {
                 </label>
                 <select
                   required
-                  value={formData.itemId}
+                  value={formData.productId}
                   onChange={(e) =>
-                    setFormData({ ...formData, itemId: e.target.value })
+                    setFormData({ ...formData, productId: e.target.value })
                   }
                   className="w-full px-3 py-2 border rounded-lg"
                 >
                   <option value="">품목을 선택하세요</option>
-                  {items.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      [{item.code}] {item.name}
+                  {products.map((product) => (
+                    <option key={product.id} value={product.id}>
+                      [{product.code}] {product.name} ({product.unit})
                     </option>
                   ))}
                 </select>
@@ -372,7 +381,7 @@ export default function LotsPage() {
             {lots.map((lot) => (
               <tr key={lot.id} className="hover:bg-gray-50">
                 <td className="px-4 py-4">
-                  [{lot.item.code}] {lot.item.name}
+                  {lot.product ? `[${lot.product.code}] ${lot.product.name}` : lot.item ? `[${lot.item.code}] ${lot.item.name}` : '-'}
                 </td>
                 <td className="px-4 py-4">{lot.lotCode || '-'}</td>
                 <td className="px-4 py-4">

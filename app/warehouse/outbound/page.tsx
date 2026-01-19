@@ -3,6 +3,16 @@
 import { useEffect, useState } from 'react'
 import { formatNumber } from '@/lib/utils'
 
+interface Product {
+  id: number
+  code: string
+  name: string
+  unit: string
+  category: {
+    nameKo: string
+  } | null
+}
+
 interface Item {
   id: number
   code: string
@@ -36,6 +46,7 @@ interface OutboundHistory {
 }
 
 export default function OutboundPage() {
+  const [products, setProducts] = useState<Product[]>([])
   const [items, setItems] = useState<Item[]>([])
   const [history, setHistory] = useState<OutboundHistory[]>([])
   const [loading, setLoading] = useState(true)
@@ -48,6 +59,7 @@ export default function OutboundPage() {
     details: OutboundDetail[]
   } | null>(null)
   const [formData, setFormData] = useState({
+    productId: '',
     itemId: '',
     quantity: '',
     outboundDate: new Date().toISOString().split('T')[0],
@@ -59,14 +71,17 @@ export default function OutboundPage() {
 
   const fetchData = async () => {
     try {
-      const [itemsRes, historyRes] = await Promise.all([
+      const [productsRes, itemsRes, historyRes] = await Promise.all([
+        fetch('/api/products'),
         fetch('/api/items'),
         fetch('/api/outbound'),
       ])
-      const [itemsData, historyData] = await Promise.all([
+      const [productsData, itemsData, historyData] = await Promise.all([
+        productsRes.json(),
         itemsRes.json(),
         historyRes.json(),
       ])
+      setProducts(productsData)
       setItems(itemsData)
       setHistory(historyData)
     } catch (error) {
@@ -81,7 +96,8 @@ export default function OutboundPage() {
     e.preventDefault()
 
     const data = {
-      itemId: parseInt(formData.itemId),
+      productId: formData.productId ? parseInt(formData.productId) : null,
+      itemId: formData.itemId ? parseInt(formData.itemId) : null,
       quantity: parseFloat(formData.quantity),
       outboundDate: formData.outboundDate,
     }
@@ -104,6 +120,7 @@ export default function OutboundPage() {
       setShowResult(true)
       setShowForm(false)
       setFormData({
+        productId: '',
         itemId: '',
         quantity: '',
         outboundDate: new Date().toISOString().split('T')[0],
@@ -166,15 +183,37 @@ export default function OutboundPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  품목 *
+                  품목 * (마스터 품목)
                 </label>
                 <select
-                  required
-                  value={formData.itemId}
+                  required={!formData.itemId}
+                  value={formData.productId}
                   onChange={(e) =>
-                    setFormData({ ...formData, itemId: e.target.value })
+                    setFormData({ ...formData, productId: e.target.value, itemId: '' })
                   }
                   className="w-full px-3 py-2 border rounded-lg"
+                  disabled={!!formData.itemId}
+                >
+                  <option value="">품목을 선택하세요</option>
+                  {products.map((product) => (
+                    <option key={product.id} value={product.id}>
+                      [{product.code}] {product.name} ({product.unit})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  또는 기존 품목
+                </label>
+                <select
+                  required={!formData.productId}
+                  value={formData.itemId}
+                  onChange={(e) =>
+                    setFormData({ ...formData, itemId: e.target.value, productId: '' })
+                  }
+                  className="w-full px-3 py-2 border rounded-lg"
+                  disabled={!!formData.productId}
                 >
                   <option value="">품목을 선택하세요</option>
                   {items.map((item) => (
