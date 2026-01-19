@@ -55,8 +55,10 @@ export async function GET(request: NextRequest) {
           (sum, lot) => sum + lot.quantityRemaining * lot.unitCost,
           0
         )
+        // 소수점 2자리로 반올림하여 금액 표시
+        const roundedTotalValue = Math.round(totalValue * 100) / 100
         const avgUnitCost =
-          totalQuantity > 0 ? totalValue / totalQuantity : 0
+          totalQuantity > 0 ? Math.round((totalValue / totalQuantity) * 100) / 100 : 0
 
         return {
           id: item.id,
@@ -65,7 +67,7 @@ export async function GET(request: NextRequest) {
           unit: item.unit,
           totalQuantity,
           avgUnitCost,
-          totalValue,
+          totalValue: roundedTotalValue,
           lotCount: item.lots.length,
         }
       })

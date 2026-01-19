@@ -112,13 +112,16 @@ export default function LotsPage() {
   }
 
   // 단가 미리보기 계산
-  const previewUnitCost = calculateUnitCost(
-    parseFloat(formData.goodsAmount) || 0,
-    parseFloat(formData.dutyAmount) || 0,
-    parseFloat(formData.domesticFreight) || 0,
-    parseFloat(formData.otherCost) || 0,
-    parseFloat(formData.quantityReceived) || 1
-  )
+  const quantity = parseFloat(formData.quantityReceived)
+  const previewUnitCost = quantity > 0
+    ? calculateUnitCost(
+        parseFloat(formData.goodsAmount) || 0,
+        parseFloat(formData.dutyAmount) || 0,
+        parseFloat(formData.domesticFreight) || 0,
+        parseFloat(formData.otherCost) || 0,
+        quantity
+      )
+    : 0
 
   if (loading) {
     return <div>로딩 중...</div>

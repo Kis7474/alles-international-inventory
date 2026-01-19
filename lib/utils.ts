@@ -19,7 +19,9 @@ export function calculateUnitCost(
   quantity: number
 ): number {
   if (quantity <= 0) return 0
-  return (goodsAmount + dutyAmount + domesticFreight + otherCost) / quantity
+  const result = (goodsAmount + dutyAmount + domesticFreight + otherCost) / quantity
+  // 소수점 6자리까지 정밀도 유지
+  return Math.round(result * 1000000) / 1000000
 }
 
 /**

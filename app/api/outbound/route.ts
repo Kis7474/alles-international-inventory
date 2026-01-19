@@ -22,85 +22,86 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 해당 품목의 사용 가능한 LOT 조회 (FIFO: 오래된 순)
-    const availableLots = await prisma.inventoryLot.findMany({
-      where: {
-        itemId,
-        quantityRemaining: { gt: 0 },
-      },
-      orderBy: [
-        { receivedDate: 'asc' },
-        { id: 'asc' },
-      ],
-    })
-
-    // 총 재고 확인
-    const totalAvailable = availableLots.reduce(
-      (sum, lot) => sum + lot.quantityRemaining,
-      0
-    )
-
-    if (totalAvailable < quantity) {
-      return NextResponse.json(
-        {
-          error: `재고가 부족합니다. 현재 재고: ${totalAvailable}, 요청 수량: ${quantity}`,
+    // 해당 품목의 사용 가능한 LOT 조회 및 FIFO 출고 처리를 트랜잭션으로 처리
+    const result = await prisma.$transaction(async (tx) => {
+      const availableLots = await tx.inventoryLot.findMany({
+        where: {
+          itemId,
+          quantityRemaining: { gt: 0 },
         },
-        { status: 400 }
-      )
-    }
-
-    // FIFO 출고 처리
-    let remainingQuantity = quantity
-    const outboundDetails: Array<{
-      lotId: number
-      lotCode: string | null
-      receivedDate: Date
-      quantity: number
-      unitCost: number
-      totalCost: number
-    }> = []
-
-    for (const lot of availableLots) {
-      if (remainingQuantity <= 0) break
-
-      const quantityToDeduct = Math.min(remainingQuantity, lot.quantityRemaining)
-      const totalCost = quantityToDeduct * lot.unitCost
-
-      // LOT 잔량 감소
-      await prisma.inventoryLot.update({
-        where: { id: lot.id },
-        data: {
-          quantityRemaining: lot.quantityRemaining - quantityToDeduct,
-        },
+        orderBy: [
+          { receivedDate: 'asc' },
+          { id: 'asc' },
+        ],
       })
 
-      // 출고 이력 생성
-      await prisma.inventoryMovement.create({
-        data: {
-          movementDate: new Date(outboundDate),
-          itemId,
+      // 총 재고 확인
+      const totalAvailable = availableLots.reduce(
+        (sum, lot) => sum + lot.quantityRemaining,
+        0
+      )
+
+      if (totalAvailable < quantity) {
+        throw new Error(
+          `재고가 부족합니다. 현재 재고: ${totalAvailable}, 요청 수량: ${quantity}`
+        )
+      }
+
+      // FIFO 출고 처리
+      let remainingQuantity = quantity
+      const outboundDetails: Array<{
+        lotId: number
+        lotCode: string | null
+        receivedDate: Date
+        quantity: number
+        unitCost: number
+        totalCost: number
+      }> = []
+
+      for (const lot of availableLots) {
+        if (remainingQuantity <= 0) break
+
+        const quantityToDeduct = Math.min(remainingQuantity, lot.quantityRemaining)
+        const totalCost = quantityToDeduct * lot.unitCost
+
+        // LOT 잔량 감소
+        await tx.inventoryLot.update({
+          where: { id: lot.id },
+          data: {
+            quantityRemaining: lot.quantityRemaining - quantityToDeduct,
+          },
+        })
+
+        // 출고 이력 생성
+        await tx.inventoryMovement.create({
+          data: {
+            movementDate: new Date(outboundDate),
+            itemId,
+            lotId: lot.id,
+            type: 'OUT',
+            quantity: quantityToDeduct,
+            unitCost: lot.unitCost,
+            totalCost,
+          },
+        })
+
+        outboundDetails.push({
           lotId: lot.id,
-          type: 'OUT',
+          lotCode: lot.lotCode,
+          receivedDate: lot.receivedDate,
           quantity: quantityToDeduct,
           unitCost: lot.unitCost,
           totalCost,
-        },
-      })
+        })
 
-      outboundDetails.push({
-        lotId: lot.id,
-        lotCode: lot.lotCode,
-        receivedDate: lot.receivedDate,
-        quantity: quantityToDeduct,
-        unitCost: lot.unitCost,
-        totalCost,
-      })
+        remainingQuantity -= quantityToDeduct
+      }
 
-      remainingQuantity -= quantityToDeduct
-    }
+      return outboundDetails
+    })
 
     // 총 출고 원가 계산
-    const totalOutboundCost = outboundDetails.reduce(
+    const totalOutboundCost = result.reduce(
       (sum, detail) => sum + detail.totalCost,
       0
     )
@@ -109,7 +110,7 @@ export async function POST(request: NextRequest) {
       success: true,
       totalQuantity: quantity,
       totalCost: totalOutboundCost,
-      details: outboundDetails,
+      details: result,
     })
   } catch (error) {
     console.error('Error processing outbound:', error)
