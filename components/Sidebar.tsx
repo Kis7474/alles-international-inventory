@@ -38,6 +38,7 @@ const menuItems = [
       { href: '/sales/vendors', label: '거래처 관리', icon: '🏢' },
       { href: '/categories', label: '카테고리 관리', icon: '📋' },
       { href: '/master/vendor-prices', label: '거래처별 가격', icon: '💰' },
+      { href: '/master/upload', label: '엑셀 업로드', icon: '📤' },
     ],
   },
   {
