@@ -10,7 +10,196 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// 품목 마스터
+// ============================================
+// 통합 마스터 데이터
+// ============================================
+
+// 통합 품목 마스터 (모든 모듈에서 사용)
+model Product {
+  id                    Int       @id @default(autoincrement())
+  code                  String    @unique
+  name                  String
+  unit                  String    // 개, BOX, kg 등
+  categoryId            Int?
+  category              Category? @relation(fields: [categoryId], references: [id])
+  description           String?
+  
+  // 기본 단가 (거래처별 특별가가 없을 때 사용)
+  defaultPurchasePrice  Float?    // 기본 매입가
+  defaultSalesPrice     Float?    // 기본 매출가
+  
+  // 관계
+  priceHistory          ProductPriceHistory[]
+  vendorPrices          VendorProductPrice[]   // 거래처별 특별가
+  salesRecords          SalesRecord[]          // 매입매출
+  importExports         ImportExport[]         // 수입/수출
+  inventoryLots         InventoryLot[]         // 창고 입고
+  
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+}
+
+// 품목 가격 이력
+model ProductPriceHistory {
+  id             Int       @id @default(autoincrement())
+  productId      Int
+  product        Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  effectiveDate  DateTime  // 적용 시작일
+  purchasePrice  Float?    // 매입 단가
+  salesPrice     Float?    // 매출 단가
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  
+  @@index([productId, effectiveDate])
+}
+
+// 통합 거래처 마스터
+model Vendor {
+  id              Int                   @id @default(autoincrement())
+  code            String                @unique
+  name            String
+  type            String                @default("DOMESTIC") // DOMESTIC(국내), OVERSEAS(해외)
+  contactPerson   String?
+  phone           String?
+  email           String?
+  address         String?
+  country         String?               // 해외 거래처용
+  currency        String?               // 기본 통화 (USD, EUR, JPY 등)
+  memo            String?
+  
+  // 관계
+  vendorPrices    VendorProductPrice[]
+  salesRecords    SalesRecord[]
+  importExports   ImportExport[]
+  inventoryLots   InventoryLot[]
+  
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+}
+
+// 거래처별 품목 특별가격
+model VendorProductPrice {
+  id              Int       @id @default(autoincrement())
+  vendorId        Int
+  vendor          Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  productId       Int
+  product         Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  purchasePrice   Float?    // 해당 거래처 매입가
+  salesPrice      Float?    // 해당 거래처 매출가
+  effectiveDate   DateTime  // 적용 시작일
+  memo            String?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@unique([vendorId, productId, effectiveDate])
+}
+
+// 통합 담당자 마스터
+model Salesperson {
+  id              Int            @id @default(autoincrement())
+  code            String         @unique  // BS, IK, YR, SJ
+  name            String
+  commissionRate  Float          @default(0)  // IK는 0.15
+  
+  // 관계
+  salesRecords    SalesRecord[]
+  importExports   ImportExport[]
+  inventoryLots   InventoryLot[]
+  
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+// 통합 카테고리 마스터
+model Category {
+  id              Int            @id @default(autoincrement())
+  code            String         @unique
+  name            String         // Machine, Parts, Fount 등
+  nameKo          String         // 기계, 부품, 약물및습수액 등
+  
+  // 관계
+  products        Product[]
+  salesRecords    SalesRecord[]
+  importExports   ImportExport[]
+  
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+// ============================================
+// 수입/수출 관리
+// ============================================
+
+// 수입/수출 기록
+model ImportExport {
+  id              Int          @id @default(autoincrement())
+  date            DateTime
+  type            String       // IMPORT(수입) or EXPORT(수출)
+  
+  // 마스터 연결 (통합)
+  productId       Int
+  product         Product      @relation(fields: [productId], references: [id])
+  vendorId        Int
+  vendor          Vendor       @relation(fields: [vendorId], references: [id])
+  salespersonId   Int?
+  salesperson     Salesperson? @relation(fields: [salespersonId], references: [id])
+  categoryId      Int?
+  category        Category?    @relation(fields: [categoryId], references: [id])
+  
+  // 수량 및 금액
+  quantity        Float
+  
+  // 외화 정보
+  currency        String       // USD, EUR, JPY 등
+  exchangeRate    Float        // 환율 (직접 입력)
+  foreignAmount   Float        // 외화 금액
+  krwAmount       Float        // 원화 환산 금액
+  
+  // 수입 원가 구성 (수입 시)
+  goodsAmount     Float?       // 물품대금 (외화)
+  dutyAmount      Float?       // 관세 (원화)
+  shippingCost    Float?       // 운송료 (원화)
+  otherCost       Float?       // 기타 비용 (원화)
+  totalCost       Float?       // 총 원가 (원화)
+  unitCost        Float?       // 단위 원가
+  
+  // 보관 옵션
+  storageType     String?      // WAREHOUSE(창고입고), OFFICE(사무실보관)
+  warehouseLotId  Int?         // 창고 입고 시 LOT 연결
+  
+  // 부가세
+  vatIncluded     Boolean      @default(false)
+  supplyAmount    Float?       // 공급가액
+  vatAmount       Float?       // 부가세액
+  totalAmount     Float?       // 합계 (공급가액 + 부가세)
+  
+  memo            String?
+  
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
+
+// 환율 관리
+model ExchangeRate {
+  id              Int          @id @default(autoincrement())
+  date            DateTime
+  currency        String       // USD, EUR, JPY, CNY 등
+  rate            Float        // 환율 (원화 기준)
+  source          String?      // 출처 (예: 하나은행, 직접입력)
+  
+  createdAt       DateTime     @default(now())
+  
+  @@unique([date, currency])
+}
+
+// ============================================
+// 창고 관리
+// ============================================
+
+// 품목 마스터 (하위 호환성 유지, 향후 Product로 통합)
 model Item {
   id          Int      @id @default(autoincrement())
   code        String   @unique
@@ -26,22 +215,29 @@ model Item {
 
 // LOT/입고 관리
 model InventoryLot {
-  id                Int      @id @default(autoincrement())
-  itemId            Int
-  item              Item     @relation(fields: [itemId], references: [id])
-  lotCode           String?  // BL번호, 참조번호 등
+  id                Int          @id @default(autoincrement())
+  itemId            Int?
+  item              Item?        @relation(fields: [itemId], references: [id])
+  productId         Int?         // 통합 품목 연결
+  product           Product?     @relation(fields: [productId], references: [id])
+  vendorId          Int?         // 거래처 연결
+  vendor            Vendor?      @relation(fields: [vendorId], references: [id])
+  salespersonId     Int?         // 담당자 연결
+  salesperson       Salesperson? @relation(fields: [salespersonId], references: [id])
+  
+  lotCode           String?      // BL번호, 참조번호 등
   receivedDate      DateTime
-  quantityReceived  Float    // 입고 수량
-  quantityRemaining Float    // 현재 잔량
+  quantityReceived  Float        // 입고 수량
+  quantityRemaining Float        // 현재 잔량
   
-  goodsAmount       Float    // 물품대금
-  dutyAmount        Float    // 수입통관료
-  domesticFreight   Float    // 국내 입고운송료
-  otherCost         Float    @default(0) // 기타 비용
-  unitCost          Float    // 단가 (자동계산)
+  goodsAmount       Float        // 물품대금
+  dutyAmount        Float        // 수입통관료
+  domesticFreight   Float        // 국내 입고운송료
+  otherCost         Float        @default(0) // 기타 비용
+  unitCost          Float        // 단가 (자동계산)
   
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
   
   movements         InventoryMovement[]
 }
@@ -78,29 +274,54 @@ model StorageExpense {
   createdAt   DateTime @default(now())
 }
 
-// 판매 담당자
-model Salesperson {
-  id             Int           @id @default(autoincrement())
-  code           String        @unique  // BS, IK, YR, SJ
-  name           String
-  commissionRate Float         @default(0)  // IK만 0.15
-  sales          SalesRecord[]
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+// 매입매출 기록
+model SalesRecord {
+  id            Int         @id @default(autoincrement())
+  date          DateTime
+  type          String      // PURCHASE(매입) or SALES(매출)
+  salespersonId Int
+  salesperson   Salesperson @relation(fields: [salespersonId], references: [id])
+  categoryId    Int
+  category      Category    @relation(fields: [categoryId], references: [id])
+  productId     Int?        // 통합 품목 연결
+  product       Product?    @relation(fields: [productId], references: [id])
+  vendorId      Int?        // 거래처 연결
+  vendor        Vendor?     @relation(fields: [vendorId], references: [id])
+  itemName      String      // 품목명 (품목 미선택시 직접 입력)
+  customer      String?     // 기존 필드 유지 (하위 호환성)
+  quantity      Float
+  unitPrice     Float
+  amount        Float       // 수량 * 단가
+  cost          Float       @default(0) // 원가 (매출 시)
+  margin        Float       @default(0) // 마진 = amount - cost
+  marginRate    Float       @default(0) // 마진율
+  
+  // 부가세
+  vatIncluded   Boolean     @default(false)  // 부가세 포함 여부
+  supplyAmount  Float?      // 공급가액
+  vatAmount     Float?      // 부가세액
+  totalAmount   Float?      // 합계 (공급가액 + 부가세)
+  
+  notes         String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 }
 
-// 품목 카테고리
+// ============================================
+// 하위 호환성 유지 (향후 마이그레이션)
+// ============================================
+
+// 품목 카테고리 (향후 Category로 통합)
 model ProductCategory {
-  id        Int           @id @default(autoincrement())
-  code      String        @unique
-  name      String        // Machine, Parts, Fount 등
-  nameKo    String        // 기계, 부품, 약물및습수액 등
-  sales     SalesRecord[]
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  id        Int      @id @default(autoincrement())
+  code      String   @unique
+  name      String   // Machine, Parts, Fount 등
+  nameKo    String   // 기계, 부품, 약물및습수액 등
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
-// 매입매출용 품목 마스터
+// 매입매출용 품목 마스터 (향후 Product로 통합)
 model SalesProduct {
   id          Int                  @id @default(autoincrement())
   name        String               @unique
@@ -110,58 +331,19 @@ model SalesProduct {
   createdAt   DateTime             @default(now())
   updatedAt   DateTime             @updatedAt
   prices      SalesProductPrice[]
-  sales       SalesRecord[]
 }
 
-// 품목별 단가 이력
+// 품목별 단가 이력 (향후 ProductPriceHistory로 통합)
 model SalesProductPrice {
-  id             Int           @id @default(autoincrement())
+  id             Int          @id @default(autoincrement())
   productId      Int
-  product        SalesProduct  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  effectiveDate  DateTime      // 적용 시작일
-  purchasePrice  Float         @default(0) // 매입 단가
-  salesPrice     Float         @default(0) // 매출 단가
+  product        SalesProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  effectiveDate  DateTime     // 적용 시작일
+  purchasePrice  Float        @default(0) // 매입 단가
+  salesPrice     Float        @default(0) // 매출 단가
   notes          String?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   @@index([productId, effectiveDate])
-}
-
-// 거래처 마스터
-model Vendor {
-  id          Int                @id @default(autoincrement())
-  name        String             @unique
-  contact     String?            // 연락처
-  address     String?            // 주소
-  notes       String?            // 메모
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
-  sales       SalesRecord[]
-}
-
-// 매입매출 기록
-model SalesRecord {
-  id            Int             @id @default(autoincrement())
-  date          DateTime
-  type          String          // PURCHASE(매입) or SALES(매출)
-  salespersonId Int
-  salesperson   Salesperson     @relation(fields: [salespersonId], references: [id])
-  categoryId    Int
-  category      ProductCategory @relation(fields: [categoryId], references: [id])
-  productId     Int?            // 품목 연결 (optional for backward compatibility)
-  product       SalesProduct?   @relation(fields: [productId], references: [id])
-  vendorId      Int?            // 거래처 연결 (optional)
-  vendor        Vendor?         @relation(fields: [vendorId], references: [id])
-  itemName      String          // 품목명 (품목 미선택시 직접 입력)
-  customer      String?         // 기존 필드 유지
-  quantity      Float
-  unitPrice     Float
-  amount        Float           // 수량 * 단가
-  cost          Float           @default(0) // 원가 (매출 시)
-  margin        Float           @default(0) // 마진 = amount - cost
-  marginRate    Float           @default(0) // 마진율
-  notes         String?
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
 }
