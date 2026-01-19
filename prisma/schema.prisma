@@ -100,6 +100,46 @@ model ProductCategory {
   updatedAt DateTime      @updatedAt
 }
 
+// 매입매출용 품목 마스터
+model SalesProduct {
+  id          Int                  @id @default(autoincrement())
+  name        String               @unique
+  description String?
+  unit        String               @default("EA") // 단위: EA, BOX, KG 등
+  notes       String?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  prices      SalesProductPrice[]
+  sales       SalesRecord[]
+}
+
+// 품목별 단가 이력
+model SalesProductPrice {
+  id             Int           @id @default(autoincrement())
+  productId      Int
+  product        SalesProduct  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  effectiveDate  DateTime      // 적용 시작일
+  purchasePrice  Float         @default(0) // 매입 단가
+  salesPrice     Float         @default(0) // 매출 단가
+  notes          String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([productId, effectiveDate])
+}
+
+// 거래처 마스터
+model Vendor {
+  id          Int                @id @default(autoincrement())
+  name        String             @unique
+  contact     String?            // 연락처
+  address     String?            // 주소
+  notes       String?            // 메모
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  sales       SalesRecord[]
+}
+
 // 매입매출 기록
 model SalesRecord {
   id            Int             @id @default(autoincrement())
@@ -109,8 +149,12 @@ model SalesRecord {
   salesperson   Salesperson     @relation(fields: [salespersonId], references: [id])
   categoryId    Int
   category      ProductCategory @relation(fields: [categoryId], references: [id])
-  itemName      String
-  customer      String?
+  productId     Int?            // 품목 연결 (optional for backward compatibility)
+  product       SalesProduct?   @relation(fields: [productId], references: [id])
+  vendorId      Int?            // 거래처 연결 (optional)
+  vendor        Vendor?         @relation(fields: [vendorId], references: [id])
+  itemName      String          // 품목명 (품목 미선택시 직접 입력)
+  customer      String?         // 기존 필드 유지
   quantity      Float
   unitPrice     Float
   amount        Float           // 수량 * 단가
