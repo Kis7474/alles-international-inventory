@@ -29,11 +29,16 @@ interface VendorProductPrice {
 
 export default function VendorPricesPage() {
   const [prices, setPrices] = useState<VendorProductPrice[]>([])
+  const [filteredPrices, setFilteredPrices] = useState<VendorProductPrice[]>([])
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingPrice, setEditingPrice] = useState<VendorProductPrice | null>(null)
+  
+  // Filter state
+  const [filterVendorId, setFilterVendorId] = useState<string>('')
+  const [filterProductId, setFilterProductId] = useState<string>('')
   
   const [formData, setFormData] = useState({
     vendorId: '',
@@ -47,6 +52,21 @@ export default function VendorPricesPage() {
   useEffect(() => {
     fetchData()
   }, [])
+
+  useEffect(() => {
+    // Apply filters whenever prices or filter values change
+    let filtered = prices
+    
+    if (filterVendorId) {
+      filtered = filtered.filter(p => p.vendorId === parseInt(filterVendorId))
+    }
+    
+    if (filterProductId) {
+      filtered = filtered.filter(p => p.productId === parseInt(filterProductId))
+    }
+    
+    setFilteredPrices(filtered)
+  }, [prices, filterVendorId, filterProductId])
 
   const fetchData = async () => {
     try {
@@ -154,13 +174,65 @@ export default function VendorPricesPage() {
   return (
     <div>
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">거래처별 품목 가격 관리</h1>
+        <h1 className="text-3xl font-bold text-gray-900">가격 관리</h1>
         <button
           onClick={() => setShowModal(true)}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
           + 가격 등록
         </button>
+      </div>
+
+      {/* 필터 섹션 */}
+      <div className="bg-white rounded-lg shadow p-4 mb-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">필터</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              거래처
+            </label>
+            <select
+              value={filterVendorId}
+              onChange={(e) => setFilterVendorId(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+            >
+              <option value="">전체</option>
+              {vendors.map((vendor) => (
+                <option key={vendor.id} value={vendor.id}>
+                  {vendor.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              품목
+            </label>
+            <select
+              value={filterProductId}
+              onChange={(e) => setFilterProductId(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+            >
+              <option value="">전체</option>
+              {products.map((product) => (
+                <option key={product.id} value={product.id}>
+                  {product.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-end">
+            <button
+              onClick={() => {
+                setFilterVendorId('')
+                setFilterProductId('')
+              }}
+              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
+            >
+              필터 초기화
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -192,7 +264,7 @@ export default function VendorPricesPage() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {prices.map((price) => (
+              {filteredPrices.map((price) => (
                 <tr key={price.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {price.vendor.name}
@@ -228,10 +300,10 @@ export default function VendorPricesPage() {
                   </td>
                 </tr>
               ))}
-              {prices.length === 0 && (
+              {filteredPrices.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
-                    등록된 가격이 없습니다.
+                    {filterVendorId || filterProductId ? '필터 조건에 맞는 가격이 없습니다.' : '등록된 가격이 없습니다.'}
                   </td>
                 </tr>
               )}

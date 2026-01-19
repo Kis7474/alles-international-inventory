@@ -4,10 +4,30 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 
-const menuItems = [
-  { href: '/', label: '매입매출장부', icon: '📊' },
-  { href: '/sales', label: '매입매출 내역', icon: '📝' },
-  { href: '/sales/product-status', label: '품목별 현황', icon: '📦' },
+interface MenuItem {
+  href?: string
+  label: string
+  icon: string
+  submenu?: MenuItem[]
+}
+
+const menuItems: MenuItem[] = [
+  {
+    label: '홈',
+    icon: '🏠',
+    submenu: [
+      { href: '/', label: '대시보드', icon: '📊' },
+      { href: '/sales', label: '매입매출장부', icon: '📝' },
+      {
+        label: '리포트',
+        icon: '📈',
+        submenu: [
+          { href: '/sales/report/monthly', label: '월별 리포트', icon: '📅' },
+          { href: '/sales/report/yearly', label: '연도별 리포트', icon: '📆' },
+        ],
+      },
+    ],
+  },
   {
     label: '수입/수출',
     icon: '🌐',
@@ -19,9 +39,8 @@ const menuItems = [
   },
   {
     label: '창고관리',
-    icon: '🏢',
+    icon: '📦',
     submenu: [
-      { href: '/warehouse/items', label: '품목 관리', icon: '📦' },
       { href: '/warehouse/lots', label: '입고 관리', icon: '📥' },
       { href: '/warehouse/outbound', label: '출고 관리', icon: '📤' },
       { href: '/warehouse/inventory', label: '재고 조회', icon: '📊' },
@@ -32,20 +51,12 @@ const menuItems = [
     label: '마스터 관리',
     icon: '⚙️',
     submenu: [
-      { href: '/master/products', label: '품목 관리 (통합)', icon: '📦' },
-      { href: '/sales/products', label: '품목 관리 (매입매출)', icon: '📦' },
-      { href: '/salesperson', label: '담당자 관리', icon: '👤' },
+      { href: '/master/products', label: '품목 관리', icon: '📦' },
+      { href: '/sales/product-status', label: '품목별 현황', icon: '📈' },
       { href: '/sales/vendors', label: '거래처 관리', icon: '🏢' },
+      { href: '/salesperson', label: '담당자 관리', icon: '👤' },
       { href: '/categories', label: '카테고리 관리', icon: '📋' },
-      { href: '/master/vendor-prices', label: '거래처별 가격', icon: '💰' },
-    ],
-  },
-  {
-    label: '리포트',
-    icon: '📈',
-    submenu: [
-      { href: '/sales/report/monthly', label: '월별 리포트', icon: '📅' },
-      { href: '/sales/report/yearly', label: '연도별 리포트', icon: '📆' },
+      { href: '/master/vendor-prices', label: '가격 관리', icon: '💰' },
     ],
   },
 ]
@@ -53,19 +64,17 @@ const menuItems = [
 export default function Sidebar() {
   const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(false)
+  const [homeOpen, setHomeOpen] = useState(
+    pathname === '/' || pathname.startsWith('/sales')
+  )
   const [importExportOpen, setImportExportOpen] = useState(
     pathname.startsWith('/import-export') || pathname.startsWith('/exchange-rates')
   )
   const [warehouseOpen, setWarehouseOpen] = useState(
-    pathname.startsWith('/warehouse') || pathname.startsWith('/items') || 
-    pathname.startsWith('/lots') || pathname.startsWith('/outbound') || 
-    pathname.startsWith('/inventory') || pathname.startsWith('/storage-expenses')
-  )
-  const [reportOpen, setReportOpen] = useState(
-    pathname.startsWith('/sales/report')
+    pathname.startsWith('/warehouse')
   )
   const [masterOpen, setMasterOpen] = useState(
-    pathname.startsWith('/sales/products') || pathname.startsWith('/sales/vendors') ||
+    pathname.startsWith('/sales/vendors') || pathname.startsWith('/sales/product-status') ||
     pathname.startsWith('/salesperson') || pathname.startsWith('/categories') ||
     pathname.startsWith('/master/')
   )
@@ -98,17 +107,17 @@ export default function Sidebar() {
               {menuItems.map((item) => {
                 if (item.submenu) {
                   // 서브메뉴가 있는 경우
+                  const isHome = item.label === '홈'
                   const isImportExport = item.label === '수입/수출'
                   const isWarehouse = item.label === '창고관리'
-                  const isReport = item.label === '리포트'
                   const isMaster = item.label === '마스터 관리'
-                  const isExpanded = isImportExport ? importExportOpen : isWarehouse ? warehouseOpen : isReport ? reportOpen : isMaster ? masterOpen : false
-                  const toggleFunc = isImportExport
+                  const isExpanded = isHome ? homeOpen : isImportExport ? importExportOpen : isWarehouse ? warehouseOpen : isMaster ? masterOpen : false
+                  const toggleFunc = isHome
+                    ? () => setHomeOpen(!homeOpen)
+                    : isImportExport
                     ? () => setImportExportOpen(!importExportOpen)
                     : isWarehouse 
                     ? () => setWarehouseOpen(!warehouseOpen) 
-                    : isReport 
-                    ? () => setReportOpen(!reportOpen)
                     : isMaster
                     ? () => setMasterOpen(!masterOpen)
                     : () => {}
@@ -130,6 +139,45 @@ export default function Sidebar() {
                       {isExpanded && (
                         <ul className="ml-4 mt-2 space-y-1">
                           {item.submenu.map((subItem) => {
+                            // Check if this submenu item has its own submenu (nested)
+                            if (subItem.submenu) {
+                              return (
+                                <li key={subItem.label} className="mt-2">
+                                  <div className="text-xs font-semibold text-gray-400 px-4 py-1 uppercase tracking-wider">
+                                    {subItem.label} {subItem.icon}
+                                  </div>
+                                  <ul className="ml-2 mt-1 space-y-1">
+                                    {subItem.submenu.map((nestedItem) => {
+                                      if (!nestedItem.href) return null
+                                      const isActive = pathname === nestedItem.href
+                                      return (
+                                        <li key={nestedItem.href}>
+                                          <Link
+                                            href={nestedItem.href}
+                                            className={`
+                                              flex items-center gap-3 px-4 py-2 rounded-lg
+                                              transition-colors duration-150 text-sm
+                                              ${
+                                                isActive
+                                                  ? 'bg-blue-600 text-white'
+                                                  : 'hover:bg-gray-700 text-gray-300'
+                                              }
+                                            `}
+                                            onClick={() => setIsOpen(false)}
+                                          >
+                                            <span>{nestedItem.icon}</span>
+                                            <span>{nestedItem.label}</span>
+                                          </Link>
+                                        </li>
+                                      )
+                                    })}
+                                  </ul>
+                                </li>
+                              )
+                            }
+                            
+                            // Regular submenu item with href
+                            if (!subItem.href) return null
                             const isActive = pathname === subItem.href
                             return (
                               <li key={subItem.href}>
@@ -157,12 +205,13 @@ export default function Sidebar() {
                     </li>
                   )
                 } else {
-                  // 일반 메뉴 아이템
+                  // 일반 메뉴 아이템 (href가 있는 경우만)
+                  if (!item.href) return null
                   const isActive = pathname === item.href
                   return (
                     <li key={item.href}>
                       <Link
-                        href={item.href!}
+                        href={item.href}
                         className={`
                           flex items-center gap-3 px-4 py-3 rounded-lg
                           transition-colors duration-150
