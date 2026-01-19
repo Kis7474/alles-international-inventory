@@ -11,7 +11,17 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
 
-    const where: any = {}
+    interface WhereClause {
+      type?: string
+      salespersonId?: number
+      categoryId?: number
+      date?: {
+        gte?: Date
+        lte?: Date
+      }
+    }
+
+    const where: WhereClause = {}
 
     if (type) {
       where.type = type
