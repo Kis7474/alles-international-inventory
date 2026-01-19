@@ -11,6 +11,20 @@ export interface ParsedData {
   }>
 }
 
+export interface TransactionRow {
+  date: string           // 날짜
+  vendorName: string     // 거래처
+  productName: string    // 품목명
+  quantity: number       // 수량
+  unitPrice: number      // 단가
+  totalWithVat: number   // 금액(부가세포함)
+  totalAmount: number    // 금액
+  salesperson: string    // 담당자
+  category: string       // 카테고리
+  margin: number         // 마진
+  marginRate: string     // 마진율
+}
+
 /**
  * Parse Excel/CSV file for vendor-product price data
  * Expected format:
@@ -98,6 +112,139 @@ export async function parseExcelFile(file: File): Promise<ParsedData> {
   }
   
   return { vendors, products, prices }
+}
+
+/**
+ * Parse Excel/CSV file for transaction data
+ * Expected format:
+ * Row 1: 날짜 | 거래처 | 품목명 | 수량 | 단가 | 금액(부가세포함) | 금액 | 담당자 | 카테고리 | 마진 | 마진율
+ * Row 2+: Data rows
+ */
+export async function parseTransactionExcel(file: File): Promise<TransactionRow[]> {
+  const buffer = await file.arrayBuffer()
+  const workbook = new ExcelJS.Workbook()
+  
+  // Load workbook from buffer
+  await workbook.xlsx.load(buffer)
+  
+  // Get first worksheet
+  const worksheet = workbook.worksheets[0]
+  
+  if (!worksheet) {
+    throw new Error('파일에 워크시트가 없습니다.')
+  }
+  
+  const rows: TransactionRow[] = []
+  let isFirstRow = true
+  
+  // Convert worksheet to array format
+  worksheet.eachRow((row, rowNumber) => {
+    // Skip header row
+    if (isFirstRow) {
+      isFirstRow = false
+      return
+    }
+    
+    const cells: (Date | number | string | null | undefined)[] = []
+    row.eachCell({ includeEmpty: true }, (cell) => {
+      cells.push(cell.value as Date | number | string | null | undefined)
+    })
+    
+    // Skip empty rows
+    if (cells.every(cell => !cell)) {
+      return
+    }
+    
+    try {
+      const transactionRow: TransactionRow = {
+        date: parseDateValue(cells[0]),
+        vendorName: String(cells[1] || '').trim(),
+        productName: String(cells[2] || '').trim(),
+        quantity: parseNumberValue(cells[3]),
+        unitPrice: parseNumberValue(cells[4]),
+        totalWithVat: parseNumberValue(cells[5]),
+        totalAmount: parseNumberValue(cells[6]),
+        salesperson: String(cells[7] || '').trim(),
+        category: String(cells[8] || '').trim(),
+        margin: parseNumberValue(cells[9]),
+        marginRate: String(cells[10] || '').trim(),
+      }
+      
+      rows.push(transactionRow)
+    } catch (error) {
+      console.error(`Error parsing row ${rowNumber}:`, error)
+      // Skip invalid rows
+    }
+  })
+  
+  return rows
+}
+
+/**
+ * Parse date value from Excel cell
+ * Supports: Date objects, Excel serial numbers, and string formats (2024-01-15, 2024.01.15, 2024/01/15)
+ */
+function parseDateValue(value: Date | number | string | null | undefined): string {
+  if (!value) {
+    throw new Error('날짜가 비어있습니다.')
+  }
+  
+  // If it's already a Date object
+  if (value instanceof Date) {
+    return value.toISOString().split('T')[0]
+  }
+  
+  // If it's an Excel serial number (number)
+  if (typeof value === 'number') {
+    const date = excelSerialToDate(value)
+    return date.toISOString().split('T')[0]
+  }
+  
+  // If it's a string, try to parse it
+  if (typeof value === 'string') {
+    // Replace various separators with hyphen
+    const normalized = value.replace(/[.\/]/g, '-')
+    const date = new Date(normalized)
+    if (!isNaN(date.getTime())) {
+      return date.toISOString().split('T')[0]
+    }
+  }
+  
+  throw new Error(`날짜 형식 오류: ${value}`)
+}
+
+/**
+ * Convert Excel serial number to Date
+ */
+function excelSerialToDate(serial: number): Date {
+  // Excel's epoch is 1900-01-01, but Excel has a bug where it treats 1900 as a leap year
+  const excelEpoch = new Date(1899, 11, 30) // December 30, 1899
+  const date = new Date(excelEpoch.getTime() + serial * 86400000) // 86400000 ms in a day
+  return date
+}
+
+/**
+ * Parse number value from Excel cell
+ */
+function parseNumberValue(value: Date | number | string | null | undefined): number {
+  if (value === null || value === undefined || value === '') {
+    return 0
+  }
+  
+  if (typeof value === 'number') {
+    return value
+  }
+  
+  if (typeof value === 'string') {
+    // Remove common separators and parse
+    const cleaned = value.replace(/[,\s%]/g, '')
+    const num = parseFloat(cleaned)
+    if (!isNaN(num)) {
+      return num
+    }
+  }
+  
+  return 0
 }
 
 /**
