@@ -9,21 +9,12 @@ const menuItems = [
   { href: '/sales', label: '매입매출 내역', icon: '📝' },
   { href: '/sales/product-status', label: '품목별 현황', icon: '📦' },
   {
-    label: '마스터 관리',
-    icon: '⚙️',
+    label: '수입/수출',
+    icon: '🌐',
     submenu: [
-      { href: '/sales/products', label: '품목 관리', icon: '📦' },
-      { href: '/salesperson', label: '담당자 관리', icon: '👤' },
-      { href: '/sales/vendors', label: '거래처 관리', icon: '🏢' },
-      { href: '/categories', label: '카테고리 관리', icon: '📋' },
-    ],
-  },
-  {
-    label: '리포트',
-    icon: '📈',
-    submenu: [
-      { href: '/sales/report/monthly', label: '월별 리포트', icon: '📅' },
-      { href: '/sales/report/yearly', label: '연도별 리포트', icon: '📆' },
+      { href: '/import-export', label: '수입/수출 내역', icon: '📋' },
+      { href: '/import-export/new', label: '수입/수출 등록', icon: '➕' },
+      { href: '/exchange-rates', label: '환율 관리', icon: '💱' },
     ],
   },
   {
@@ -37,11 +28,34 @@ const menuItems = [
       { href: '/warehouse/storage-expenses', label: '창고료 관리', icon: '💰' },
     ],
   },
+  {
+    label: '마스터 관리',
+    icon: '⚙️',
+    submenu: [
+      { href: '/master/products', label: '품목 관리 (통합)', icon: '📦' },
+      { href: '/sales/products', label: '품목 관리 (매입매출)', icon: '📦' },
+      { href: '/salesperson', label: '담당자 관리', icon: '👤' },
+      { href: '/sales/vendors', label: '거래처 관리', icon: '🏢' },
+      { href: '/categories', label: '카테고리 관리', icon: '📋' },
+      { href: '/master/vendor-prices', label: '거래처별 가격', icon: '💰' },
+    ],
+  },
+  {
+    label: '리포트',
+    icon: '📈',
+    submenu: [
+      { href: '/sales/report/monthly', label: '월별 리포트', icon: '📅' },
+      { href: '/sales/report/yearly', label: '연도별 리포트', icon: '📆' },
+    ],
+  },
 ]
 
 export default function Sidebar() {
   const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(false)
+  const [importExportOpen, setImportExportOpen] = useState(
+    pathname.startsWith('/import-export') || pathname.startsWith('/exchange-rates')
+  )
   const [warehouseOpen, setWarehouseOpen] = useState(
     pathname.startsWith('/warehouse') || pathname.startsWith('/items') || 
     pathname.startsWith('/lots') || pathname.startsWith('/outbound') || 
@@ -52,7 +66,8 @@ export default function Sidebar() {
   )
   const [masterOpen, setMasterOpen] = useState(
     pathname.startsWith('/sales/products') || pathname.startsWith('/sales/vendors') ||
-    pathname.startsWith('/salesperson') || pathname.startsWith('/categories')
+    pathname.startsWith('/salesperson') || pathname.startsWith('/categories') ||
+    pathname.startsWith('/master/')
   )
 
   return (
@@ -83,11 +98,14 @@ export default function Sidebar() {
               {menuItems.map((item) => {
                 if (item.submenu) {
                   // 서브메뉴가 있는 경우
+                  const isImportExport = item.label === '수입/수출'
                   const isWarehouse = item.label === '창고관리'
                   const isReport = item.label === '리포트'
                   const isMaster = item.label === '마스터 관리'
-                  const isExpanded = isWarehouse ? warehouseOpen : isReport ? reportOpen : isMaster ? masterOpen : false
-                  const toggleFunc = isWarehouse 
+                  const isExpanded = isImportExport ? importExportOpen : isWarehouse ? warehouseOpen : isReport ? reportOpen : isMaster ? masterOpen : false
+                  const toggleFunc = isImportExport
+                    ? () => setImportExportOpen(!importExportOpen)
+                    : isWarehouse 
                     ? () => setWarehouseOpen(!warehouseOpen) 
                     : isReport 
                     ? () => setReportOpen(!reportOpen)

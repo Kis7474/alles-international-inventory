@@ -52,15 +52,15 @@ async function main() {
 
   // Seed Vendors
   const vendors = [
-    { name: '한국인쇄(주)', contact: '02-123-4567', address: '서울시 강남구', notes: '주요 거래처' },
-    { name: 'ABC 무역', contact: '031-987-6543', address: '경기도 성남시', notes: null },
-    { name: '글로벌 프린팅', contact: '02-555-7777', address: '서울시 마포구', notes: null },
+    { code: 'V001', name: '한국인쇄(주)', type: 'DOMESTIC', contactPerson: null, phone: '02-123-4567', email: null, address: '서울시 강남구', country: null, currency: null, memo: '주요 거래처' },
+    { code: 'V002', name: 'ABC 무역', type: 'DOMESTIC', contactPerson: null, phone: '031-987-6543', email: null, address: '경기도 성남시', country: null, currency: null, memo: null },
+    { code: 'V003', name: '글로벌 프린팅', type: 'DOMESTIC', contactPerson: null, phone: '02-555-7777', email: null, address: '서울시 마포구', country: null, currency: null, memo: null },
   ]
 
   console.log('Creating vendors...')
   for (const vendor of vendors) {
     await prisma.vendor.upsert({
-      where: { name: vendor.name },
+      where: { code: vendor.code },
       update: {},
       create: vendor,
     })
