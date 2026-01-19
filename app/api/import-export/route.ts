@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
     
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: any = {}
     if (type) where.type = type
     if (startDate && endDate) {

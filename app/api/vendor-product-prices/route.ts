@@ -8,6 +8,7 @@ export async function GET(request: NextRequest) {
     const vendorId = searchParams.get('vendorId')
     const productId = searchParams.get('productId')
     
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: any = {}
     if (vendorId) where.vendorId = parseInt(vendorId)
     if (productId) where.productId = parseInt(productId)
@@ -60,9 +61,9 @@ export async function POST(request: NextRequest) {
     })
 
     return NextResponse.json(price, { status: 201 })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error creating vendor product price:', error)
-    if (error.code === 'P2002') {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
       return NextResponse.json(
         { error: '동일한 거래처, 품목, 적용일자의 가격이 이미 존재합니다.' },
         { status: 400 }
@@ -102,9 +103,9 @@ export async function PUT(request: NextRequest) {
     })
 
     return NextResponse.json(price)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating vendor product price:', error)
-    if (error.code === 'P2002') {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
       return NextResponse.json(
         { error: '동일한 거래처, 품목, 적용일자의 가격이 이미 존재합니다.' },
         { status: 400 }

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
 // GET /api/sales-products - 품목 목록 조회
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const products = await prisma.salesProduct.findMany({
       include: {
@@ -50,9 +50,9 @@ export async function POST(request: NextRequest) {
     })
 
     return NextResponse.json(product, { status: 201 })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error creating sales product:', error)
-    if (error.code === 'P2002') {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
       return NextResponse.json(
         { error: '이미 존재하는 품목명입니다.' },
         { status: 400 }
@@ -87,9 +87,9 @@ export async function PUT(request: NextRequest) {
     })
 
     return NextResponse.json(product)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating sales product:', error)
-    if (error.code === 'P2002') {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
       return NextResponse.json(
         { error: '이미 존재하는 품목명입니다.' },
         { status: 400 }

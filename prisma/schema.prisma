@@ -276,35 +276,37 @@ model StorageExpense {
 
 // 매입매출 기록
 model SalesRecord {
-  id            Int         @id @default(autoincrement())
+  id            Int          @id @default(autoincrement())
   date          DateTime
-  type          String      // PURCHASE(매입) or SALES(매출)
+  type          String       // PURCHASE(매입) or SALES(매출)
   salespersonId Int
-  salesperson   Salesperson @relation(fields: [salespersonId], references: [id])
+  salesperson   Salesperson  @relation(fields: [salespersonId], references: [id])
   categoryId    Int
-  category      Category    @relation(fields: [categoryId], references: [id])
-  productId     Int?        // 통합 품목 연결
-  product       Product?    @relation(fields: [productId], references: [id])
-  vendorId      Int?        // 거래처 연결
-  vendor        Vendor?     @relation(fields: [vendorId], references: [id])
-  itemName      String      // 품목명 (품목 미선택시 직접 입력)
-  customer      String?     // 기존 필드 유지 (하위 호환성)
+  category      Category     @relation(fields: [categoryId], references: [id])
+  productId     Int?         // 통합 품목 연결
+  product       Product?     @relation(fields: [productId], references: [id])
+  salesProductId Int?        // 기존 매입매출 품목 연결 (하위 호환성)
+  salesProduct  SalesProduct? @relation(fields: [salesProductId], references: [id])
+  vendorId      Int?         // 거래처 연결
+  vendor        Vendor?      @relation(fields: [vendorId], references: [id])
+  itemName      String       // 품목명 (품목 미선택시 직접 입력)
+  customer      String?      // 기존 필드 유지 (하위 호환성)
   quantity      Float
   unitPrice     Float
-  amount        Float       // 수량 * 단가
-  cost          Float       @default(0) // 원가 (매출 시)
-  margin        Float       @default(0) // 마진 = amount - cost
-  marginRate    Float       @default(0) // 마진율
+  amount        Float        // 수량 * 단가
+  cost          Float        @default(0) // 원가 (매출 시)
+  margin        Float        @default(0) // 마진 = amount - cost
+  marginRate    Float        @default(0) // 마진율
   
   // 부가세
-  vatIncluded   Boolean     @default(false)  // 부가세 포함 여부
-  supplyAmount  Float?      // 공급가액
-  vatAmount     Float?      // 부가세액
-  totalAmount   Float?      // 합계 (공급가액 + 부가세)
+  vatIncluded   Boolean      @default(false)  // 부가세 포함 여부
+  supplyAmount  Float?       // 공급가액
+  vatAmount     Float?       // 부가세액
+  totalAmount   Float?       // 합계 (공급가액 + 부가세)
   
   notes         String?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 }
 
 // ============================================
@@ -331,6 +333,7 @@ model SalesProduct {
   createdAt   DateTime             @default(now())
   updatedAt   DateTime             @updatedAt
   prices      SalesProductPrice[]
+  sales       SalesRecord[]        // 매입매출 기록 연결
 }
 
 // 품목별 단가 이력 (향후 ProductPriceHistory로 통합)

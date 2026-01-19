@@ -8,6 +8,7 @@ export async function GET(request: NextRequest) {
     const currency = searchParams.get('currency')
     const date = searchParams.get('date')
     
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: any = {}
     if (currency) where.currency = currency
     if (date) {
@@ -48,9 +49,9 @@ export async function POST(request: NextRequest) {
     })
 
     return NextResponse.json(exchangeRate, { status: 201 })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error creating exchange rate:', error)
-    if (error.code === 'P2002') {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
       return NextResponse.json(
         { error: '동일한 날짜와 통화의 환율이 이미 존재합니다.' },
         { status: 400 }

@@ -152,7 +152,7 @@ export default function YearlyReportPage() {
                 <XAxis dataKey="month" label={{ value: '월', position: 'insideBottom', offset: -5 }} />
                 <YAxis />
                 <Tooltip
-                  formatter={(value: number) => `₩${formatNumber(value, 0)}`}
+                  formatter={(value?: number) => `₩${formatNumber(value || 0, 0)}`}
                   labelFormatter={(label) => `${label}월`}
                 />
                 <Legend />
@@ -214,7 +214,7 @@ export default function YearlyReportPage() {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="salesperson.name" />
                     <YAxis />
-                    <Tooltip formatter={(value: number) => `₩${formatNumber(value, 0)}`} />
+                    <Tooltip formatter={(value?: number) => `₩${formatNumber(value || 0, 0)}`} />
                     <Legend />
                     <Bar dataKey="totalSales" fill="#3b82f6" name="매출" />
                     <Bar dataKey="totalMargin" fill="#10b981" name="마진" />
@@ -266,7 +266,7 @@ export default function YearlyReportPage() {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis type="number" />
                     <YAxis dataKey="category.nameKo" type="category" width={100} />
-                    <Tooltip formatter={(value: number) => `₩${formatNumber(value, 0)}`} />
+                    <Tooltip formatter={(value?: number) => `₩${formatNumber(value || 0, 0)}`} />
                     <Legend />
                     <Bar dataKey="totalSales" fill="#3b82f6" name="매출" />
                   </BarChart>

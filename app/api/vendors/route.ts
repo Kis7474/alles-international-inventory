@@ -54,9 +54,9 @@ export async function POST(request: NextRequest) {
     })
 
     return NextResponse.json(vendor, { status: 201 })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error creating vendor:', error)
-    if (error.code === 'P2002') {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
       return NextResponse.json(
         { error: '이미 존재하는 거래처명 또는 코드입니다.' },
         { status: 400 }
@@ -107,9 +107,9 @@ export async function PUT(request: NextRequest) {
     })
 
     return NextResponse.json(vendor)
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating vendor:', error)
-    if (error.code === 'P2002') {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
       return NextResponse.json(
         { error: '이미 존재하는 거래처명 또는 코드입니다.' },
         { status: 400 }
