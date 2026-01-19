@@ -119,9 +119,10 @@ export async function POST(request: NextRequest) {
             type: 'IN',
             quantity: quantityReceived,
             unitCost,
-          totalCost: quantityReceived * unitCost,
-        },
-      })
+            totalCost: quantityReceived * unitCost,
+          },
+        })
+      }
 
       return newLot
     })
