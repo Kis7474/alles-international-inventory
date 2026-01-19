@@ -114,3 +114,59 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
+// DELETE - 입고 내역 삭제
+export async function DELETE(request: NextRequest) {
+  try {
+    const searchParams = request.nextUrl.searchParams
+    const id = searchParams.get('id')
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'ID가 필요합니다.' },
+        { status: 400 }
+      )
+    }
+
+    // 해당 LOT의 현재 잔량 확인
+    const lot = await prisma.inventoryLot.findUnique({
+      where: { id: parseInt(id) },
+    })
+
+    if (!lot) {
+      return NextResponse.json(
+        { error: '해당 입고 내역을 찾을 수 없습니다.' },
+        { status: 404 }
+      )
+    }
+
+    // 잔량이 입고수량과 다르면 이미 출고된 것이므로 삭제 불가
+    if (lot.quantityRemaining !== lot.quantityReceived) {
+      return NextResponse.json(
+        { error: '이미 출고된 LOT는 삭제할 수 없습니다.' },
+        { status: 400 }
+      )
+    }
+
+    // LOT와 관련 이력 삭제 (트랜잭션)
+    await prisma.$transaction(async (tx) => {
+      // 관련 입출고 이력 삭제
+      await tx.inventoryMovement.deleteMany({
+        where: { lotId: parseInt(id) },
+      })
+
+      // LOT 삭제
+      await tx.inventoryLot.delete({
+        where: { id: parseInt(id) },
+      })
+    })
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Error deleting lot:', error)
+    return NextResponse.json(
+      { error: '입고 내역 삭제 중 오류가 발생했습니다.' },
+      { status: 500 }
+    )
+  }
+}

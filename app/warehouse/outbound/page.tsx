@@ -41,6 +41,7 @@ export default function OutboundPage() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [showResult, setShowResult] = useState(false)
+  const [deletingMovementId, setDeletingMovementId] = useState<number | null>(null)
   const [outboundResult, setOutboundResult] = useState<{
     totalQuantity: number
     totalCost: number
@@ -111,6 +112,33 @@ export default function OutboundPage() {
     } catch (error) {
       console.error('Error processing outbound:', error)
       alert('출고 처리 중 오류가 발생했습니다.')
+    }
+  }
+
+  const handleDelete = async (movementId: number) => {
+    setDeletingMovementId(movementId)
+  }
+
+  const confirmDelete = async () => {
+    if (!deletingMovementId) return
+
+    try {
+      const res = await fetch(`/api/outbound?id=${deletingMovementId}`, {
+        method: 'DELETE',
+      })
+
+      if (!res.ok) {
+        const result = await res.json()
+        alert(result.error || '삭제 중 오류가 발생했습니다.')
+        return
+      }
+
+      alert('출고 내역이 삭제되었습니다.')
+      setDeletingMovementId(null)
+      fetchData()
+    } catch (error) {
+      console.error('Error deleting outbound record:', error)
+      alert('삭제 중 오류가 발생했습니다.')
     }
   }
 
@@ -308,6 +336,9 @@ export default function OutboundPage() {
               <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">
                 총액
               </th>
+              <th className="px-4 py-3 text-center text-sm font-medium text-gray-700">
+                관리
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -331,12 +362,20 @@ export default function OutboundPage() {
                 <td className="px-4 py-4 text-right">
                   ₩{formatNumber(record.totalCost, 0)}
                 </td>
+                <td className="px-4 py-4 text-center">
+                  <button
+                    onClick={() => handleDelete(record.id)}
+                    className="text-red-600 hover:text-red-900 text-sm"
+                  >
+                    삭제
+                  </button>
+                </td>
               </tr>
             ))}
             {history.length === 0 && (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={7}
                   className="px-6 py-8 text-center text-gray-500"
                 >
                   출고 내역이 없습니다.
@@ -346,6 +385,35 @@ export default function OutboundPage() {
           </tbody>
         </table>
       </div>
+
+      {/* 삭제 확인 모달 */}
+      {deletingMovementId && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 max-w-md w-full">
+            <h2 className="text-2xl font-bold mb-4 text-gray-900">
+              출고 내역 삭제
+            </h2>
+            <p className="text-gray-700 mb-6">
+              정말 이 출고 내역을 삭제하시겠습니까?<br/>
+              관련된 재고 수량도 함께 조정됩니다.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setDeletingMovementId(null)}
+                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
+              >
+                취소
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+              >
+                삭제
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

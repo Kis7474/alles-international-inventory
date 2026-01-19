@@ -153,3 +153,65 @@ export async function GET(request: NextRequest) {
     )
   }
 }
+
+// DELETE - 출고 내역 삭제
+export async function DELETE(request: NextRequest) {
+  try {
+    const searchParams = request.nextUrl.searchParams
+    const id = searchParams.get('id')
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'ID가 필요합니다.' },
+        { status: 400 }
+      )
+    }
+
+    // 해당 출고 이력 조회
+    const movement = await prisma.inventoryMovement.findUnique({
+      where: { id: parseInt(id) },
+    })
+
+    if (!movement) {
+      return NextResponse.json(
+        { error: '해당 출고 내역을 찾을 수 없습니다.' },
+        { status: 404 }
+      )
+    }
+
+    if (movement.type !== 'OUT') {
+      return NextResponse.json(
+        { error: '출고 내역만 삭제할 수 있습니다.' },
+        { status: 400 }
+      )
+    }
+
+    // 출고 내역 삭제 및 LOT 잔량 복구 (트랜잭션)
+    await prisma.$transaction(async (tx) => {
+      // 출고 내역 삭제
+      await tx.inventoryMovement.delete({
+        where: { id: parseInt(id) },
+      })
+
+      // LOT 잔량 복구 (출고 취소이므로 다시 더함)
+      if (movement.lotId) {
+        await tx.inventoryLot.update({
+          where: { id: movement.lotId },
+          data: {
+            quantityRemaining: {
+              increment: movement.quantity,
+            },
+          },
+        })
+      }
+    })
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Error deleting outbound record:', error)
+    return NextResponse.json(
+      { error: '출고 내역 삭제 중 오류가 발생했습니다.' },
+      { status: 500 }
+    )
+  }
+}

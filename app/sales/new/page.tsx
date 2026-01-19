@@ -34,6 +34,15 @@ interface Vendor {
   name: string
 }
 
+interface VendorPrice {
+  id: number
+  productId: number
+  vendorId: number
+  purchasePrice: number | null
+  salesPrice: number | null
+  effectiveDate: string
+}
+
 export default function NewSalesPage() {
   const router = useRouter()
   const [salespersons, setSalespersons] = useState<Salesperson[]>([])
@@ -100,16 +109,75 @@ export default function NewSalesPage() {
     if (productId) {
       const product = products.find((p) => p.id === parseInt(productId))
       if (product) {
-        const price = calculateApplicablePrice(product, formData.date, formData.type)
         setFormData((prev) => ({ 
           ...prev, 
           productId, 
           itemName: product.name,
-          unitPrice: price.toString() 
         }))
+        // Fetch vendor-specific price if vendor is selected
+        if (formData.vendorId) {
+          fetchVendorPrice(parseInt(productId), parseInt(formData.vendorId), formData.date, formData.type)
+        } else {
+          // Use product's default price
+          const price = calculateApplicablePrice(product, formData.date, formData.type)
+          setFormData((prev) => ({ ...prev, productId, itemName: product.name, unitPrice: price.toString() }))
+        }
       }
     } else {
       setFormData((prev) => ({ ...prev, productId: '', itemName: '', unitPrice: '' }))
+    }
+  }
+
+  const handleVendorChange = (vendorId: string) => {
+    setFormData((prev) => ({ ...prev, vendorId }))
+    // Fetch vendor-specific price if product is selected
+    if (vendorId && formData.productId) {
+      fetchVendorPrice(parseInt(formData.productId), parseInt(vendorId), formData.date, formData.type)
+    } else if (formData.productId) {
+      // Fall back to product's default price
+      const product = products.find((p) => p.id === parseInt(formData.productId))
+      if (product) {
+        const price = calculateApplicablePrice(product, formData.date, formData.type)
+        setFormData((prev) => ({ ...prev, vendorId, unitPrice: price.toString() }))
+      }
+    }
+  }
+
+  const fetchVendorPrice = async (productId: number, vendorId: number, date: string, type: string) => {
+    try {
+      const res = await fetch(`/api/vendor-product-prices?productId=${productId}&vendorId=${vendorId}`)
+      const prices: VendorPrice[] = await res.json()
+      
+      if (prices.length > 0) {
+        // Get the most recent price before or on the transaction date
+        const transactionDate = new Date(date)
+        const applicablePrice = prices
+          .filter((p: VendorPrice) => new Date(p.effectiveDate) <= transactionDate)
+          .sort((a: VendorPrice, b: VendorPrice) => new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime())[0]
+        
+        if (applicablePrice) {
+          const price = type === 'PURCHASE' ? applicablePrice.purchasePrice : applicablePrice.salesPrice
+          if (price) {
+            setFormData((prev) => ({ ...prev, unitPrice: price.toString() }))
+            return
+          }
+        }
+      }
+      
+      // Fall back to product's default price
+      const product = products.find((p) => p.id === productId)
+      if (product) {
+        const price = calculateApplicablePrice(product, date, type)
+        setFormData((prev) => ({ ...prev, unitPrice: price.toString() }))
+      }
+    } catch (error) {
+      console.error('Error fetching vendor price:', error)
+      // Fall back to product's default price
+      const product = products.find((p) => p.id === productId)
+      if (product) {
+        const price = calculateApplicablePrice(product, date, type)
+        setFormData((prev) => ({ ...prev, unitPrice: price.toString() }))
+      }
     }
   }
 
@@ -118,10 +186,14 @@ export default function NewSalesPage() {
     
     // 날짜 변경 시 품목이 선택되어 있으면 단가 재계산
     if (formData.productId) {
-      const product = products.find((p) => p.id === parseInt(formData.productId))
-      if (product) {
-        const price = calculateApplicablePrice(product, date, formData.type)
-        setFormData((prev) => ({ ...prev, date, unitPrice: price.toString() }))
+      if (formData.vendorId) {
+        fetchVendorPrice(parseInt(formData.productId), parseInt(formData.vendorId), date, formData.type)
+      } else {
+        const product = products.find((p) => p.id === parseInt(formData.productId))
+        if (product) {
+          const price = calculateApplicablePrice(product, date, formData.type)
+          setFormData((prev) => ({ ...prev, date, unitPrice: price.toString() }))
+        }
       }
     }
   }
@@ -131,10 +203,14 @@ export default function NewSalesPage() {
     
     // 거래 유형 변경 시 품목이 선택되어 있으면 단가 재계산
     if (formData.productId) {
-      const product = products.find((p) => p.id === parseInt(formData.productId))
-      if (product) {
-        const price = calculateApplicablePrice(product, formData.date, type)
-        setFormData((prev) => ({ ...prev, type, unitPrice: price.toString() }))
+      if (formData.vendorId) {
+        fetchVendorPrice(parseInt(formData.productId), parseInt(formData.vendorId), formData.date, type)
+      } else {
+        const product = products.find((p) => p.id === parseInt(formData.productId))
+        if (product) {
+          const price = calculateApplicablePrice(product, formData.date, type)
+          setFormData((prev) => ({ ...prev, type, unitPrice: price.toString() }))
+        }
       }
     }
   }
@@ -335,9 +411,7 @@ export default function NewSalesPage() {
               </label>
               <select
                 value={formData.vendorId}
-                onChange={(e) =>
-                  setFormData({ ...formData, vendorId: e.target.value })
-                }
+                onChange={(e) => handleVendorChange(e.target.value)}
                 className="w-full px-3 py-2 border rounded-lg text-gray-900"
               >
                 <option value="">직접 입력</option>
