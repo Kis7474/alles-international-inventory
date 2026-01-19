@@ -70,36 +70,39 @@ export async function POST(request: NextRequest) {
       quantityReceived
     )
 
-    // LOT 생성
-    const lot = await prisma.inventoryLot.create({
-      data: {
-        itemId,
-        lotCode: lotCode || null,
-        receivedDate: new Date(receivedDate),
-        quantityReceived,
-        quantityRemaining: quantityReceived,
-        goodsAmount: goodsAmount || 0,
-        dutyAmount: dutyAmount || 0,
-        domesticFreight: domesticFreight || 0,
-        otherCost: otherCost || 0,
-        unitCost,
-      },
-      include: {
-        item: true,
-      },
-    })
+    // LOT 생성과 입고 이력 생성을 트랜잭션으로 처리
+    const lot = await prisma.$transaction(async (tx) => {
+      const newLot = await tx.inventoryLot.create({
+        data: {
+          itemId,
+          lotCode: lotCode || null,
+          receivedDate: new Date(receivedDate),
+          quantityReceived,
+          quantityRemaining: quantityReceived,
+          goodsAmount: goodsAmount || 0,
+          dutyAmount: dutyAmount || 0,
+          domesticFreight: domesticFreight || 0,
+          otherCost: otherCost || 0,
+          unitCost,
+        },
+        include: {
+          item: true,
+        },
+      })
 
-    // 입고 이력 생성
-    await prisma.inventoryMovement.create({
-      data: {
-        movementDate: new Date(receivedDate),
-        itemId,
-        lotId: lot.id,
-        type: 'IN',
-        quantity: quantityReceived,
-        unitCost,
-        totalCost: quantityReceived * unitCost,
-      },
+      await tx.inventoryMovement.create({
+        data: {
+          movementDate: new Date(receivedDate),
+          itemId,
+          lotId: newLot.id,
+          type: 'IN',
+          quantity: quantityReceived,
+          unitCost,
+          totalCost: quantityReceived * unitCost,
+        },
+      })
+
+      return newLot
     })
 
     return NextResponse.json(lot, { status: 201 })
