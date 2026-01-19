@@ -56,8 +56,8 @@ export async function parseExcelFile(file: File): Promise<ParsedData> {
     
     // Extract prices for each product
     for (let prodIdx = 0; prodIdx < products.length; prodIdx++) {
-      const salesPrice = row[1 + prodIdx * 2] as number || null
-      const purchasePrice = row[2 + prodIdx * 2] as number || null
+      const salesPrice = typeof row[1 + prodIdx * 2] === 'number' ? row[1 + prodIdx * 2] as number : null
+      const purchasePrice = typeof row[2 + prodIdx * 2] === 'number' ? row[2 + prodIdx * 2] as number : null
       
       prices.push({
         vendorName,
@@ -78,6 +78,7 @@ export function generateCode(name: string): string {
   // Remove special characters and spaces, take first 8 characters
   const cleaned = name.replace(/[^a-zA-Z0-9가-힣]/g, '').toUpperCase()
   const base = cleaned.substring(0, 8)
-  const timestamp = Date.now().toString(36).substring(-4)
-  return `${base}-${timestamp}`
+  const timestamp = Date.now().toString(36).slice(-4)
+  const random = Math.random().toString(36).substring(2, 6)
+  return `${base}-${timestamp}${random}`
 }

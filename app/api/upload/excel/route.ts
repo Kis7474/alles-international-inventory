@@ -125,6 +125,7 @@ export async function POST(request: NextRequest) {
         }
         
         const effectiveDate = new Date()
+        effectiveDate.setHours(0, 0, 0, 0) // Normalize to start of day
         
         const existing = await prisma.vendorProductPrice.findFirst({
           where: {
