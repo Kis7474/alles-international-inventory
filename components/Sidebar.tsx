@@ -6,6 +6,15 @@ import { useState } from 'react'
 
 const menuItems = [
   { href: '/', label: '매입매출장부', icon: '📊' },
+  { href: '/sales', label: '매입매출 내역', icon: '📝' },
+  {
+    label: '리포트',
+    icon: '📈',
+    submenu: [
+      { href: '/sales/report/monthly', label: '월별 리포트', icon: '📅' },
+      { href: '/sales/report/yearly', label: '연도별 리포트', icon: '📆' },
+    ],
+  },
   {
     label: '창고관리',
     icon: '🏢',
@@ -26,6 +35,9 @@ export default function Sidebar() {
     pathname.startsWith('/warehouse') || pathname.startsWith('/items') || 
     pathname.startsWith('/lots') || pathname.startsWith('/outbound') || 
     pathname.startsWith('/inventory') || pathname.startsWith('/storage-expenses')
+  )
+  const [reportOpen, setReportOpen] = useState(
+    pathname.startsWith('/sales/report')
   )
 
   return (
@@ -55,11 +67,20 @@ export default function Sidebar() {
             <ul className="space-y-2">
               {menuItems.map((item) => {
                 if (item.submenu) {
-                  // 창고관리 서브메뉴
+                  // 서브메뉴가 있는 경우
+                  const isWarehouse = item.label === '창고관리'
+                  const isReport = item.label === '리포트'
+                  const isExpanded = isWarehouse ? warehouseOpen : isReport ? reportOpen : false
+                  const toggleFunc = isWarehouse 
+                    ? () => setWarehouseOpen(!warehouseOpen) 
+                    : isReport 
+                    ? () => setReportOpen(!reportOpen) 
+                    : () => {}
+
                   return (
                     <li key={item.label}>
                       <button
-                        onClick={() => setWarehouseOpen(!warehouseOpen)}
+                        onClick={toggleFunc}
                         className="w-full flex items-center justify-between px-4 py-3 rounded-lg hover:bg-gray-700 transition-colors duration-150 text-white"
                       >
                         <div className="flex items-center gap-3">
@@ -67,10 +88,10 @@ export default function Sidebar() {
                           <span>{item.label}</span>
                         </div>
                         <span className="text-sm">
-                          {warehouseOpen ? '▼' : '▶'}
+                          {isExpanded ? '▼' : '▶'}
                         </span>
                       </button>
-                      {warehouseOpen && (
+                      {isExpanded && (
                         <ul className="ml-4 mt-2 space-y-1">
                           {item.submenu.map((subItem) => {
                             const isActive = pathname === subItem.href
