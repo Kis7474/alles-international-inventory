@@ -22,14 +22,34 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { name, contact, address, notes } = body
+    const { 
+      code, 
+      name, 
+      type, 
+      contactPerson, 
+      phone, 
+      email, 
+      address, 
+      country, 
+      currency, 
+      memo,
+      // 하위 호환성
+      contact,
+      notes
+    } = body
 
     const vendor = await prisma.vendor.create({
       data: {
+        code: code || `V${Date.now()}`, // 자동 생성
         name,
-        contact: contact || null,
+        type: type || 'DOMESTIC',
+        contactPerson: contactPerson || contact || null,
+        phone: phone || null,
+        email: email || null,
         address: address || null,
-        notes: notes || null,
+        country: country || null,
+        currency: currency || null,
+        memo: memo || notes || null,
       },
     })
 
@@ -38,7 +58,7 @@ export async function POST(request: NextRequest) {
     console.error('Error creating vendor:', error)
     if (error.code === 'P2002') {
       return NextResponse.json(
-        { error: '이미 존재하는 거래처명입니다.' },
+        { error: '이미 존재하는 거래처명 또는 코드입니다.' },
         { status: 400 }
       )
     }
@@ -53,15 +73,36 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
-    const { id, name, contact, address, notes } = body
+    const { 
+      id, 
+      code,
+      name, 
+      type,
+      contactPerson,
+      phone,
+      email,
+      address,
+      country,
+      currency,
+      memo,
+      // 하위 호환성
+      contact,
+      notes
+    } = body
 
     const vendor = await prisma.vendor.update({
       where: { id: parseInt(id) },
       data: {
+        code: code || undefined,
         name,
-        contact: contact || null,
+        type: type || 'DOMESTIC',
+        contactPerson: contactPerson || contact || null,
+        phone: phone || null,
+        email: email || null,
         address: address || null,
-        notes: notes || null,
+        country: country || null,
+        currency: currency || null,
+        memo: memo || notes || null,
       },
     })
 
@@ -70,7 +111,7 @@ export async function PUT(request: NextRequest) {
     console.error('Error updating vendor:', error)
     if (error.code === 'P2002') {
       return NextResponse.json(
-        { error: '이미 존재하는 거래처명입니다.' },
+        { error: '이미 존재하는 거래처명 또는 코드입니다.' },
         { status: 400 }
       )
     }
