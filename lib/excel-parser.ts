@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx'
+import ExcelJS from 'exceljs'
 
 export interface ParsedData {
   vendors: string[]
@@ -20,9 +20,38 @@ export interface ParsedData {
  */
 export async function parseExcelFile(file: File): Promise<ParsedData> {
   const buffer = await file.arrayBuffer()
-  const workbook = XLSX.read(buffer, { type: 'array' })
-  const sheet = workbook.Sheets[workbook.SheetNames[0]]
-  const data = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as (string | number)[][]
+  const workbook = new ExcelJS.Workbook()
+  
+  // Load workbook from buffer
+  await workbook.xlsx.load(buffer)
+  
+  // Get first worksheet
+  const worksheet = workbook.worksheets[0]
+  
+  if (!worksheet) {
+    throw new Error('파일에 워크시트가 없습니다.')
+  }
+  
+  const data: (string | number)[][] = []
+  
+  // Convert worksheet to array format
+  worksheet.eachRow((row) => {
+    const rowData: (string | number)[] = []
+    row.eachCell({ includeEmpty: true }, (cell) => {
+      const value = cell.value
+      if (value === null || value === undefined) {
+        rowData.push('')
+      } else if (typeof value === 'number') {
+        rowData.push(value)
+      } else if (typeof value === 'string') {
+        rowData.push(value)
+      } else {
+        // Handle other cell types (formulas, dates, etc.)
+        rowData.push(String(value))
+      }
+    })
+    data.push(rowData)
+  })
   
   if (data.length < 2) {
     throw new Error('파일에 데이터가 충분하지 않습니다.')
