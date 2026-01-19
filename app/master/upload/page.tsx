@@ -198,7 +198,7 @@ export default function ExcelUploadPage() {
               </label>
               <select
                 value={options.duplicateHandling}
-                onChange={(e) => setOptions({ ...options, duplicateHandling: e.target.value as any })}
+                onChange={(e) => setOptions({ ...options, duplicateHandling: e.target.value as 'overwrite' | 'skip' | 'merge' })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
               >
                 <option value="skip">중복 시 건너뛰기</option>
