@@ -82,8 +82,8 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
         if (!row.productName) {
           throw new Error('품목명이 비어있습니다.')
         }
-        if (!row.quantity || row.quantity === 0) {
-          throw new Error('수량이 0입니다.')
+        if (!row.quantity || row.quantity <= 0) {
+          throw new Error('수량이 유효하지 않습니다.')
         }
         if (!options.transactionType) {
           throw new Error('거래 유형이 선택되지 않았습니다.')
