@@ -84,79 +84,57 @@ export default function NewSalesPage() {
     }
   }
 
-  const handleProductChange = (productId: string) => {
-    setFormData({ ...formData, productId })
+  const calculateApplicablePrice = (product: Product, date: string, type: string): number => {
+    const transactionDate = new Date(date)
+    const applicablePrice = product.prices
+      .filter((p) => new Date(p.effectiveDate) <= transactionDate)
+      .sort((a, b) => new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime())[0]
     
+    if (applicablePrice) {
+      return type === 'PURCHASE' ? applicablePrice.purchasePrice : applicablePrice.salesPrice
+    }
+    return 0
+  }
+
+  const handleProductChange = (productId: string) => {
     if (productId) {
       const product = products.find((p) => p.id === parseInt(productId))
       if (product) {
-        // 품목 선택 시 품목명 자동 입력
-        setFormData((prev) => ({ ...prev, productId, itemName: product.name }))
-        
-        // 거래일자 기준으로 적용 가능한 단가 찾기
-        const transactionDate = new Date(formData.date)
-        const applicablePrice = product.prices
-          .filter((p) => new Date(p.effectiveDate) <= transactionDate)
-          .sort((a, b) => new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime())[0]
-        
-        if (applicablePrice) {
-          const price = formData.type === 'PURCHASE' 
-            ? applicablePrice.purchasePrice 
-            : applicablePrice.salesPrice
-          
-          setFormData((prev) => ({ 
-            ...prev, 
-            productId, 
-            itemName: product.name,
-            unitPrice: price.toString() 
-          }))
-        }
+        const price = calculateApplicablePrice(product, formData.date, formData.type)
+        setFormData((prev) => ({ 
+          ...prev, 
+          productId, 
+          itemName: product.name,
+          unitPrice: price.toString() 
+        }))
       }
+    } else {
+      setFormData((prev) => ({ ...prev, productId: '', itemName: '', unitPrice: '' }))
     }
   }
 
   const handleDateChange = (date: string) => {
-    setFormData({ ...formData, date })
+    setFormData((prev) => ({ ...prev, date }))
     
     // 날짜 변경 시 품목이 선택되어 있으면 단가 재계산
     if (formData.productId) {
       const product = products.find((p) => p.id === parseInt(formData.productId))
       if (product) {
-        const transactionDate = new Date(date)
-        const applicablePrice = product.prices
-          .filter((p) => new Date(p.effectiveDate) <= transactionDate)
-          .sort((a, b) => new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime())[0]
-        
-        if (applicablePrice) {
-          const price = formData.type === 'PURCHASE' 
-            ? applicablePrice.purchasePrice 
-            : applicablePrice.salesPrice
-          
-          setFormData((prev) => ({ ...prev, date, unitPrice: price.toString() }))
-        }
+        const price = calculateApplicablePrice(product, date, formData.type)
+        setFormData((prev) => ({ ...prev, date, unitPrice: price.toString() }))
       }
     }
   }
 
   const handleTypeChange = (type: string) => {
-    setFormData({ ...formData, type })
+    setFormData((prev) => ({ ...prev, type }))
     
     // 거래 유형 변경 시 품목이 선택되어 있으면 단가 재계산
     if (formData.productId) {
       const product = products.find((p) => p.id === parseInt(formData.productId))
       if (product) {
-        const transactionDate = new Date(formData.date)
-        const applicablePrice = product.prices
-          .filter((p) => new Date(p.effectiveDate) <= transactionDate)
-          .sort((a, b) => new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime())[0]
-        
-        if (applicablePrice) {
-          const price = type === 'PURCHASE' 
-            ? applicablePrice.purchasePrice 
-            : applicablePrice.salesPrice
-          
-          setFormData((prev) => ({ ...prev, type, unitPrice: price.toString() }))
-        }
+        const price = calculateApplicablePrice(product, formData.date, type)
+        setFormData((prev) => ({ ...prev, type, unitPrice: price.toString() }))
       }
     }
   }

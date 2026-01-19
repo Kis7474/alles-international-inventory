@@ -58,13 +58,12 @@ export default function SalesProductsPage() {
     setLoading(true)
 
     try {
-      const url = editingProduct ? '/api/sales-products' : '/api/sales-products'
       const method = editingProduct ? 'PUT' : 'POST'
       const body = editingProduct
         ? { id: editingProduct.id, ...formData }
         : formData
 
-      const res = await fetch(url, {
+      const res = await fetch('/api/sales-products', {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
