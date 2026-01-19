@@ -13,6 +13,11 @@ interface Product {
   id: number
   code: string
   name: string
+  defaultPurchasePrice: number | null
+  category: {
+    id: number
+    nameKo: string
+  } | null
 }
 
 interface VendorProductPrice {
@@ -161,6 +166,22 @@ export default function VendorPricesPage() {
       effectiveDate: new Date().toISOString().split('T')[0],
       memo: '',
     })
+  }
+
+  const handleProductChange = (productId: string) => {
+    const product = products.find((p) => p.id === parseInt(productId))
+    if (product && product.defaultPurchasePrice !== null) {
+      setFormData({
+        ...formData,
+        productId,
+        purchasePrice: product.defaultPurchasePrice.toString(),
+      })
+    } else {
+      setFormData({
+        ...formData,
+        productId,
+      })
+    }
   }
 
   if (loading) {
@@ -347,7 +368,7 @@ export default function VendorPricesPage() {
                   <select
                     required
                     value={formData.productId}
-                    onChange={(e) => setFormData({ ...formData, productId: e.target.value })}
+                    onChange={(e) => handleProductChange(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                     disabled={!!editingPrice}
                   >
@@ -364,23 +385,25 @@ export default function VendorPricesPage() {
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    매입가 (₩)
+                    매입가 (₩) {formData.productId && <span className="text-xs text-blue-600">(품목에서 자동 설정됨, 읽기전용)</span>}
                   </label>
                   <input
                     type="number"
                     step="0.01"
                     value={formData.purchasePrice}
                     onChange={(e) => setFormData({ ...formData, purchasePrice: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-gray-100"
+                    disabled={!!formData.productId}
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    매출가 (₩)
+                    매출가 (₩) *
                   </label>
                   <input
                     type="number"
                     step="0.01"
+                    required
                     value={formData.salesPrice}
                     onChange={(e) => setFormData({ ...formData, salesPrice: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"

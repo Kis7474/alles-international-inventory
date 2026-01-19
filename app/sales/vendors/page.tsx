@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 interface Vendor {
   id: number
   name: string
+  type: string
   contact: string | null
   address: string | null
   notes: string | null
@@ -17,6 +18,7 @@ export default function VendorsPage() {
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null)
   const [formData, setFormData] = useState({
     name: '',
+    type: 'DOMESTIC',
     contact: '',
     address: '',
     notes: '',
@@ -80,6 +82,7 @@ export default function VendorsPage() {
     setEditingVendor(vendor)
     setFormData({
       name: vendor.name,
+      type: vendor.type || 'DOMESTIC',
       contact: vendor.contact || '',
       address: vendor.address || '',
       notes: vendor.notes || '',
@@ -113,6 +116,7 @@ export default function VendorsPage() {
   const resetForm = () => {
     setFormData({
       name: '',
+      type: 'DOMESTIC',
       contact: '',
       address: '',
       notes: '',
@@ -150,18 +154,35 @@ export default function VendorsPage() {
             {editingVendor ? '거래처 수정' : '거래처 등록'}
           </h2>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1 text-gray-700">
-                거래처명 *
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-3 py-2 border rounded-lg text-gray-900"
-                placeholder="거래처명을 입력하세요"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1 text-gray-700">
+                  거래처명 *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg text-gray-900"
+                  placeholder="거래처명을 입력하세요"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1 text-gray-700">
+                  유형 *
+                </label>
+                <select
+                  required
+                  value={formData.type}
+                  onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg text-gray-900"
+                >
+                  <option value="DOMESTIC">국내 (매입/매출용)</option>
+                  <option value="OVERSEAS">해외 (수입/수출용)</option>
+                </select>
+              </div>
             </div>
 
             <div>
@@ -234,6 +255,7 @@ export default function VendorsPage() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">거래처명</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">유형</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">연락처</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">주소</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">메모</th>
@@ -244,6 +266,11 @@ export default function VendorsPage() {
               {vendors.map((vendor) => (
                 <tr key={vendor.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 text-gray-900 font-medium">{vendor.name}</td>
+                  <td className="px-4 py-3 text-gray-900">
+                    <span className={`px-2 py-1 rounded-full text-xs ${vendor.type === 'DOMESTIC' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>
+                      {vendor.type === 'DOMESTIC' ? '국내' : '해외'}
+                    </span>
+                  </td>
                   <td className="px-4 py-3 text-gray-900">{vendor.contact || '-'}</td>
                   <td className="px-4 py-3 text-gray-900">{vendor.address || '-'}</td>
                   <td className="px-4 py-3 text-gray-900">{vendor.notes || '-'}</td>
@@ -265,7 +292,7 @@ export default function VendorsPage() {
               ))}
               {vendors.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
                     등록된 거래처가 없습니다.
                   </td>
                 </tr>
