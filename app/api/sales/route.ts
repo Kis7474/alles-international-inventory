@@ -47,6 +47,8 @@ export async function GET(request: NextRequest) {
       include: {
         salesperson: true,
         category: true,
+        product: true,
+        vendor: true,
       },
       orderBy: { date: 'desc' },
     })
@@ -70,6 +72,8 @@ export async function POST(request: NextRequest) {
       type,
       salespersonId,
       categoryId,
+      productId,
+      vendorId,
       itemName,
       customer,
       quantity,
@@ -91,6 +95,8 @@ export async function POST(request: NextRequest) {
         type,
         salespersonId: parseInt(salespersonId),
         categoryId: parseInt(categoryId),
+        productId: productId ? parseInt(productId) : null,
+        vendorId: vendorId ? parseInt(vendorId) : null,
         itemName,
         customer: customer || null,
         quantity: parseFloat(quantity),
@@ -104,6 +110,8 @@ export async function POST(request: NextRequest) {
       include: {
         salesperson: true,
         category: true,
+        product: true,
+        vendor: true,
       },
     })
 
@@ -127,6 +135,8 @@ export async function PUT(request: NextRequest) {
       type,
       salespersonId,
       categoryId,
+      productId,
+      vendorId,
       itemName,
       customer,
       quantity,
@@ -149,6 +159,8 @@ export async function PUT(request: NextRequest) {
         type,
         salespersonId: parseInt(salespersonId),
         categoryId: parseInt(categoryId),
+        productId: productId ? parseInt(productId) : null,
+        vendorId: vendorId ? parseInt(vendorId) : null,
         itemName,
         customer: customer || null,
         quantity: parseFloat(quantity),
@@ -162,6 +174,8 @@ export async function PUT(request: NextRequest) {
       include: {
         salesperson: true,
         category: true,
+        product: true,
+        vendor: true,
       },
     })
 

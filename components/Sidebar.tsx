@@ -7,6 +7,17 @@ import { useState } from 'react'
 const menuItems = [
   { href: '/', label: '매입매출장부', icon: '📊' },
   { href: '/sales', label: '매입매출 내역', icon: '📝' },
+  { href: '/sales/product-status', label: '품목별 현황', icon: '📦' },
+  {
+    label: '마스터 관리',
+    icon: '⚙️',
+    submenu: [
+      { href: '/sales/products', label: '품목 관리', icon: '📦' },
+      { href: '/salesperson', label: '담당자 관리', icon: '👤' },
+      { href: '/sales/vendors', label: '거래처 관리', icon: '🏢' },
+      { href: '/categories', label: '카테고리 관리', icon: '📋' },
+    ],
+  },
   {
     label: '리포트',
     icon: '📈',
@@ -39,6 +50,10 @@ export default function Sidebar() {
   const [reportOpen, setReportOpen] = useState(
     pathname.startsWith('/sales/report')
   )
+  const [masterOpen, setMasterOpen] = useState(
+    pathname.startsWith('/sales/products') || pathname.startsWith('/sales/vendors') ||
+    pathname.startsWith('/salesperson') || pathname.startsWith('/categories')
+  )
 
   return (
     <>
@@ -70,11 +85,14 @@ export default function Sidebar() {
                   // 서브메뉴가 있는 경우
                   const isWarehouse = item.label === '창고관리'
                   const isReport = item.label === '리포트'
-                  const isExpanded = isWarehouse ? warehouseOpen : isReport ? reportOpen : false
+                  const isMaster = item.label === '마스터 관리'
+                  const isExpanded = isWarehouse ? warehouseOpen : isReport ? reportOpen : isMaster ? masterOpen : false
                   const toggleFunc = isWarehouse 
                     ? () => setWarehouseOpen(!warehouseOpen) 
                     : isReport 
-                    ? () => setReportOpen(!reportOpen) 
+                    ? () => setReportOpen(!reportOpen)
+                    : isMaster
+                    ? () => setMasterOpen(!masterOpen)
                     : () => {}
 
                   return (

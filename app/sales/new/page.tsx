@@ -17,16 +17,37 @@ interface Category {
   nameKo: string
 }
 
+interface Product {
+  id: number
+  name: string
+  unit: string
+  prices: Array<{
+    id: number
+    effectiveDate: string
+    purchasePrice: number
+    salesPrice: number
+  }>
+}
+
+interface Vendor {
+  id: number
+  name: string
+}
+
 export default function NewSalesPage() {
   const router = useRouter()
   const [salespersons, setSalespersons] = useState<Salesperson[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [products, setProducts] = useState<Product[]>([])
+  const [vendors, setVendors] = useState<Vendor[]>([])
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     type: 'SALES',
     salespersonId: '',
     categoryId: '',
+    productId: '',
+    vendorId: '',
     itemName: '',
     customer: '',
     quantity: '',
@@ -41,19 +62,80 @@ export default function NewSalesPage() {
 
   const fetchMasterData = async () => {
     try {
-      const [salespersonsRes, categoriesRes] = await Promise.all([
+      const [salespersonsRes, categoriesRes, productsRes, vendorsRes] = await Promise.all([
         fetch('/api/salesperson'),
         fetch('/api/categories'),
+        fetch('/api/sales-products'),
+        fetch('/api/vendors'),
       ])
 
       const salespersonsData = await salespersonsRes.json()
       const categoriesData = await categoriesRes.json()
+      const productsData = await productsRes.json()
+      const vendorsData = await vendorsRes.json()
 
       setSalespersons(salespersonsData)
       setCategories(categoriesData)
+      setProducts(productsData)
+      setVendors(vendorsData)
     } catch (error) {
       console.error('Error fetching master data:', error)
       alert('기초 데이터 조회 중 오류가 발생했습니다.')
+    }
+  }
+
+  const calculateApplicablePrice = (product: Product, date: string, type: string): number => {
+    const transactionDate = new Date(date)
+    const applicablePrice = product.prices
+      .filter((p) => new Date(p.effectiveDate) <= transactionDate)
+      .sort((a, b) => new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime())[0]
+    
+    if (applicablePrice) {
+      return type === 'PURCHASE' ? applicablePrice.purchasePrice : applicablePrice.salesPrice
+    }
+    return 0
+  }
+
+  const handleProductChange = (productId: string) => {
+    if (productId) {
+      const product = products.find((p) => p.id === parseInt(productId))
+      if (product) {
+        const price = calculateApplicablePrice(product, formData.date, formData.type)
+        setFormData((prev) => ({ 
+          ...prev, 
+          productId, 
+          itemName: product.name,
+          unitPrice: price.toString() 
+        }))
+      }
+    } else {
+      setFormData((prev) => ({ ...prev, productId: '', itemName: '', unitPrice: '' }))
+    }
+  }
+
+  const handleDateChange = (date: string) => {
+    setFormData((prev) => ({ ...prev, date }))
+    
+    // 날짜 변경 시 품목이 선택되어 있으면 단가 재계산
+    if (formData.productId) {
+      const product = products.find((p) => p.id === parseInt(formData.productId))
+      if (product) {
+        const price = calculateApplicablePrice(product, date, formData.type)
+        setFormData((prev) => ({ ...prev, date, unitPrice: price.toString() }))
+      }
+    }
+  }
+
+  const handleTypeChange = (type: string) => {
+    setFormData((prev) => ({ ...prev, type }))
+    
+    // 거래 유형 변경 시 품목이 선택되어 있으면 단가 재계산
+    if (formData.productId) {
+      const product = products.find((p) => p.id === parseInt(formData.productId))
+      if (product) {
+        const price = calculateApplicablePrice(product, formData.date, type)
+        setFormData((prev) => ({ ...prev, type, unitPrice: price.toString() }))
+      }
     }
   }
 
@@ -143,7 +225,7 @@ export default function NewSalesPage() {
                 type="date"
                 required
                 value={formData.date}
-                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                onChange={(e) => handleDateChange(e.target.value)}
                 className="w-full px-3 py-2 border rounded-lg text-gray-900"
               />
             </div>
@@ -155,7 +237,7 @@ export default function NewSalesPage() {
               <select
                 required
                 value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                onChange={(e) => handleTypeChange(e.target.value)}
                 className="w-full px-3 py-2 border rounded-lg text-gray-900"
               >
                 <option value="SALES">매출</option>
@@ -211,35 +293,76 @@ export default function NewSalesPage() {
 
             <div>
               <label className="block text-sm font-medium mb-1 text-gray-700">
-                품목명 *
+                품목 선택
               </label>
-              <input
-                type="text"
-                required
-                value={formData.itemName}
-                onChange={(e) =>
-                  setFormData({ ...formData, itemName: e.target.value })
-                }
+              <select
+                value={formData.productId}
+                onChange={(e) => handleProductChange(e.target.value)}
                 className="w-full px-3 py-2 border rounded-lg text-gray-900"
-                placeholder="품목명을 입력하세요"
-              />
+              >
+                <option value="">직접 입력</option>
+                {products.map((product) => (
+                  <option key={product.id} value={product.id}>
+                    {product.name} ({product.unit})
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
-          {/* 거래처 */}
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700">
-              거래처
+              품목명 *
             </label>
             <input
               type="text"
-              value={formData.customer}
+              required
+              value={formData.itemName}
               onChange={(e) =>
-                setFormData({ ...formData, customer: e.target.value })
+                setFormData({ ...formData, itemName: e.target.value })
               }
               className="w-full px-3 py-2 border rounded-lg text-gray-900"
-              placeholder="거래처명을 입력하세요"
+              placeholder="품목명을 입력하세요 (또는 위에서 품목 선택)"
+              disabled={!!formData.productId}
             />
+          </div>
+
+          {/* 거래처/고객 */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1 text-gray-700">
+                거래처 선택
+              </label>
+              <select
+                value={formData.vendorId}
+                onChange={(e) =>
+                  setFormData({ ...formData, vendorId: e.target.value })
+                }
+                className="w-full px-3 py-2 border rounded-lg text-gray-900"
+              >
+                <option value="">직접 입력</option>
+                {vendors.map((vendor) => (
+                  <option key={vendor.id} value={vendor.id}>
+                    {vendor.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1 text-gray-700">
+                거래처/고객명
+              </label>
+              <input
+                type="text"
+                value={formData.customer}
+                onChange={(e) =>
+                  setFormData({ ...formData, customer: e.target.value })
+                }
+                className="w-full px-3 py-2 border rounded-lg text-gray-900"
+                placeholder="거래처명을 입력하세요 (또는 위에서 거래처 선택)"
+              />
+            </div>
           </div>
 
           {/* 금액 정보 */}
@@ -263,7 +386,7 @@ export default function NewSalesPage() {
 
             <div>
               <label className="block text-sm font-medium mb-1 text-gray-700">
-                단가 *
+                단가 * {formData.productId && <span className="text-xs text-blue-600">(품목 단가 자동 적용됨)</span>}
               </label>
               <input
                 type="number"
