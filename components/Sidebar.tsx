@@ -5,17 +5,28 @@ import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 
 const menuItems = [
-  { href: '/', label: '홈', icon: '🏠' },
-  { href: '/items', label: '품목 관리', icon: '📦' },
-  { href: '/lots', label: '입고 관리', icon: '📥' },
-  { href: '/outbound', label: '출고 관리', icon: '📤' },
-  { href: '/inventory', label: '재고 조회', icon: '📊' },
-  { href: '/storage-expenses', label: '창고료 관리', icon: '💰' },
+  { href: '/', label: '매입매출장부', icon: '📊' },
+  {
+    label: '창고관리',
+    icon: '🏢',
+    submenu: [
+      { href: '/warehouse/items', label: '품목 관리', icon: '📦' },
+      { href: '/warehouse/lots', label: '입고 관리', icon: '📥' },
+      { href: '/warehouse/outbound', label: '출고 관리', icon: '📤' },
+      { href: '/warehouse/inventory', label: '재고 조회', icon: '📊' },
+      { href: '/warehouse/storage-expenses', label: '창고료 관리', icon: '💰' },
+    ],
+  },
 ]
 
 export default function Sidebar() {
   const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(false)
+  const [warehouseOpen, setWarehouseOpen] = useState(
+    pathname.startsWith('/warehouse') || pathname.startsWith('/items') || 
+    pathname.startsWith('/lots') || pathname.startsWith('/outbound') || 
+    pathname.startsWith('/inventory') || pathname.startsWith('/storage-expenses')
+  )
 
   return (
     <>
@@ -37,33 +48,81 @@ export default function Sidebar() {
         `}
       >
         <div className="p-6">
-          <h1 className="text-2xl font-bold mb-8">
+          <h1 className="text-2xl font-bold mb-8 text-white">
             알레스인터네셔날
           </h1>
           <nav>
             <ul className="space-y-2">
               {menuItems.map((item) => {
-                const isActive = pathname === item.href
-                return (
-                  <li key={item.href}>
-                    <Link
-                      href={item.href}
-                      className={`
-                        flex items-center gap-3 px-4 py-3 rounded-lg
-                        transition-colors duration-150
-                        ${
-                          isActive
-                            ? 'bg-blue-600 text-white'
-                            : 'hover:bg-gray-700'
-                        }
-                      `}
-                      onClick={() => setIsOpen(false)}
-                    >
-                      <span className="text-xl">{item.icon}</span>
-                      <span>{item.label}</span>
-                    </Link>
-                  </li>
-                )
+                if (item.submenu) {
+                  // 창고관리 서브메뉴
+                  return (
+                    <li key={item.label}>
+                      <button
+                        onClick={() => setWarehouseOpen(!warehouseOpen)}
+                        className="w-full flex items-center justify-between px-4 py-3 rounded-lg hover:bg-gray-700 transition-colors duration-150 text-white"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-xl">{item.icon}</span>
+                          <span>{item.label}</span>
+                        </div>
+                        <span className="text-sm">
+                          {warehouseOpen ? '▼' : '▶'}
+                        </span>
+                      </button>
+                      {warehouseOpen && (
+                        <ul className="ml-4 mt-2 space-y-1">
+                          {item.submenu.map((subItem) => {
+                            const isActive = pathname === subItem.href
+                            return (
+                              <li key={subItem.href}>
+                                <Link
+                                  href={subItem.href}
+                                  className={`
+                                    flex items-center gap-3 px-4 py-2 rounded-lg
+                                    transition-colors duration-150 text-sm
+                                    ${
+                                      isActive
+                                        ? 'bg-blue-600 text-white'
+                                        : 'hover:bg-gray-700 text-gray-300'
+                                    }
+                                  `}
+                                  onClick={() => setIsOpen(false)}
+                                >
+                                  <span>{subItem.icon}</span>
+                                  <span>{subItem.label}</span>
+                                </Link>
+                              </li>
+                            )
+                          })}
+                        </ul>
+                      )}
+                    </li>
+                  )
+                } else {
+                  // 일반 메뉴 아이템
+                  const isActive = pathname === item.href
+                  return (
+                    <li key={item.href}>
+                      <Link
+                        href={item.href!}
+                        className={`
+                          flex items-center gap-3 px-4 py-3 rounded-lg
+                          transition-colors duration-150
+                          ${
+                            isActive
+                              ? 'bg-blue-600 text-white'
+                              : 'hover:bg-gray-700 text-white'
+                          }
+                        `}
+                        onClick={() => setIsOpen(false)}
+                      >
+                        <span className="text-xl">{item.icon}</span>
+                        <span>{item.label}</span>
+                      </Link>
+                    </li>
+                  )
+                }
               })}
             </ul>
           </nav>
