@@ -8,8 +8,12 @@ export async function GET(request: NextRequest) {
     const vendorId = searchParams.get('vendorId')
     const productId = searchParams.get('productId')
     
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const where: any = {}
+    interface WhereClause {
+      vendorId?: number
+      productId?: number
+    }
+    
+    const where: WhereClause = {}
     if (vendorId) where.vendorId = parseInt(vendorId)
     if (productId) where.productId = parseInt(productId)
     

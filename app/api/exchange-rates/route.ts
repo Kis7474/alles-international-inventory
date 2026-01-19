@@ -8,8 +8,14 @@ export async function GET(request: NextRequest) {
     const currency = searchParams.get('currency')
     const date = searchParams.get('date')
     
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const where: any = {}
+    interface WhereClause {
+      currency?: string
+      date?: {
+        lte: Date
+      }
+    }
+    
+    const where: WhereClause = {}
     if (currency) where.currency = currency
     if (date) {
       where.date = {
