@@ -77,3 +77,47 @@ model StorageExpense {
   
   createdAt   DateTime @default(now())
 }
+
+// 판매 담당자
+model Salesperson {
+  id             Int           @id @default(autoincrement())
+  code           String        @unique  // BS, IK, YR, SJ
+  name           String
+  commissionRate Float         @default(0)  // IK만 0.15
+  sales          SalesRecord[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+// 품목 카테고리
+model ProductCategory {
+  id        Int           @id @default(autoincrement())
+  code      String        @unique
+  name      String        // Machine, Parts, Fount 등
+  nameKo    String        // 기계, 부품, 약물및습수액 등
+  sales     SalesRecord[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+// 매입매출 기록
+model SalesRecord {
+  id            Int             @id @default(autoincrement())
+  date          DateTime
+  type          String          // PURCHASE(매입) or SALES(매출)
+  salespersonId Int
+  salesperson   Salesperson     @relation(fields: [salespersonId], references: [id])
+  categoryId    Int
+  category      ProductCategory @relation(fields: [categoryId], references: [id])
+  itemName      String
+  customer      String?
+  quantity      Float
+  unitPrice     Float
+  amount        Float           // 수량 * 단가
+  cost          Float           @default(0) // 원가 (매출 시)
+  margin        Float           @default(0) // 마진 = amount - cost
+  marginRate    Float           @default(0) // 마진율
+  notes         String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+}
