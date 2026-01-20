@@ -126,10 +126,31 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const itemId = searchParams.get('itemId')
+    const startDate = searchParams.get('startDate')
+    const endDate = searchParams.get('endDate')
 
-    const where: { type: string; itemId?: number } = { type: 'OUT' }
+    interface WhereClause {
+      type: string
+      itemId?: number
+      movementDate?: {
+        gte?: Date
+        lte?: Date
+      }
+    }
+
+    const where: WhereClause = { type: 'OUT' }
+    
     if (itemId) {
       where.itemId = parseInt(itemId)
+    }
+    if (startDate || endDate) {
+      where.movementDate = {}
+      if (startDate) {
+        where.movementDate.gte = new Date(startDate)
+      }
+      if (endDate) {
+        where.movementDate.lte = new Date(endDate)
+      }
     }
 
     const movements = await prisma.inventoryMovement.findMany({

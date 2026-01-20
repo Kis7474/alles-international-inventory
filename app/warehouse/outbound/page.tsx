@@ -55,6 +55,12 @@ export default function OutboundPage() {
   const [deletingMovementId, setDeletingMovementId] = useState<number | null>(null)
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [selectAll, setSelectAll] = useState(false)
+  
+  // 필터 상태
+  const [filterStartDate, setFilterStartDate] = useState('')
+  const [filterEndDate, setFilterEndDate] = useState('')
+  const [filterItemId, setFilterItemId] = useState('')
+  
   const [outboundResult, setOutboundResult] = useState<{
     totalQuantity: number
     totalCost: number
@@ -89,6 +95,27 @@ export default function OutboundPage() {
     } catch (error) {
       console.error('Error fetching data:', error)
       alert('데이터 조회 중 오류가 발생했습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleFilter = async () => {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams()
+      if (filterStartDate) params.append('startDate', filterStartDate)
+      if (filterEndDate) params.append('endDate', filterEndDate)
+      if (filterItemId) params.append('itemId', filterItemId)
+
+      const res = await fetch(`/api/outbound?${params.toString()}`)
+      const data = await res.json()
+      setHistory(data)
+      setSelectedIds([])
+      setSelectAll(false)
+    } catch (error) {
+      console.error('Error filtering outbound:', error)
+      alert('필터링 중 오류가 발생했습니다.')
     } finally {
       setLoading(false)
     }
@@ -230,6 +257,68 @@ export default function OutboundPage() {
             className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
           >
             + 출고 등록
+          </button>
+        </div>
+      </div>
+
+      {/* 필터 */}
+      <div className="bg-white p-6 rounded-lg shadow mb-6">
+        <h2 className="text-lg font-bold mb-4 text-gray-900">필터</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-1 text-gray-700">시작일</label>
+            <input
+              type="date"
+              value={filterStartDate}
+              onChange={(e) => setFilterStartDate(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg text-gray-900"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium mb-1 text-gray-700">종료일</label>
+            <input
+              type="date"
+              value={filterEndDate}
+              onChange={(e) => setFilterEndDate(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg text-gray-900"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium mb-1 text-gray-700">품목</label>
+            <select
+              value={filterItemId}
+              onChange={(e) => setFilterItemId(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg text-gray-900"
+            >
+              <option value="">전체</option>
+              {items.map((item) => (
+                <option key={item.id} value={item.id}>
+                  [{item.code}] {item.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        
+        <div className="mt-4">
+          <button
+            onClick={handleFilter}
+            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+          >
+            필터 적용
+          </button>
+          <button
+            onClick={() => {
+              setFilterStartDate('')
+              setFilterEndDate('')
+              setFilterItemId('')
+              fetchData()
+            }}
+            className="ml-2 bg-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-400"
+          >
+            초기화
           </button>
         </div>
       </div>

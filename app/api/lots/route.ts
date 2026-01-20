@@ -3,9 +3,38 @@ import { prisma } from '@/lib/prisma'
 import { calculateUnitCost } from '@/lib/utils'
 
 // GET - LOT 목록 조회
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const searchParams = request.nextUrl.searchParams
+    const startDate = searchParams.get('startDate')
+    const endDate = searchParams.get('endDate')
+    const productId = searchParams.get('productId')
+
+    interface WhereClause {
+      receivedDate?: {
+        gte?: Date
+        lte?: Date
+      }
+      productId?: number
+    }
+
+    const where: WhereClause = {}
+
+    if (startDate || endDate) {
+      where.receivedDate = {}
+      if (startDate) {
+        where.receivedDate.gte = new Date(startDate)
+      }
+      if (endDate) {
+        where.receivedDate.lte = new Date(endDate)
+      }
+    }
+    if (productId) {
+      where.productId = parseInt(productId)
+    }
+
     const lots = await prisma.inventoryLot.findMany({
+      where,
       include: {
         item: true,
         product: {

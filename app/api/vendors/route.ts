@@ -2,9 +2,28 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
 // GET /api/vendors - 거래처 목록 조회
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const searchParams = request.nextUrl.searchParams
+    const type = searchParams.get('type')
+    const searchName = searchParams.get('searchName')
+
+    interface WhereClause {
+      type?: string
+      name?: { contains: string; mode: 'insensitive' }
+    }
+
+    const where: WhereClause = {}
+
+    if (type) {
+      where.type = type
+    }
+    if (searchName) {
+      where.name = { contains: searchName, mode: 'insensitive' as const }
+    }
+
     const vendors = await prisma.vendor.findMany({
+      where,
       orderBy: { name: 'asc' },
     })
 

@@ -18,6 +18,11 @@ export default function VendorsPage() {
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null)
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [selectAll, setSelectAll] = useState(false)
+  
+  // 필터 상태
+  const [filterType, setFilterType] = useState('')
+  const [filterSearchName, setFilterSearchName] = useState('')
+  
   const [formData, setFormData] = useState({
     name: '',
     type: 'DOMESTIC_PURCHASE',
@@ -38,6 +43,26 @@ export default function VendorsPage() {
     } catch (error) {
       console.error('Error fetching vendors:', error)
       alert('거래처 조회 중 오류가 발생했습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleFilter = async () => {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams()
+      if (filterType) params.append('type', filterType)
+      if (filterSearchName) params.append('searchName', filterSearchName)
+
+      const res = await fetch(`/api/vendors?${params.toString()}`)
+      const data = await res.json()
+      setVendors(data)
+      setSelectedIds([])
+      setSelectAll(false)
+    } catch (error) {
+      console.error('Error filtering vendors:', error)
+      alert('필터링 중 오류가 발생했습니다.')
     } finally {
       setLoading(false)
     }
@@ -202,6 +227,57 @@ export default function VendorsPage() {
             className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
           >
             + 거래처 등록
+          </button>
+        </div>
+      </div>
+
+      {/* 필터 */}
+      <div className="bg-white p-6 rounded-lg shadow mb-6">
+        <h2 className="text-lg font-bold mb-4 text-gray-900">필터</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-1 text-gray-700">유형</label>
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg text-gray-900"
+            >
+              <option value="">전체</option>
+              <option value="DOMESTIC_PURCHASE">국내(매입)</option>
+              <option value="DOMESTIC_SALES">국내(매출)</option>
+              <option value="INTERNATIONAL_PURCHASE">해외(매입)</option>
+              <option value="INTERNATIONAL_SALES">해외(매출)</option>
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium mb-1 text-gray-700">거래처명 검색</label>
+            <input
+              type="text"
+              value={filterSearchName}
+              onChange={(e) => setFilterSearchName(e.target.value)}
+              placeholder="거래처명으로 검색"
+              className="w-full px-3 py-2 border rounded-lg text-gray-900"
+            />
+          </div>
+        </div>
+        
+        <div className="mt-4">
+          <button
+            onClick={handleFilter}
+            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+          >
+            필터 적용
+          </button>
+          <button
+            onClick={() => {
+              setFilterType('')
+              setFilterSearchName('')
+              fetchVendors()
+            }}
+            className="ml-2 bg-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-400"
+          >
+            초기화
           </button>
         </div>
       </div>

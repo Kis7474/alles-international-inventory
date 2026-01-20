@@ -31,6 +31,10 @@ export default function MasterProductsPage() {
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [selectAll, setSelectAll] = useState(false)
   
+  // 필터 상태
+  const [filterCategoryId, setFilterCategoryId] = useState('')
+  const [filterSearchName, setFilterSearchName] = useState('')
+  
   const [formData, setFormData] = useState({
     code: '',
     name: '',
@@ -57,6 +61,26 @@ export default function MasterProductsPage() {
       setCategories(categoriesData)
     } catch (error) {
       console.error('Error fetching data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleFilter = async () => {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams()
+      if (filterCategoryId) params.append('categoryId', filterCategoryId)
+      if (filterSearchName) params.append('searchName', filterSearchName)
+
+      const res = await fetch(`/api/products?${params.toString()}`)
+      const data = await res.json()
+      setProducts(data)
+      setSelectedIds([])
+      setSelectAll(false)
+    } catch (error) {
+      console.error('Error filtering products:', error)
+      alert('필터링 중 오류가 발생했습니다.')
     } finally {
       setLoading(false)
     }
@@ -212,6 +236,58 @@ export default function MasterProductsPage() {
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
             + 품목 등록
+          </button>
+        </div>
+      </div>
+
+      {/* 필터 */}
+      <div className="bg-white p-6 rounded-lg shadow mb-6">
+        <h2 className="text-lg font-bold mb-4 text-gray-900">필터</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-1 text-gray-700">카테고리</label>
+            <select
+              value={filterCategoryId}
+              onChange={(e) => setFilterCategoryId(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg text-gray-900"
+            >
+              <option value="">전체</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.nameKo}
+                </option>
+              ))}
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium mb-1 text-gray-700">품목명 검색</label>
+            <input
+              type="text"
+              value={filterSearchName}
+              onChange={(e) => setFilterSearchName(e.target.value)}
+              placeholder="품목명 또는 코드로 검색"
+              className="w-full px-3 py-2 border rounded-lg text-gray-900"
+            />
+          </div>
+        </div>
+        
+        <div className="mt-4">
+          <button
+            onClick={handleFilter}
+            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+          >
+            필터 적용
+          </button>
+          <button
+            onClick={() => {
+              setFilterCategoryId('')
+              setFilterSearchName('')
+              fetchData()
+            }}
+            className="ml-2 bg-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-400"
+          >
+            초기화
           </button>
         </div>
       </div>

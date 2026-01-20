@@ -16,6 +16,10 @@ export default function CategoriesPage() {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null)
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [selectAll, setSelectAll] = useState(false)
+  
+  // 필터 상태
+  const [filterSearchName, setFilterSearchName] = useState('')
+  
   const [formData, setFormData] = useState({
     code: '',
     name: '',
@@ -34,6 +38,25 @@ export default function CategoriesPage() {
     } catch (error) {
       console.error('Error fetching categories:', error)
       alert('카테고리 조회 중 오류가 발생했습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleFilter = async () => {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams()
+      if (filterSearchName) params.append('searchName', filterSearchName)
+
+      const res = await fetch(`/api/categories?${params.toString()}`)
+      const data = await res.json()
+      setCategories(data)
+      setSelectedIds([])
+      setSelectAll(false)
+    } catch (error) {
+      console.error('Error filtering categories:', error)
+      alert('필터링 중 오류가 발생했습니다.')
     } finally {
       setLoading(false)
     }
@@ -194,6 +217,41 @@ export default function CategoriesPage() {
             className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
           >
             + 카테고리 등록
+          </button>
+        </div>
+      </div>
+
+      {/* 필터 */}
+      <div className="bg-white p-6 rounded-lg shadow mb-6">
+        <h2 className="text-lg font-bold mb-4 text-gray-900">필터</h2>
+        <div className="grid grid-cols-1 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-1 text-gray-700">카테고리명 검색</label>
+            <input
+              type="text"
+              value={filterSearchName}
+              onChange={(e) => setFilterSearchName(e.target.value)}
+              placeholder="코드, 영문명, 한글명으로 검색"
+              className="w-full px-3 py-2 border rounded-lg text-gray-900"
+            />
+          </div>
+        </div>
+        
+        <div className="mt-4">
+          <button
+            onClick={handleFilter}
+            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+          >
+            필터 적용
+          </button>
+          <button
+            onClick={() => {
+              setFilterSearchName('')
+              fetchCategories()
+            }}
+            className="ml-2 bg-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-400"
+          >
+            초기화
           </button>
         </div>
       </div>

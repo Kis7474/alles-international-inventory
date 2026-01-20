@@ -1,15 +1,37 @@
 import { NextResponse, NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const searchParams = request.nextUrl.searchParams
+    const searchName = searchParams.get('searchName')
+
+    interface WhereClause {
+      OR?: Array<{
+        code?: { contains: string; mode: 'insensitive' }
+        name?: { contains: string; mode: 'insensitive' }
+        nameKo?: { contains: string; mode: 'insensitive' }
+      }>
+    }
+
+    const where: WhereClause = {}
+
+    if (searchName) {
+      where.OR = [
+        { code: { contains: searchName, mode: 'insensitive' as const } },
+        { name: { contains: searchName, mode: 'insensitive' as const } },
+        { nameKo: { contains: searchName, mode: 'insensitive' as const } },
+      ]
+    }
+
     // 통합 카테고리 우선 조회, 없으면 ProductCategory 조회
     const categories = await prisma.category.findMany({
+      where,
       orderBy: { code: 'asc' },
     })
     
     // 통합 카테고리가 없으면 기존 ProductCategory 반환
-    if (categories.length === 0) {
+    if (categories.length === 0 && !searchName) {
       const productCategories = await prisma.productCategory.findMany({
         orderBy: { code: 'asc' },
       })
