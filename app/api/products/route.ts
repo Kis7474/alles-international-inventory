@@ -6,8 +6,27 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const categoryId = searchParams.get('categoryId')
+    const searchName = searchParams.get('searchName')
     
-    const where = categoryId ? { categoryId: parseInt(categoryId) } : {}
+    interface WhereClause {
+      categoryId?: number
+      OR?: Array<{
+        name?: { contains: string }
+        code?: { contains: string }
+      }>
+    }
+    
+    const where: WhereClause = {}
+    
+    if (categoryId) {
+      where.categoryId = parseInt(categoryId)
+    }
+    if (searchName) {
+      where.OR = [
+        { name: { contains: searchName } },
+        { code: { contains: searchName } },
+      ]
+    }
     
     const products = await prisma.product.findMany({
       where,
@@ -102,12 +121,24 @@ export async function PUT(request: Request) {
   }
 }
 
-// DELETE /api/products - 품목 삭제
+// DELETE /api/products - 품목 삭제 (단일 또는 다중)
 export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
-    
+    const body = await request.json().catch(() => null)
+
+    // Bulk delete
+    if (body && body.ids && Array.isArray(body.ids)) {
+      await prisma.product.deleteMany({
+        where: {
+          id: { in: body.ids.map((id: string | number) => parseInt(id.toString())) }
+        }
+      })
+      return NextResponse.json({ success: true, count: body.ids.length })
+    }
+
+    // Single delete
     if (!id) {
       return NextResponse.json({ error: 'Product ID is required' }, { status: 400 })
     }

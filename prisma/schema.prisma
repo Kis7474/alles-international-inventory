@@ -59,7 +59,7 @@ model Vendor {
   id              Int                   @id @default(autoincrement())
   code            String                @unique
   name            String
-  type            String                @default("DOMESTIC") // DOMESTIC(국내), OVERSEAS(해외)
+  type            String                @default("DOMESTIC_PURCHASE") // DOMESTIC_PURCHASE, DOMESTIC_SALES, INTERNATIONAL_PURCHASE, INTERNATIONAL_SALES
   contactPerson   String?
   phone           String?
   email           String?

@@ -126,10 +126,31 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const itemId = searchParams.get('itemId')
+    const startDate = searchParams.get('startDate')
+    const endDate = searchParams.get('endDate')
 
-    const where: { type: string; itemId?: number } = { type: 'OUT' }
+    interface WhereClause {
+      type: string
+      itemId?: number
+      movementDate?: {
+        gte?: Date
+        lte?: Date
+      }
+    }
+
+    const where: WhereClause = { type: 'OUT' }
+    
     if (itemId) {
       where.itemId = parseInt(itemId)
+    }
+    if (startDate || endDate) {
+      where.movementDate = {}
+      if (startDate) {
+        where.movementDate.gte = new Date(startDate)
+      }
+      if (endDate) {
+        where.movementDate.lte = new Date(endDate)
+      }
     }
 
     const movements = await prisma.inventoryMovement.findMany({
@@ -154,12 +175,57 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// DELETE - 출고 내역 삭제
+// DELETE - 출고 내역 삭제 (단일 또는 다중)
 export async function DELETE(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
     const id = searchParams.get('id')
+    const body = await request.json().catch(() => null)
 
+    // Bulk delete
+    if (body && body.ids && Array.isArray(body.ids)) {
+      const ids = body.ids.map((id: string | number) => parseInt(id.toString()))
+      
+      // 모든 출고 이력 조회
+      const movements = await prisma.inventoryMovement.findMany({
+        where: { id: { in: ids } },
+      })
+
+      // OUT 타입이 아닌 것이 있는지 확인
+      const invalidMovements = movements.filter(m => m.type !== 'OUT')
+      if (invalidMovements.length > 0) {
+        return NextResponse.json(
+          { error: '출고 내역만 삭제할 수 있습니다.' },
+          { status: 400 }
+        )
+      }
+
+      // 출고 내역 삭제 및 LOT 잔량 복구 (트랜잭션)
+      await prisma.$transaction(async (tx) => {
+        for (const movement of movements) {
+          // 출고 내역 삭제
+          await tx.inventoryMovement.delete({
+            where: { id: movement.id },
+          })
+
+          // LOT 잔량 복구 (출고 취소이므로 다시 더함)
+          if (movement.lotId) {
+            await tx.inventoryLot.update({
+              where: { id: movement.lotId },
+              data: {
+                quantityRemaining: {
+                  increment: movement.quantity,
+                },
+              },
+            })
+          }
+        }
+      })
+
+      return NextResponse.json({ success: true, count: body.ids.length })
+    }
+
+    // Single delete
     if (!id) {
       return NextResponse.json(
         { error: 'ID가 필요합니다.' },

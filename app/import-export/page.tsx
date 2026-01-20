@@ -31,6 +31,8 @@ export default function ImportExportPage() {
     startDate: '',
     endDate: '',
   })
+  const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [selectAll, setSelectAll] = useState(false)
 
   useEffect(() => {
     fetchRecords()
@@ -57,6 +59,8 @@ export default function ImportExportPage() {
   const handleFilter = () => {
     setLoading(true)
     fetchRecords()
+    setSelectedIds([])
+    setSelectAll(false)
   }
 
   const handleDelete = async (id: number) => {
@@ -69,12 +73,57 @@ export default function ImportExportPage() {
 
       if (res.ok) {
         await fetchRecords()
+        setSelectedIds([])
+        setSelectAll(false)
       } else {
         const error = await res.json()
         alert(error.error || '삭제 중 오류가 발생했습니다.')
       }
     } catch (error) {
       console.error('Error deleting record:', error)
+      alert('삭제 중 오류가 발생했습니다.')
+    }
+  }
+
+  const handleSelectAll = () => {
+    if (selectAll) {
+      setSelectedIds([])
+    } else {
+      setSelectedIds(records.map(r => r.id))
+    }
+    setSelectAll(!selectAll)
+  }
+
+  const handleSelect = (id: number) => {
+    setSelectedIds(prev => 
+      prev.includes(id) 
+        ? prev.filter(i => i !== id)
+        : [...prev, id]
+    )
+  }
+
+  const handleBulkDelete = async () => {
+    if (!confirm(`${selectedIds.length}개 항목을 삭제하시겠습니까?`)) return
+    
+    try {
+      const res = await fetch('/api/import-export', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: selectedIds })
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        alert(data.error || '삭제 중 오류가 발생했습니다.')
+        return
+      }
+
+      alert(`${selectedIds.length}개 항목이 삭제되었습니다.`)
+      fetchRecords()
+      setSelectedIds([])
+      setSelectAll(false)
+    } catch (error) {
+      console.error('Error bulk deleting records:', error)
       alert('삭제 중 오류가 발생했습니다.')
     }
   }
@@ -91,12 +140,22 @@ export default function ImportExportPage() {
     <div>
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold text-gray-900">수입/수출 관리</h1>
-        <Link
-          href="/import-export/new"
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          + 수입/수출 등록
-        </Link>
+        <div className="flex gap-2">
+          {selectedIds.length > 0 && (
+            <button
+              onClick={handleBulkDelete}
+              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
+            >
+              선택 삭제 ({selectedIds.length}개)
+            </button>
+          )}
+          <Link
+            href="/import-export/new"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            + 수입/수출 등록
+          </Link>
+        </div>
       </div>
 
       {/* 필터 */}
@@ -155,6 +214,14 @@ export default function ImportExportPage() {
           <table className="min-w-full">
             <thead className="bg-gray-50 border-b">
               <tr>
+                <th className="px-4 py-3 w-12">
+                  <input
+                    type="checkbox"
+                    checked={selectAll}
+                    onChange={handleSelectAll}
+                    className="w-4 h-4 rounded"
+                  />
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                   날짜
                 </th>
@@ -190,6 +257,14 @@ export default function ImportExportPage() {
             <tbody className="bg-white divide-y divide-gray-200">
               {records.map((record) => (
                 <tr key={record.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(record.id)}
+                      onChange={() => handleSelect(record.id)}
+                      className="w-4 h-4 rounded"
+                    />
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {new Date(record.date).toLocaleDateString('ko-KR')}
                   </td>
@@ -233,7 +308,7 @@ export default function ImportExportPage() {
               ))}
               {records.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={11} className="px-6 py-4 text-center text-gray-500">
                     등록된 내역이 없습니다.
                   </td>
                 </tr>

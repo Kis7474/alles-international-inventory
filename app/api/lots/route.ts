@@ -3,9 +3,38 @@ import { prisma } from '@/lib/prisma'
 import { calculateUnitCost } from '@/lib/utils'
 
 // GET - LOT 목록 조회
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const searchParams = request.nextUrl.searchParams
+    const startDate = searchParams.get('startDate')
+    const endDate = searchParams.get('endDate')
+    const productId = searchParams.get('productId')
+
+    interface WhereClause {
+      receivedDate?: {
+        gte?: Date
+        lte?: Date
+      }
+      productId?: number
+    }
+
+    const where: WhereClause = {}
+
+    if (startDate || endDate) {
+      where.receivedDate = {}
+      if (startDate) {
+        where.receivedDate.gte = new Date(startDate)
+      }
+      if (endDate) {
+        where.receivedDate.lte = new Date(endDate)
+      }
+    }
+    if (productId) {
+      where.productId = parseInt(productId)
+    }
+
     const lots = await prisma.inventoryLot.findMany({
+      where,
       include: {
         item: true,
         product: {
@@ -137,12 +166,44 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// DELETE - 입고 내역 삭제
+// DELETE - 입고 내역 삭제 (단일 또는 다중)
 export async function DELETE(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
     const id = searchParams.get('id')
+    const body = await request.json().catch(() => null)
 
+    // Bulk delete
+    if (body && body.ids && Array.isArray(body.ids)) {
+      const ids = body.ids.map((id: string | number) => parseInt(id.toString()))
+      
+      // 모든 LOT의 잔량 확인
+      const lots = await prisma.inventoryLot.findMany({
+        where: { id: { in: ids } },
+      })
+
+      // 잔량이 입고수량과 다른 LOT가 있는지 확인
+      const invalidLots = lots.filter(lot => lot.quantityRemaining !== lot.quantityReceived)
+      if (invalidLots.length > 0) {
+        return NextResponse.json(
+          { error: '이미 출고된 LOT는 삭제할 수 없습니다.' },
+          { status: 400 }
+        )
+      }
+
+      await prisma.$transaction(async (tx) => {
+        await tx.inventoryMovement.deleteMany({
+          where: { lotId: { in: ids } },
+        })
+        await tx.inventoryLot.deleteMany({
+          where: { id: { in: ids } },
+        })
+      })
+
+      return NextResponse.json({ success: true, count: body.ids.length })
+    }
+
+    // Single delete
     if (!id) {
       return NextResponse.json(
         { error: 'ID가 필요합니다.' },

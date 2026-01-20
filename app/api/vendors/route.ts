@@ -2,9 +2,28 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
 // GET /api/vendors - 거래처 목록 조회
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const searchParams = request.nextUrl.searchParams
+    const type = searchParams.get('type')
+    const searchName = searchParams.get('searchName')
+
+    interface WhereClause {
+      type?: string
+      name?: { contains: string }
+    }
+
+    const where: WhereClause = {}
+
+    if (type) {
+      where.type = type
+    }
+    if (searchName) {
+      where.name = { contains: searchName }
+    }
+
     const vendors = await prisma.vendor.findMany({
+      where,
       orderBy: { name: 'asc' },
     })
 
@@ -122,12 +141,37 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-// DELETE /api/vendors - 거래처 삭제
+// DELETE /api/vendors - 거래처 삭제 (단일 또는 다중)
 export async function DELETE(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
     const id = searchParams.get('id')
+    const body = await request.json().catch(() => null)
 
+    // Bulk delete
+    if (body && body.ids && Array.isArray(body.ids)) {
+      const ids = body.ids.map((id: string | number) => parseInt(id.toString()))
+      
+      // 판매 내역이 있는지 확인
+      const salesCount = await prisma.salesRecord.count({
+        where: { vendorId: { in: ids } },
+      })
+
+      if (salesCount > 0) {
+        return NextResponse.json(
+          { error: '거래 내역이 있는 거래처는 삭제할 수 없습니다.' },
+          { status: 400 }
+        )
+      }
+
+      await prisma.vendor.deleteMany({
+        where: { id: { in: ids } },
+      })
+
+      return NextResponse.json({ success: true, count: body.ids.length })
+    }
+
+    // Single delete
     if (!id) {
       return NextResponse.json(
         { error: 'ID가 필요합니다.' },

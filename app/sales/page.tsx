@@ -46,6 +46,10 @@ export default function SalesPage() {
   const [filterStartDate, setFilterStartDate] = useState('')
   const [filterEndDate, setFilterEndDate] = useState('')
 
+  // 다중 선택 상태
+  const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [selectAll, setSelectAll] = useState(false)
+
   useEffect(() => {
     fetchData()
   }, [])
@@ -86,6 +90,8 @@ export default function SalesPage() {
       const res = await fetch(`/api/sales?${params.toString()}`)
       const data = await res.json()
       setSales(data)
+      setSelectedIds([])
+      setSelectAll(false)
     } catch (error) {
       console.error('Error filtering sales:', error)
       alert('필터링 중 오류가 발생했습니다.')
@@ -110,9 +116,89 @@ export default function SalesPage() {
 
       alert('삭제되었습니다.')
       fetchData()
+      setSelectedIds([])
+      setSelectAll(false)
     } catch (error) {
       console.error('Error deleting sales record:', error)
       alert('삭제 중 오류가 발생했습니다.')
+    }
+  }
+
+  // 전체 선택 토글
+  const handleSelectAll = () => {
+    if (selectAll) {
+      setSelectedIds([])
+    } else {
+      setSelectedIds(sales.map(r => r.id))
+    }
+    setSelectAll(!selectAll)
+  }
+
+  // 개별 선택
+  const handleSelect = (id: number) => {
+    setSelectedIds(prev => 
+      prev.includes(id) 
+        ? prev.filter(i => i !== id)
+        : [...prev, id]
+    )
+  }
+
+  // 선택 삭제
+  const handleBulkDelete = async () => {
+    if (!confirm(`${selectedIds.length}개 항목을 삭제하시겠습니까?`)) return
+    
+    try {
+      const res = await fetch('/api/sales', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: selectedIds })
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        alert(data.error || '삭제 중 오류가 발생했습니다.')
+        return
+      }
+
+      alert(`${selectedIds.length}개 항목이 삭제되었습니다.`)
+      fetchData()
+      setSelectedIds([])
+      setSelectAll(false)
+    } catch (error) {
+      console.error('Error bulk deleting sales records:', error)
+      alert('삭제 중 오류가 발생했습니다.')
+    }
+  }
+
+  // 엑셀 다운로드
+  const handleExcelDownload = async () => {
+    try {
+      const params = new URLSearchParams()
+      if (filterType) params.append('type', filterType)
+      if (filterSalesperson) params.append('salespersonId', filterSalesperson)
+      if (filterCategory) params.append('categoryId', filterCategory)
+      if (filterStartDate) params.append('startDate', filterStartDate)
+      if (filterEndDate) params.append('endDate', filterEndDate)
+      
+      const response = await fetch(`/api/sales/export?${params.toString()}`)
+      
+      if (!response.ok) {
+        alert('엑셀 다운로드 중 오류가 발생했습니다.')
+        return
+      }
+      
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `매입매출내역_${new Date().toISOString().slice(0,10).replace(/-/g,'')}.xlsx`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (error) {
+      console.error('Error downloading Excel:', error)
+      alert('엑셀 다운로드 중 오류가 발생했습니다.')
     }
   }
 
@@ -129,9 +215,23 @@ export default function SalesPage() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-900">매입매출 내역</h1>
         <div className="flex gap-2">
+          {selectedIds.length > 0 && (
+            <button
+              onClick={handleBulkDelete}
+              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
+            >
+              선택 삭제 ({selectedIds.length}개)
+            </button>
+          )}
+          <button
+            onClick={handleExcelDownload}
+            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
+          >
+            📥 엑셀 내려받기
+          </button>
           <Link
             href="/master/upload"
-            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
+            className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700"
           >
             📤 엑셀 업로드
           </Link>
@@ -243,6 +343,14 @@ export default function SalesPage() {
           <table className="min-w-full">
             <thead className="bg-gray-50">
               <tr>
+                <th className="px-4 py-3 w-12">
+                  <input
+                    type="checkbox"
+                    checked={selectAll}
+                    onChange={handleSelectAll}
+                    className="w-4 h-4 rounded"
+                  />
+                </th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">날짜</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">구분</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">담당자</th>
@@ -251,7 +359,7 @@ export default function SalesPage() {
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">거래처</th>
                 <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">수량</th>
                 <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">단가</th>
-                <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">금액</th>
+                <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">총액(부가세제외)</th>
                 <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">마진</th>
                 <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">마진율</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">작업</th>
@@ -260,6 +368,14 @@ export default function SalesPage() {
             <tbody className="divide-y divide-gray-200">
               {sales.map((record) => (
                 <tr key={record.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(record.id)}
+                      onChange={() => handleSelect(record.id)}
+                      className="w-4 h-4 rounded"
+                    />
+                  </td>
                   <td className="px-4 py-3 text-gray-900">
                     {new Date(record.date).toLocaleDateString('ko-KR')}
                   </td>
@@ -283,11 +399,23 @@ export default function SalesPage() {
                   <td className="px-4 py-3 text-right text-gray-900">
                     ₩{formatNumber(record.amount, 0)}
                   </td>
-                  <td className="px-4 py-3 text-right text-gray-900">
-                    {record.type === 'SALES' ? `₩${formatNumber(record.margin, 0)}` : '-'}
+                  <td className="px-4 py-3 text-right">
+                    {record.type === 'SALES' ? (
+                      <span className={record.margin >= 0 ? 'text-green-600' : 'text-red-600'}>
+                        ₩{formatNumber(record.margin, 0)}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
                   </td>
-                  <td className="px-4 py-3 text-right text-gray-900">
-                    {record.type === 'SALES' ? `${record.marginRate.toFixed(1)}%` : '-'}
+                  <td className="px-4 py-3 text-right">
+                    {record.type === 'SALES' ? (
+                      <span className={record.marginRate >= 0 ? 'text-green-600' : 'text-red-600'}>
+                        {record.marginRate.toFixed(1)}%
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <Link
@@ -307,7 +435,7 @@ export default function SalesPage() {
               ))}
               {sales.length === 0 && (
                 <tr>
-                  <td colSpan={12} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={13} className="px-4 py-8 text-center text-gray-500">
                     등록된 매입매출 내역이 없습니다.
                   </td>
                 </tr>
