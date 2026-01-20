@@ -28,6 +28,8 @@ export default function MasterProductsPage() {
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+  const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [selectAll, setSelectAll] = useState(false)
   
   const [formData, setFormData] = useState({
     code: '',
@@ -79,6 +81,8 @@ export default function MasterProductsPage() {
       if (res.ok) {
         await fetchData()
         handleCloseModal()
+        setSelectedIds([])
+        setSelectAll(false)
       } else {
         const error = await res.json()
         alert(error.error || '오류가 발생했습니다.')
@@ -99,12 +103,57 @@ export default function MasterProductsPage() {
 
       if (res.ok) {
         await fetchData()
+        setSelectedIds([])
+        setSelectAll(false)
       } else {
         const error = await res.json()
         alert(error.error || '삭제 중 오류가 발생했습니다.')
       }
     } catch (error) {
       console.error('Error deleting product:', error)
+      alert('삭제 중 오류가 발생했습니다.')
+    }
+  }
+
+  const handleSelectAll = () => {
+    if (selectAll) {
+      setSelectedIds([])
+    } else {
+      setSelectedIds(products.map(r => r.id))
+    }
+    setSelectAll(!selectAll)
+  }
+
+  const handleSelect = (id: number) => {
+    setSelectedIds(prev => 
+      prev.includes(id) 
+        ? prev.filter(i => i !== id)
+        : [...prev, id]
+    )
+  }
+
+  const handleBulkDelete = async () => {
+    if (!confirm(`${selectedIds.length}개 항목을 삭제하시겠습니까?`)) return
+    
+    try {
+      const res = await fetch('/api/products', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: selectedIds })
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        alert(data.error || '삭제 중 오류가 발생했습니다.')
+        return
+      }
+
+      alert(`${selectedIds.length}개 항목이 삭제되었습니다.`)
+      fetchData()
+      setSelectedIds([])
+      setSelectAll(false)
+    } catch (error) {
+      console.error('Error bulk deleting products:', error)
       alert('삭제 중 오류가 발생했습니다.')
     }
   }
@@ -149,12 +198,22 @@ export default function MasterProductsPage() {
     <div>
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold text-gray-900">통합 품목 관리</h1>
-        <button
-          onClick={() => setShowModal(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          + 품목 등록
-        </button>
+        <div className="flex gap-2">
+          {selectedIds.length > 0 && (
+            <button
+              onClick={handleBulkDelete}
+              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
+            >
+              선택 삭제 ({selectedIds.length}개)
+            </button>
+          )}
+          <button
+            onClick={() => setShowModal(true)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            + 품목 등록
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -162,6 +221,14 @@ export default function MasterProductsPage() {
           <table className="min-w-full">
             <thead className="bg-gray-50 border-b">
               <tr>
+                <th className="px-4 py-3 w-12">
+                  <input
+                    type="checkbox"
+                    checked={selectAll}
+                    onChange={handleSelectAll}
+                    className="w-4 h-4 rounded"
+                  />
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                   코드
                 </th>
@@ -188,6 +255,14 @@ export default function MasterProductsPage() {
             <tbody className="bg-white divide-y divide-gray-200">
               {products.map((product) => (
                 <tr key={product.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(product.id)}
+                      onChange={() => handleSelect(product.id)}
+                      className="w-4 h-4 rounded"
+                    />
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {product.code}
                   </td>
@@ -224,7 +299,7 @@ export default function MasterProductsPage() {
               ))}
               {products.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={8} className="px-6 py-4 text-center text-gray-500">
                     등록된 품목이 없습니다.
                   </td>
                 </tr>

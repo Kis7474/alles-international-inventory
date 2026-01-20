@@ -277,12 +277,24 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-// DELETE /api/import-export - 수입/수출 삭제
+// DELETE /api/import-export - 수입/수출 삭제 (단일 또는 다중)
 export async function DELETE(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
     const id = searchParams.get('id')
+    const body = await request.json().catch(() => null)
 
+    // Bulk delete
+    if (body && body.ids && Array.isArray(body.ids)) {
+      await prisma.importExport.deleteMany({
+        where: {
+          id: { in: body.ids.map((id: string | number) => parseInt(id.toString())) }
+        }
+      })
+      return NextResponse.json({ success: true, count: body.ids.length })
+    }
+
+    // Single delete
     if (!id) {
       return NextResponse.json(
         { error: 'ID가 필요합니다.' },

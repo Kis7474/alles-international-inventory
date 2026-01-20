@@ -14,6 +14,8 @@ export default function CategoriesPage() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingCategory, setEditingCategory] = useState<Category | null>(null)
+  const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [selectAll, setSelectAll] = useState(false)
   const [formData, setFormData] = useState({
     code: '',
     name: '',
@@ -66,6 +68,8 @@ export default function CategoriesPage() {
       setEditingCategory(null)
       resetForm()
       fetchCategories()
+      setSelectedIds([])
+      setSelectAll(false)
     } catch (error) {
       console.error('Error saving category:', error)
       alert('저장 중 오류가 발생했습니다.')
@@ -101,8 +105,53 @@ export default function CategoriesPage() {
 
       alert('삭제되었습니다.')
       fetchCategories()
+      setSelectedIds([])
+      setSelectAll(false)
     } catch (error) {
       console.error('Error deleting category:', error)
+      alert('삭제 중 오류가 발생했습니다.')
+    }
+  }
+
+  const handleSelectAll = () => {
+    if (selectAll) {
+      setSelectedIds([])
+    } else {
+      setSelectedIds(categories.map(r => r.id))
+    }
+    setSelectAll(!selectAll)
+  }
+
+  const handleSelect = (id: number) => {
+    setSelectedIds(prev => 
+      prev.includes(id) 
+        ? prev.filter(i => i !== id)
+        : [...prev, id]
+    )
+  }
+
+  const handleBulkDelete = async () => {
+    if (!confirm(`${selectedIds.length}개 항목을 삭제하시겠습니까?`)) return
+    
+    try {
+      const res = await fetch('/api/categories', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: selectedIds })
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        alert(data.error || '삭제 중 오류가 발생했습니다.')
+        return
+      }
+
+      alert(`${selectedIds.length}개 항목이 삭제되었습니다.`)
+      fetchCategories()
+      setSelectedIds([])
+      setSelectAll(false)
+    } catch (error) {
+      console.error('Error bulk deleting categories:', error)
       alert('삭제 중 오류가 발생했습니다.')
     }
   }
@@ -127,16 +176,26 @@ export default function CategoriesPage() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-900">카테고리 관리</h1>
-        <button
-          onClick={() => {
-            setEditingCategory(null)
-            resetForm()
-            setShowForm(true)
-          }}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-        >
-          + 카테고리 등록
-        </button>
+        <div className="flex gap-2">
+          {selectedIds.length > 0 && (
+            <button
+              onClick={handleBulkDelete}
+              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
+            >
+              선택 삭제 ({selectedIds.length}개)
+            </button>
+          )}
+          <button
+            onClick={() => {
+              setEditingCategory(null)
+              resetForm()
+              setShowForm(true)
+            }}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+          >
+            + 카테고리 등록
+          </button>
+        </div>
       </div>
 
       {/* 등록/수정 폼 */}
@@ -221,6 +280,14 @@ export default function CategoriesPage() {
           <table className="min-w-full">
             <thead className="bg-gray-50">
               <tr>
+                <th className="px-4 py-3 w-12">
+                  <input
+                    type="checkbox"
+                    checked={selectAll}
+                    onChange={handleSelectAll}
+                    className="w-4 h-4 rounded"
+                  />
+                </th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">코드</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">영문명</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">한글명</th>
@@ -230,6 +297,14 @@ export default function CategoriesPage() {
             <tbody className="divide-y divide-gray-200">
               {categories.map((category) => (
                 <tr key={category.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(category.id)}
+                      onChange={() => handleSelect(category.id)}
+                      className="w-4 h-4 rounded"
+                    />
+                  </td>
                   <td className="px-4 py-3 text-gray-900 font-medium">{category.code}</td>
                   <td className="px-4 py-3 text-gray-900">{category.name}</td>
                   <td className="px-4 py-3 text-gray-900">{category.nameKo}</td>
@@ -251,7 +326,7 @@ export default function CategoriesPage() {
               ))}
               {categories.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
                     등록된 카테고리가 없습니다.
                   </td>
                 </tr>
