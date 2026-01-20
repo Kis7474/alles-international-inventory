@@ -421,7 +421,7 @@ export default function VendorsPage() {
                   <td className="px-4 py-3 text-gray-900 font-medium">{vendor.name}</td>
                   <td className="px-4 py-3 text-gray-900">
                     <span className={`px-2 py-1 rounded-full text-xs ${
-                      vendor.type && vendor.type.startsWith('DOMESTIC') ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
+                      vendor.type?.startsWith('DOMESTIC') ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
                     }`}>
                       {vendor.type === 'DOMESTIC_PURCHASE' ? '국내(매입)' : 
                        vendor.type === 'DOMESTIC_SALES' ? '국내(매출)' :

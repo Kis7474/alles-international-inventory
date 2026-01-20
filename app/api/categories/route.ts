@@ -8,9 +8,9 @@ export async function GET(request: NextRequest) {
 
     interface WhereClause {
       OR?: Array<{
-        code?: { contains: string; mode?: 'insensitive' }
-        name?: { contains: string; mode?: 'insensitive' }
-        nameKo?: { contains: string; mode?: 'insensitive' }
+        code?: { contains: string }
+        name?: { contains: string }
+        nameKo?: { contains: string }
       }>
     }
 

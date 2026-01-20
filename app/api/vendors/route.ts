@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
 
     interface WhereClause {
       type?: string
-      name?: { contains: string; mode?: 'insensitive' }
+      name?: { contains: string }
     }
 
     const where: WhereClause = {}

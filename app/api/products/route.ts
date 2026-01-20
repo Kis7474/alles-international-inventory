@@ -11,8 +11,8 @@ export async function GET(request: Request) {
     interface WhereClause {
       categoryId?: number
       OR?: Array<{
-        name?: { contains: string; mode?: 'insensitive' }
-        code?: { contains: string; mode?: 'insensitive' }
+        name?: { contains: string }
+        code?: { contains: string }
       }>
     }
     
