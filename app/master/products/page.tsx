@@ -10,9 +10,22 @@ interface Category {
   nameKo: string
 }
 
-interface Product {
+interface Vendor {
   id: number
   code: string
+  name: string
+  type: string
+}
+
+interface ProductSalesVendor {
+  id: number
+  vendorId: number
+  vendor: Vendor
+}
+
+interface Product {
+  id: number
+  code: string | null
   name: string
   unit: string
   categoryId: number | null
@@ -20,11 +33,15 @@ interface Product {
   description: string | null
   defaultPurchasePrice: number | null
   defaultSalesPrice: number | null
+  purchaseVendorId: number
+  purchaseVendor: Vendor
+  salesVendors: ProductSalesVendor[]
 }
 
 export default function MasterProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [vendors, setVendors] = useState<Vendor[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
@@ -35,6 +52,9 @@ export default function MasterProductsPage() {
   const [filterCategoryId, setFilterCategoryId] = useState('')
   const [filterSearchName, setFilterSearchName] = useState('')
   
+  // Sales vendor management
+  const [selectedSalesVendorId, setSelectedSalesVendorId] = useState('')
+  
   const [formData, setFormData] = useState({
     code: '',
     name: '',
@@ -43,6 +63,8 @@ export default function MasterProductsPage() {
     description: '',
     defaultPurchasePrice: '',
     defaultSalesPrice: '',
+    purchaseVendorId: '',
+    salesVendorIds: [] as string[],
   })
 
   useEffect(() => {
@@ -51,14 +73,17 @@ export default function MasterProductsPage() {
 
   const fetchData = async () => {
     try {
-      const [productsRes, categoriesRes] = await Promise.all([
+      const [productsRes, categoriesRes, vendorsRes] = await Promise.all([
         fetch('/api/products'),
         fetch('/api/categories'),
+        fetch('/api/vendors'),
       ])
       const productsData = await productsRes.json()
       const categoriesData = await categoriesRes.json()
+      const vendorsData = await vendorsRes.json()
       setProducts(productsData)
       setCategories(categoriesData)
+      setVendors(vendorsData)
     } catch (error) {
       console.error('Error fetching data:', error)
     } finally {
@@ -86,8 +111,33 @@ export default function MasterProductsPage() {
     }
   }
 
+  const addSalesVendor = () => {
+    if (!selectedSalesVendorId) return
+    if (formData.salesVendorIds.includes(selectedSalesVendorId)) {
+      alert('이미 추가된 거래처입니다.')
+      return
+    }
+    setFormData({
+      ...formData,
+      salesVendorIds: [...formData.salesVendorIds, selectedSalesVendorId],
+    })
+    setSelectedSalesVendorId('')
+  }
+
+  const removeSalesVendor = (vendorId: string) => {
+    setFormData({
+      ...formData,
+      salesVendorIds: formData.salesVendorIds.filter((id) => id !== vendorId),
+    })
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    if (!formData.purchaseVendorId) {
+      alert('매입 거래처를 선택해주세요.')
+      return
+    }
     
     try {
       const url = '/api/products'
@@ -185,13 +235,15 @@ export default function MasterProductsPage() {
   const handleEdit = (product: Product) => {
     setEditingProduct(product)
     setFormData({
-      code: product.code,
+      code: product.code || '',
       name: product.name,
       unit: product.unit,
       categoryId: product.categoryId?.toString() || '',
       description: product.description || '',
       defaultPurchasePrice: product.defaultPurchasePrice?.toString() || '',
       defaultSalesPrice: product.defaultSalesPrice?.toString() || '',
+      purchaseVendorId: product.purchaseVendorId.toString(),
+      salesVendorIds: product.salesVendors?.map((sv) => sv.vendorId.toString()) || [],
     })
     setShowModal(true)
   }
@@ -207,7 +259,10 @@ export default function MasterProductsPage() {
       description: '',
       defaultPurchasePrice: '',
       defaultSalesPrice: '',
+      purchaseVendorId: '',
+      salesVendorIds: [],
     })
+    setSelectedSalesVendorId('')
   }
 
   if (loading) {
@@ -315,6 +370,12 @@ export default function MasterProductsPage() {
                   단위
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                  매입처
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                  매출처
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                   카테고리
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
@@ -340,13 +401,29 @@ export default function MasterProductsPage() {
                     />
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {product.code}
+                    {product.code || '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {product.name}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {product.unit}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {product.purchaseVendor?.name || '-'}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-900">
+                    {product.salesVendors && product.salesVendors.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {product.salesVendors.map((sv) => (
+                          <span key={sv.id} className="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
+                            {sv.vendor.name}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {product.category?.nameKo || '-'}
@@ -375,7 +452,7 @@ export default function MasterProductsPage() {
               ))}
               {products.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={10} className="px-6 py-4 text-center text-gray-500">
                     등록된 품목이 없습니다.
                   </td>
                 </tr>
@@ -394,22 +471,31 @@ export default function MasterProductsPage() {
             </h2>
             <form onSubmit={handleSubmit}>
               <div className="grid grid-cols-2 gap-4 mb-4">
+                {/* 매입 거래처 선택 (필수) */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    품목코드 *
+                    매입 거래처 * <span className="text-xs text-blue-600">(거래처 관리에서 등록된 매입처)</span>
                   </label>
-                  <input
-                    type="text"
+                  <select
                     required
-                    value={formData.code}
-                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                    value={formData.purchaseVendorId}
+                    onChange={(e) => setFormData({ ...formData, purchaseVendorId: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                  />
+                  >
+                    <option value="">선택하세요</option>
+                    {vendors
+                      .filter(v => v.type === 'DOMESTIC_PURCHASE' || v.type === 'INTERNATIONAL_PURCHASE')
+                      .map((vendor) => (
+                        <option key={vendor.id} value={vendor.id}>
+                          [{vendor.code}] {vendor.name}
+                        </option>
+                      ))}
+                  </select>
                 </div>
+
+                {/* 품목명 */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    품목명 *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">품목명 *</label>
                   <input
                     type="text"
                     required
@@ -420,7 +506,73 @@ export default function MasterProductsPage() {
                 </div>
               </div>
 
+              {/* 매출 거래처 관리 */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  매출 거래처 <span className="text-xs text-gray-500">(여러 거래처 추가 가능)</span>
+                </label>
+                
+                {/* 현재 등록된 매출 거래처 목록 */}
+                <div className="flex flex-wrap gap-2 mb-2 min-h-[32px]">
+                  {formData.salesVendorIds.map((vendorId) => {
+                    const vendor = vendors.find(v => v.id.toString() === vendorId)
+                    return vendor ? (
+                      <span key={vendorId} className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+                        {vendor.name}
+                        <button
+                          type="button"
+                          onClick={() => removeSalesVendor(vendorId)}
+                          className="ml-2 text-blue-600 hover:text-blue-800 font-bold"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ) : null
+                  })}
+                  {formData.salesVendorIds.length === 0 && (
+                    <span className="text-gray-400 text-sm">등록된 매출 거래처가 없습니다</span>
+                  )}
+                </div>
+                
+                {/* 매출 거래처 추가 */}
+                <div className="flex gap-2">
+                  <select
+                    value={selectedSalesVendorId}
+                    onChange={(e) => setSelectedSalesVendorId(e.target.value)}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                  >
+                    <option value="">매출 거래처 선택</option>
+                    {vendors
+                      .filter(v => v.type === 'DOMESTIC_SALES' || v.type === 'INTERNATIONAL_SALES')
+                      .filter(v => !formData.salesVendorIds.includes(v.id.toString()))
+                      .map((vendor) => (
+                        <option key={vendor.id} value={vendor.id}>
+                          [{vendor.code}] {vendor.name}
+                        </option>
+                      ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={addSalesVendor}
+                    className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                  >
+                    추가
+                  </button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    품목코드 (선택)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.code}
+                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                  />
+                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     단위 *
@@ -434,23 +586,24 @@ export default function MasterProductsPage() {
                     placeholder="EA, BOX, KG 등"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    카테고리
-                  </label>
-                  <select
-                    value={formData.categoryId}
-                    onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                  >
-                    <option value="">선택</option>
-                    {categories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.nameKo}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  카테고리
+                </label>
+                <select
+                  value={formData.categoryId}
+                  onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                >
+                  <option value="">선택</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.nameKo}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="grid grid-cols-2 gap-4 mb-4">

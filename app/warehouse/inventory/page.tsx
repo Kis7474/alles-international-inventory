@@ -4,10 +4,12 @@ import { useEffect, useState } from 'react'
 import { formatNumber } from '@/lib/utils'
 
 interface InventoryItem {
-  id: number
-  code: string
-  name: string
+  productId: number
+  productCode: string | null
+  productName: string
   unit: string
+  purchaseVendor: string | null
+  category: string | null
   totalQuantity: number
   avgUnitCost: number
   totalValue: number
@@ -24,7 +26,7 @@ interface Lot {
 }
 
 interface ItemDetail {
-  itemId: number
+  productId: number
   totalQuantity: number
   lots: Lot[]
 }
@@ -51,9 +53,9 @@ export default function InventoryPage() {
     }
   }
 
-  const handleItemClick = async (itemId: number) => {
+  const handleItemClick = async (productId: number) => {
     try {
-      const res = await fetch(`/api/inventory?itemId=${itemId}`)
+      const res = await fetch(`/api/inventory?productId=${productId}`)
       const data = await res.json()
       setSelectedItem(data)
     } catch (error) {
@@ -83,6 +85,12 @@ export default function InventoryPage() {
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
                     품목
                   </th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                    매입처
+                  </th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                    카테고리
+                  </th>
                   <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">
                     재고
                   </th>
@@ -97,15 +105,21 @@ export default function InventoryPage() {
               <tbody className="divide-y divide-gray-200">
                 {inventory.map((item) => (
                   <tr
-                    key={item.id}
-                    onClick={() => handleItemClick(item.id)}
+                    key={item.productId}
+                    onClick={() => handleItemClick(item.productId)}
                     className={`cursor-pointer hover:bg-blue-50 ${
-                      selectedItem?.itemId === item.id ? 'bg-blue-50' : ''
+                      selectedItem?.productId === item.productId ? 'bg-blue-50' : ''
                     }`}
                   >
                     <td className="px-4 py-3">
-                      <div className="font-medium">[{item.code}]</div>
-                      <div className="text-sm text-gray-600">{item.name}</div>
+                      <div className="font-medium">{item.productName}</div>
+                      {item.productCode && <div className="text-sm text-gray-600">[{item.productCode}]</div>}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      {item.purchaseVendor || '-'}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      {item.category || '-'}
                     </td>
                     <td className="px-4 py-3 text-right">
                       {formatNumber(item.totalQuantity, 0)} {item.unit}
@@ -121,7 +135,7 @@ export default function InventoryPage() {
                 {inventory.length === 0 && (
                   <tr>
                     <td
-                      colSpan={4}
+                      colSpan={6}
                       className="px-6 py-8 text-center text-gray-500"
                     >
                       재고가 없습니다.

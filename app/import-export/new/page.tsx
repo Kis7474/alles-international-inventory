@@ -6,9 +6,14 @@ import { formatCurrency } from '@/lib/utils'
 
 interface Product {
   id: number
-  code: string
+  code: string | null
   name: string
   unit: string
+  purchaseVendorId: number
+  purchaseVendor: {
+    id: number
+    name: string
+  }
 }
 
 interface Vendor {
@@ -42,6 +47,13 @@ export default function ImportExportNewPage() {
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [salespeople, setSalespeople] = useState<Salesperson[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  
+  // Filtered products based on vendor
+  const [availableProducts, setAvailableProducts] = useState<Product[]>([])
+  
+  // Search states
+  const [vendorSearch, setVendorSearch] = useState('')
+  const [productSearch, setProductSearch] = useState('')
   
   // Form data
   const [formData, setFormData] = useState({
@@ -110,7 +122,9 @@ export default function ImportExportNewPage() {
       ])
       
       setProducts(productsData)
-      setVendors(vendorsData.filter((v: Vendor) => v.type === 'OVERSEAS'))
+      setVendors(vendorsData.filter((v: Vendor) => 
+        v.type === 'INTERNATIONAL_PURCHASE' || v.type === 'INTERNATIONAL_SALES'
+      ))
       setSalespeople(salespeopleData)
       setCategories(categoriesData)
     } catch (error) {
@@ -168,6 +182,19 @@ export default function ImportExportNewPage() {
       vatAmount,
       totalAmount,
     })
+  }
+  
+  const handleVendorChange = (vendorId: string) => {
+    setFormData({ ...formData, vendorId, productId: '' })
+    setProductSearch('')
+    
+    if (vendorId) {
+      // 수입/수출: 선택한 거래처가 매입처인 품목 필터링
+      const filtered = products.filter(p => p.purchaseVendorId === parseInt(vendorId))
+      setAvailableProducts(filtered)
+    } else {
+      setAvailableProducts([])
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -270,41 +297,51 @@ export default function ImportExportNewPage() {
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                품목 <span className="text-red-500">*</span>
+                거래처 (해외) <span className="text-red-500">*</span> <span className="text-xs text-blue-600">(해외 매입 거래처)</span>
+              </label>
+              <select
+                name="vendorId"
+                value={formData.vendorId}
+                onChange={(e) => handleVendorChange(e.target.value)}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+              >
+                <option value="">선택하세요</option>
+                {vendors
+                  .filter(v => 
+                    v.name.toLowerCase().includes(vendorSearch.toLowerCase()) ||
+                    v.code.toLowerCase().includes(vendorSearch.toLowerCase())
+                  )
+                  .map((vendor) => (
+                    <option key={vendor.id} value={vendor.id}>
+                      [{vendor.code}] {vendor.name}
+                    </option>
+                  ))}
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                품목 <span className="text-red-500">*</span> <span className="text-xs text-blue-600">(선택한 거래처의 품목)</span>
               </label>
               <select
                 name="productId"
                 value={formData.productId}
                 onChange={handleChange}
                 required
+                disabled={!formData.vendorId}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
               >
-                <option value="">선택하세요</option>
-                {products.map((product) => (
-                  <option key={product.id} value={product.id}>
-                    [{product.code}] {product.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                거래처 (해외) <span className="text-red-500">*</span>
-              </label>
-              <select
-                name="vendorId"
-                value={formData.vendorId}
-                onChange={handleChange}
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-              >
-                <option value="">선택하세요</option>
-                {vendors.map((vendor) => (
-                  <option key={vendor.id} value={vendor.id}>
-                    [{vendor.code}] {vendor.name}
-                  </option>
-                ))}
+                <option value="">{formData.vendorId ? '품목을 선택하세요' : '거래처를 먼저 선택하세요'}</option>
+                {availableProducts
+                  .filter(p => 
+                    p.name.toLowerCase().includes(productSearch.toLowerCase())
+                  )
+                  .map((product) => (
+                    <option key={product.id} value={product.id}>
+                      [{product.code}] {product.name} ({product.unit})
+                    </option>
+                  ))}
               </select>
             </div>
             

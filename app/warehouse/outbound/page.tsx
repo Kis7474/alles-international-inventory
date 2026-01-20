@@ -3,21 +3,24 @@
 import { useEffect, useState } from 'react'
 import { formatNumber } from '@/lib/utils'
 
-interface Product {
-  id: number
-  code: string
-  name: string
-  unit: string
-  category: {
-    nameKo: string
-  } | null
-}
-
 interface Item {
   id: number
   code: string
   name: string
   unit: string
+}
+
+interface InventoryProduct {
+  productId: number
+  productName: string
+  productCode: string | null
+  unit: string
+  purchaseVendor: string | null
+  category: string | null
+  totalQuantity: number
+  avgUnitCost: number
+  totalValue: number
+  lotCount: number
 }
 
 interface OutboundDetail {
@@ -46,9 +49,10 @@ interface OutboundHistory {
 }
 
 export default function OutboundPage() {
-  const [products, setProducts] = useState<Product[]>([])
   const [items, setItems] = useState<Item[]>([])
   const [history, setHistory] = useState<OutboundHistory[]>([])
+  const [inventoryProducts, setInventoryProducts] = useState<InventoryProduct[]>([])
+  const [selectedProductInfo, setSelectedProductInfo] = useState<InventoryProduct | null>(null)
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [showResult, setShowResult] = useState(false)
@@ -75,21 +79,19 @@ export default function OutboundPage() {
 
   useEffect(() => {
     fetchData()
+    fetchInventoryProducts()
   }, [])
 
   const fetchData = async () => {
     try {
-      const [productsRes, itemsRes, historyRes] = await Promise.all([
-        fetch('/api/products'),
+      const [itemsRes, historyRes] = await Promise.all([
         fetch('/api/items'),
         fetch('/api/outbound'),
       ])
-      const [productsData, itemsData, historyData] = await Promise.all([
-        productsRes.json(),
+      const [itemsData, historyData] = await Promise.all([
         itemsRes.json(),
         historyRes.json(),
       ])
-      setProducts(productsData)
       setItems(itemsData)
       setHistory(historyData)
     } catch (error) {
@@ -98,6 +100,23 @@ export default function OutboundPage() {
     } finally {
       setLoading(false)
     }
+  }
+  
+  const fetchInventoryProducts = async () => {
+    try {
+      const res = await fetch('/api/inventory')
+      const data: InventoryProduct[] = await res.json()
+      // Filter to only products with inventory
+      setInventoryProducts(data.filter((item) => item.totalQuantity > 0))
+    } catch (error) {
+      console.error('Error fetching inventory:', error)
+    }
+  }
+  
+  const handleProductSelect = (productId: string) => {
+    const selected = inventoryProducts.find(p => p.productId === parseInt(productId))
+    setFormData({ ...formData, productId, itemId: '' })
+    setSelectedProductInfo(selected)
   }
 
   const handleFilter = async () => {
@@ -331,42 +350,18 @@ export default function OutboundPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  품목 * (마스터 품목)
+                  품목 * <span className="text-xs text-blue-600">(재고에 있는 품목만 표시)</span>
                 </label>
                 <select
-                  required={!formData.itemId}
+                  required
                   value={formData.productId}
-                  onChange={(e) =>
-                    setFormData({ ...formData, productId: e.target.value, itemId: '' })
-                  }
+                  onChange={(e) => handleProductSelect(e.target.value)}
                   className="w-full px-3 py-2 border rounded-lg"
-                  disabled={!!formData.itemId}
                 >
                   <option value="">품목을 선택하세요</option>
-                  {products.map((product) => (
-                    <option key={product.id} value={product.id}>
-                      [{product.code}] {product.name} ({product.unit})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  또는 기존 품목
-                </label>
-                <select
-                  required={!formData.productId}
-                  value={formData.itemId}
-                  onChange={(e) =>
-                    setFormData({ ...formData, itemId: e.target.value, productId: '' })
-                  }
-                  className="w-full px-3 py-2 border rounded-lg"
-                  disabled={!!formData.productId}
-                >
-                  <option value="">품목을 선택하세요</option>
-                  {items.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      [{item.code}] {item.name}
+                  {inventoryProducts.map((item) => (
+                    <option key={item.productId} value={item.productId}>
+                      {item.productName} (재고: {item.totalQuantity} {item.unit})
                     </option>
                   ))}
                 </select>
@@ -386,6 +381,16 @@ export default function OutboundPage() {
                   }
                   className="w-full px-3 py-2 border rounded-lg"
                 />
+                {selectedProductInfo && (
+                  <div className="mt-2 p-3 bg-blue-50 rounded-lg text-sm">
+                    <div className="text-blue-800">
+                      현재 재고: <span className="font-bold">{selectedProductInfo.totalQuantity}</span> {selectedProductInfo.unit}
+                    </div>
+                    <div className="text-blue-600 text-xs mt-1">
+                      {selectedProductInfo.lotCount}개 LOT (FIFO 순서로 출고됩니다)
+                    </div>
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">

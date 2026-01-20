@@ -251,11 +251,26 @@ async function handlePriceMatrixUpload(file: File, options: UploadOptions) {
         if (existing) {
           summary.productsUpdated++
         } else if (options.createProducts) {
+          // Get or create a default purchase vendor
+          const defaultVendor = await prisma.vendor.findFirst({
+            where: { code: 'DEFAULT_PURCHASE' },
+          })
+          
+          if (!defaultVendor) {
+            errors.push({
+              row: 0,
+              column: '품목',
+              message: `기본 매입처가 없어 품목 '${productName}'을(를) 생성할 수 없습니다.`,
+            })
+            continue
+          }
+          
           await prisma.product.create({
             data: {
               code: generateCode(productName),
               name: productName,
               unit: '개',
+              purchaseVendorId: defaultVendor.id,
             },
           })
           summary.productsCreated++
@@ -387,12 +402,22 @@ async function findOrCreateProduct(name: string, categoryId: number | undefined,
     return null
   }
   
+  // Get default purchase vendor
+  const defaultVendor = await prisma.vendor.findFirst({
+    where: { code: 'DEFAULT_PURCHASE' },
+  })
+  
+  if (!defaultVendor) {
+    throw new Error('기본 매입처가 없습니다. 품목을 생성할 수 없습니다.')
+  }
+  
   const newProduct = await prisma.product.create({
     data: {
       code: generateCode(name),
       name,
       unit: '개',
       categoryId: categoryId,
+      purchaseVendorId: defaultVendor.id,
     },
   })
   
