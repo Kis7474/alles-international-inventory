@@ -69,6 +69,29 @@ export async function POST(request: Request) {
       salesVendorIds,
     } = body
     
+    // Validate required fields
+    if (!name) {
+      return NextResponse.json({ error: '품목명은 필수입니다.' }, { status: 400 })
+    }
+    
+    if (!purchaseVendorId) {
+      return NextResponse.json({ error: '매입 거래처는 필수입니다.' }, { status: 400 })
+    }
+    
+    const parsedPurchaseVendorId = parseInt(purchaseVendorId)
+    if (isNaN(parsedPurchaseVendorId)) {
+      return NextResponse.json({ error: '유효하지 않은 매입 거래처입니다.' }, { status: 400 })
+    }
+    
+    // Validate salesVendorIds if provided
+    let parsedSalesVendorIds: number[] | undefined
+    if (salesVendorIds && Array.isArray(salesVendorIds) && salesVendorIds.length > 0) {
+      parsedSalesVendorIds = salesVendorIds.map((id: string) => parseInt(id))
+      if (parsedSalesVendorIds.some(id => isNaN(id))) {
+        return NextResponse.json({ error: '유효하지 않은 매출 거래처가 포함되어 있습니다.' }, { status: 400 })
+      }
+    }
+    
     const product = await prisma.product.create({
       data: {
         code: code || null,
@@ -78,10 +101,10 @@ export async function POST(request: Request) {
         description,
         defaultPurchasePrice: defaultPurchasePrice ? parseFloat(defaultPurchasePrice) : null,
         defaultSalesPrice: defaultSalesPrice ? parseFloat(defaultSalesPrice) : null,
-        purchaseVendorId: parseInt(purchaseVendorId),
-        salesVendors: salesVendorIds && salesVendorIds.length > 0 ? {
-          create: salesVendorIds.map((vendorId: string) => ({
-            vendorId: parseInt(vendorId),
+        purchaseVendorId: parsedPurchaseVendorId,
+        salesVendors: parsedSalesVendorIds ? {
+          create: parsedSalesVendorIds.map((vendorId) => ({
+            vendorId,
           })),
         } : undefined,
       },
@@ -120,13 +143,46 @@ export async function PUT(request: Request) {
       salesVendorIds,
     } = body
     
+    // Validate required fields
+    if (!id) {
+      return NextResponse.json({ error: '품목 ID가 필요합니다.' }, { status: 400 })
+    }
+    
+    if (!name) {
+      return NextResponse.json({ error: '품목명은 필수입니다.' }, { status: 400 })
+    }
+    
+    if (!purchaseVendorId) {
+      return NextResponse.json({ error: '매입 거래처는 필수입니다.' }, { status: 400 })
+    }
+    
+    const parsedId = parseInt(id)
+    const parsedPurchaseVendorId = parseInt(purchaseVendorId)
+    
+    if (isNaN(parsedId)) {
+      return NextResponse.json({ error: '유효하지 않은 품목 ID입니다.' }, { status: 400 })
+    }
+    
+    if (isNaN(parsedPurchaseVendorId)) {
+      return NextResponse.json({ error: '유효하지 않은 매입 거래처입니다.' }, { status: 400 })
+    }
+    
+    // Validate salesVendorIds if provided
+    let parsedSalesVendorIds: number[] | undefined
+    if (salesVendorIds && Array.isArray(salesVendorIds) && salesVendorIds.length > 0) {
+      parsedSalesVendorIds = salesVendorIds.map((vendorId: string) => parseInt(vendorId))
+      if (parsedSalesVendorIds.some(id => isNaN(id))) {
+        return NextResponse.json({ error: '유효하지 않은 매출 거래처가 포함되어 있습니다.' }, { status: 400 })
+      }
+    }
+    
     // First, delete existing sales vendor relationships
     await prisma.productSalesVendor.deleteMany({
-      where: { productId: parseInt(id) },
+      where: { productId: parsedId },
     })
     
     const product = await prisma.product.update({
-      where: { id: parseInt(id) },
+      where: { id: parsedId },
       data: {
         code: code || null,
         name,
@@ -135,10 +191,10 @@ export async function PUT(request: Request) {
         description,
         defaultPurchasePrice: defaultPurchasePrice ? parseFloat(defaultPurchasePrice) : null,
         defaultSalesPrice: defaultSalesPrice ? parseFloat(defaultSalesPrice) : null,
-        purchaseVendorId: parseInt(purchaseVendorId),
-        salesVendors: salesVendorIds && salesVendorIds.length > 0 ? {
-          create: salesVendorIds.map((vendorId: string) => ({
-            vendorId: parseInt(vendorId),
+        purchaseVendorId: parsedPurchaseVendorId,
+        salesVendors: parsedSalesVendorIds ? {
+          create: parsedSalesVendorIds.map((vendorId) => ({
+            vendorId,
           })),
         } : undefined,
       },
