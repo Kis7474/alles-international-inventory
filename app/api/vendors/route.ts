@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
 
     interface WhereClause {
       type?: string
-      name?: { contains: string; mode: 'insensitive' }
+      name?: { contains: string; mode?: 'insensitive' }
     }
 
     const where: WhereClause = {}
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
       where.type = type
     }
     if (searchName) {
-      where.name = { contains: searchName, mode: 'insensitive' as const }
+      where.name = { contains: searchName }
     }
 
     const vendors = await prisma.vendor.findMany({

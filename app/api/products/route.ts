@@ -11,8 +11,8 @@ export async function GET(request: Request) {
     interface WhereClause {
       categoryId?: number
       OR?: Array<{
-        name?: { contains: string; mode: 'insensitive' }
-        code?: { contains: string; mode: 'insensitive' }
+        name?: { contains: string; mode?: 'insensitive' }
+        code?: { contains: string; mode?: 'insensitive' }
       }>
     }
     
@@ -23,8 +23,8 @@ export async function GET(request: Request) {
     }
     if (searchName) {
       where.OR = [
-        { name: { contains: searchName, mode: 'insensitive' as const } },
-        { code: { contains: searchName, mode: 'insensitive' as const } },
+        { name: { contains: searchName } },
+        { code: { contains: searchName } },
       ]
     }
     
