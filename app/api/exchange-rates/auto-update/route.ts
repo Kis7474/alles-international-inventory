@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
 // 한국수출입은행 환율 API
@@ -19,7 +19,7 @@ interface KoreaEximRate {
 }
 
 // POST /api/exchange-rates/auto-update - 환율 자동 업데이트
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     // 설정에서 API 키 가져오기
     const settings = await prisma.systemSetting.findUnique({
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
       try {
         const parsed = JSON.parse(settings.value)
         apiKey = parsed.koreaeximApiKey || parsed.koreaexim_api_key || apiKey
-      } catch (e) {
+      } catch {
         console.warn('Failed to parse exchange rate settings')
       }
     }
@@ -144,11 +144,11 @@ export async function POST(request: NextRequest) {
       updatedAt: new Date().toISOString(),
     })
     
-  } catch (error: any) {
+  } catch (error) {
     console.error('Exchange rate update error:', error)
     return NextResponse.json({ 
       success: false,
-      error: error.message || '환율 업데이트 중 오류가 발생했습니다.' 
+      error: error instanceof Error ? error.message : '환율 업데이트 중 오류가 발생했습니다.' 
     }, { status: 500 })
   }
 }

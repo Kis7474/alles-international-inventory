@@ -415,8 +415,9 @@ async function handlePriceMatrixUpload(file: File, options: UploadOptions) {
 }
 
 /**
- * Find or create vendor
+ * Find or create vendor (legacy - for backward compatibility with price matrix upload)
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function findOrCreateVendor(name: string, autoCreate: boolean) {
   const existing = await prisma.vendor.findFirst({
     where: { name },
@@ -452,9 +453,9 @@ async function findOrCreateVendorByType(
 ) {
   if (!name) return null
   
-  // First try to find by name (case-insensitive)
+  // First try to find by name
   const existing = await prisma.vendor.findFirst({
-    where: { name: { equals: name, mode: 'insensitive' } },
+    where: { name },
   })
   
   if (existing) {
@@ -480,8 +481,9 @@ async function findOrCreateVendorByType(
 }
 
 /**
- * Find or create product
+ * Find or create product (legacy - for backward compatibility with price matrix upload)
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function findOrCreateProduct(name: string, categoryId: number | undefined, autoCreate: boolean) {
   const existing = await prisma.product.findFirst({
     where: { name },
@@ -529,9 +531,9 @@ async function findOrCreateProductWithVendor(
 ) {
   if (!name) return null
   
-  // Find existing product (case-insensitive)
+  // Find existing product
   const existing = await prisma.product.findFirst({
-    where: { name: { equals: name, mode: 'insensitive' } },
+    where: { name },
   })
   
   if (existing) {
@@ -595,9 +597,9 @@ async function findOrCreateSalesperson(name: string, autoCreate: boolean) {
 async function findOrCreateCategory(name: string, autoCreate: boolean) {
   if (!name) return null
   
-  // Try to find by nameKo first (case-insensitive)
+  // Try to find by nameKo first
   const existing = await prisma.category.findFirst({
-    where: { nameKo: { equals: name, mode: 'insensitive' } },
+    where: { nameKo: name },
   })
   
   if (existing) {
