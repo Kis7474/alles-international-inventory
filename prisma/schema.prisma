@@ -188,8 +188,8 @@ model ImportExport {
   unitCost        Float?       // 단위 원가
   
   // 보관 옵션
-  storageType     String?      // WAREHOUSE(창고입고), OFFICE(사무실보관)
-  warehouseLotId  Int?         // 창고 입고 시 LOT 연결
+  storageType     String?      // WAREHOUSE(창고입고), OFFICE(사무실보관), DIRECT_DELIVERY(직배), OTHER(기타)
+  inventoryLot    InventoryLot? // 자동 입고 시 생성된 LOT 참조
   
   // 부가세
   vatIncluded     Boolean      @default(false)
@@ -256,6 +256,13 @@ model InventoryLot {
   domesticFreight   Float        // 국내 입고운송료
   otherCost         Float        @default(0) // 기타 비용
   unitCost          Float        // 단가 (자동계산)
+  
+  // 보관 위치
+  storageLocation   String       @default("WAREHOUSE")  // 'WAREHOUSE' 또는 'OFFICE'
+  
+  // 수입/수출 참조 (자동 생성된 경우)
+  importExportId    Int?         @unique
+  importExport      ImportExport? @relation(fields: [importExportId], references: [id])
   
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt

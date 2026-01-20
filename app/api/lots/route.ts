@@ -9,6 +9,7 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
     const productId = searchParams.get('productId')
+    const storageLocation = searchParams.get('storageLocation')
 
     interface WhereClause {
       receivedDate?: {
@@ -16,6 +17,7 @@ export async function GET(request: NextRequest) {
         lte?: Date
       }
       productId?: number
+      storageLocation?: string
     }
 
     const where: WhereClause = {}
@@ -31,6 +33,9 @@ export async function GET(request: NextRequest) {
     }
     if (productId) {
       where.productId = parseInt(productId)
+    }
+    if (storageLocation) {
+      where.storageLocation = storageLocation
     }
 
     const lots = await prisma.inventoryLot.findMany({
@@ -72,6 +77,7 @@ export async function POST(request: NextRequest) {
       dutyAmount,
       domesticFreight,
       otherCost = 0,
+      storageLocation = 'WAREHOUSE',
     } = body
 
     // 유효성 검사 - itemId 또는 productId 중 하나는 필수
@@ -127,6 +133,7 @@ export async function POST(request: NextRequest) {
           domesticFreight: domesticFreight || 0,
           otherCost: otherCost || 0,
           unitCost,
+          storageLocation,
         },
         include: {
           item: true,

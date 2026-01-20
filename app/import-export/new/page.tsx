@@ -541,7 +541,7 @@ export default function ImportExportNewPage() {
           <div className="mb-8">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">보관 옵션</h2>
             <div className="space-y-2">
-              <label className="flex items-center">
+              <label className="flex items-center cursor-pointer">
                 <input
                   type="radio"
                   name="storageType"
@@ -550,9 +550,9 @@ export default function ImportExportNewPage() {
                   onChange={handleChange}
                   className="mr-2"
                 />
-                <span className="text-gray-700">창고 입고 (InventoryLot 자동 생성)</span>
+                <span className="text-gray-700">🏭 창고 입고 (입고 관리에 자동 등록)</span>
               </label>
-              <label className="flex items-center">
+              <label className="flex items-center cursor-pointer">
                 <input
                   type="radio"
                   name="storageType"
@@ -561,9 +561,20 @@ export default function ImportExportNewPage() {
                   onChange={handleChange}
                   className="mr-2"
                 />
-                <span className="text-gray-700">사무실 보관 (창고료 없음)</span>
+                <span className="text-gray-700">🏢 사무실 보관 (입고 관리에 자동 등록)</span>
               </label>
-              <label className="flex items-center">
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  name="storageType"
+                  value="DIRECT_DELIVERY"
+                  checked={formData.storageType === 'DIRECT_DELIVERY'}
+                  onChange={handleChange}
+                  className="mr-2"
+                />
+                <span className="text-gray-700">🚚 직접 배송 (입고 안 함)</span>
+              </label>
+              <label className="flex items-center cursor-pointer">
                 <input
                   type="radio"
                   name="storageType"

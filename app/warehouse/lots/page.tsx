@@ -42,6 +42,9 @@ export default function LotsPage() {
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [selectAll, setSelectAll] = useState(false)
   
+  // 탭 상태
+  const [activeTab, setActiveTab] = useState<'ALL' | 'WAREHOUSE' | 'OFFICE'>('ALL')
+  
   // 필터 상태
   const [filterStartDate, setFilterStartDate] = useState('')
   const [filterEndDate, setFilterEndDate] = useState('')
@@ -56,11 +59,17 @@ export default function LotsPage() {
     dutyAmount: '',
     domesticFreight: '',
     otherCost: '0',
+    storageLocation: 'WAREHOUSE',
   })
 
   useEffect(() => {
     fetchData()
   }, [])
+
+  useEffect(() => {
+    handleFilter()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
 
   const fetchData = async () => {
     try {
@@ -89,6 +98,7 @@ export default function LotsPage() {
       if (filterStartDate) params.append('startDate', filterStartDate)
       if (filterEndDate) params.append('endDate', filterEndDate)
       if (filterProductId) params.append('productId', filterProductId)
+      if (activeTab !== 'ALL') params.append('storageLocation', activeTab)
 
       const res = await fetch(`/api/lots?${params.toString()}`)
       const data = await res.json()
@@ -115,6 +125,7 @@ export default function LotsPage() {
       dutyAmount: parseFloat(formData.dutyAmount) || 0,
       domesticFreight: parseFloat(formData.domesticFreight) || 0,
       otherCost: parseFloat(formData.otherCost) || 0,
+      storageLocation: formData.storageLocation,
     }
 
     try {
@@ -142,6 +153,7 @@ export default function LotsPage() {
         dutyAmount: '',
         domesticFreight: '',
         otherCost: '0',
+        storageLocation: 'WAREHOUSE',
       })
       fetchData()
       setSelectedIds([])
@@ -260,6 +272,49 @@ export default function LotsPage() {
             + 입고 등록
           </button>
         </div>
+      </div>
+
+      {/* 탭 UI */}
+      <div className="flex border-b mb-6">
+        <button
+          onClick={() => {
+            setActiveTab('ALL')
+            handleFilter()
+          }}
+          className={`px-6 py-3 font-medium transition-colors ${
+            activeTab === 'ALL'
+              ? 'border-b-2 border-blue-600 text-blue-600'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          📊 전체
+        </button>
+        <button
+          onClick={() => {
+            setActiveTab('WAREHOUSE')
+            handleFilter()
+          }}
+          className={`px-6 py-3 font-medium transition-colors ${
+            activeTab === 'WAREHOUSE'
+              ? 'border-b-2 border-blue-600 text-blue-600'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          🏭 창고 입고
+        </button>
+        <button
+          onClick={() => {
+            setActiveTab('OFFICE')
+            handleFilter()
+          }}
+          className={`px-6 py-3 font-medium transition-colors ${
+            activeTab === 'OFFICE'
+              ? 'border-b-2 border-blue-600 text-blue-600'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          🏢 사무실 보관
+        </button>
       </div>
 
       {/* 필터 */}
@@ -459,6 +514,22 @@ export default function LotsPage() {
                   }
                   className="w-full px-3 py-2 border rounded-lg"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  보관 위치 *
+                </label>
+                <select
+                  required
+                  value={formData.storageLocation}
+                  onChange={(e) =>
+                    setFormData({ ...formData, storageLocation: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border rounded-lg"
+                >
+                  <option value="WAREHOUSE">🏭 창고</option>
+                  <option value="OFFICE">🏢 사무실</option>
+                </select>
               </div>
             </div>
 

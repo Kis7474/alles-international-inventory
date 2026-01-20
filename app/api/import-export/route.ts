@@ -143,8 +143,8 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // 창고 입고 처리 (storageType === 'WAREHOUSE')
-    if (storageType === 'WAREHOUSE' && type === 'IMPORT' && unitCost) {
+    // 창고 또는 사무실 입고 처리 (storageType === 'WAREHOUSE' or 'OFFICE')
+    if ((storageType === 'WAREHOUSE' || storageType === 'OFFICE') && type === 'IMPORT' && unitCost) {
       await prisma.inventoryLot.create({
         data: {
           productId: parseInt(productId),
@@ -159,6 +159,8 @@ export async function POST(request: NextRequest) {
           domesticFreight: shippingCost ? parseFloat(shippingCost) : 0,
           otherCost: otherCost ? parseFloat(otherCost) : 0,
           unitCost,
+          storageLocation: storageType, // 'WAREHOUSE' 또는 'OFFICE'
+          importExportId: record.id,
         },
       })
     }
