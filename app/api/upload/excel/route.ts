@@ -184,14 +184,19 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
         const vatAmount = totalWithVat - supplyAmount
         
         // 9. Create SalesRecord
+        // Ensure required vendor exists
         const vendorForTransaction = transactionType === 'SALES' ? salesVendor : purchaseVendor
+        if (!vendorForTransaction) {
+          const vendorType = transactionType === 'SALES' ? '판매처' : '매입처'
+          throw new Error(`${vendorType}가 필요합니다.`)
+        }
         const vendorNameForTransaction = transactionType === 'SALES' ? row.salesVendorName : row.purchaseVendorName
         
         await prisma.salesRecord.create({
           data: {
             date: transactionDate,
             type: transactionType,
-            vendorId: vendorForTransaction?.data.id || null,
+            vendorId: vendorForTransaction.data.id,
             productId: product.data.id,
             salespersonId: salesperson?.data.id || (await getDefaultSalesperson()).id,
             categoryId: category?.data.id || (await getDefaultCategory()).id,
@@ -415,7 +420,12 @@ async function handlePriceMatrixUpload(file: File, options: UploadOptions) {
 }
 
 /**
- * Find or create vendor (legacy - for backward compatibility with price matrix upload)
+ * Find or create vendor (legacy)
+ * 
+ * This function is kept for backward compatibility with the price matrix upload feature.
+ * The price matrix upload path currently uses direct vendor creation without type specification.
+ * 
+ * New code should use findOrCreateVendorByType instead.
  */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function findOrCreateVendor(name: string, autoCreate: boolean) {
@@ -481,7 +491,12 @@ async function findOrCreateVendorByType(
 }
 
 /**
- * Find or create product (legacy - for backward compatibility with price matrix upload)
+ * Find or create product (legacy)
+ * 
+ * This function is kept for backward compatibility with the price matrix upload feature.
+ * It uses a default purchase vendor when creating new products.
+ * 
+ * New code should use findOrCreateProductWithVendor which requires explicit vendor specification.
  */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function findOrCreateProduct(name: string, categoryId: number | undefined, autoCreate: boolean) {
