@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getProductCostWithStorage } from '@/lib/storage-cost'
 
 // GET /api/products - 통합 품목 목록 조회
 export async function GET(request: Request) {
@@ -7,6 +8,8 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const categoryId = searchParams.get('categoryId')
     const searchName = searchParams.get('searchName')
+    const salesVendorId = searchParams.get('salesVendorId')
+    const includeCostInfo = searchParams.get('includeCostInfo') === 'true'
     
     interface WhereClause {
       categoryId?: number
@@ -14,6 +17,11 @@ export async function GET(request: Request) {
         name?: { contains: string }
         code?: { contains: string }
       }>
+      salesVendors?: {
+        some: {
+          vendorId: number
+        }
+      }
     }
     
     const where: WhereClause = {}
@@ -26,6 +34,14 @@ export async function GET(request: Request) {
         { name: { contains: searchName } },
         { code: { contains: searchName } },
       ]
+    }
+    if (salesVendorId) {
+      // 해당 거래처에 판매하는 품목만 조회
+      where.salesVendors = {
+        some: {
+          vendorId: parseInt(salesVendorId),
+        },
+      }
     }
     
     const products = await prisma.product.findMany({
@@ -45,6 +61,20 @@ export async function GET(request: Request) {
       },
       orderBy: { id: 'asc' },
     })
+    
+    // Include storage cost information if requested
+    if (includeCostInfo) {
+      const productsWithCostInfo = await Promise.all(
+        products.map(async (product) => {
+          const costInfo = await getProductCostWithStorage(product.id)
+          return {
+            ...product,
+            costInfo,
+          }
+        })
+      )
+      return NextResponse.json(productsWithCostInfo)
+    }
     
     return NextResponse.json(products)
   } catch (error) {
