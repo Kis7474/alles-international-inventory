@@ -2,14 +2,38 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { calculateImportCost } from '@/lib/utils'
 
-// GET /api/import-export - 수입/수출 목록 조회
+// GET /api/import-export - 수입/수출 목록 조회 또는 단일 조회
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
+    const id = searchParams.get('id')
     const type = searchParams.get('type') // IMPORT or EXPORT
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
     
+    // 단일 레코드 조회
+    if (id) {
+      const record = await prisma.importExport.findUnique({
+        where: { id: parseInt(id) },
+        include: {
+          product: true,
+          vendor: true,
+          salesperson: true,
+          category: true,
+        },
+      })
+      
+      if (!record) {
+        return NextResponse.json(
+          { error: '해당 데이터를 찾을 수 없습니다.' },
+          { status: 404 }
+        )
+      }
+      
+      return NextResponse.json(record)
+    }
+    
+    // 목록 조회
     interface WhereClause {
       type?: string
       date?: {

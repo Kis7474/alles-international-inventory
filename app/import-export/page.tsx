@@ -297,6 +297,12 @@ export default function ImportExportPage() {
                     {record.storageType === 'WAREHOUSE' ? '창고' : record.storageType === 'OFFICE' ? '사무실' : '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
+                    <Link
+                      href={`/import-export/${record.id}`}
+                      className="text-blue-600 hover:text-blue-900 mr-3"
+                    >
+                      수정
+                    </Link>
                     <button
                       onClick={() => handleDelete(record.id)}
                       className="text-red-600 hover:text-red-900"
