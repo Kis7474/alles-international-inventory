@@ -12,18 +12,19 @@ export interface ParsedData {
 }
 
 export interface TransactionRow {
-  date: string           // 날짜
-  type: string           // 구분 (매출/매입)
-  vendorName: string     // 거래처
-  productName: string    // 품목명
-  quantity: number       // 수량
-  unitPrice: number      // 단가
-  totalWithVat: number   // 금액(부가세포함)
-  totalAmount: number    // 금액
-  salesperson: string    // 담당자
-  category: string       // 카테고리
-  margin: number         // 마진
-  marginRate: string     // 마진율
+  date: string              // 날짜
+  type: string              // 구분 (매출/매입)
+  salesVendorName: string   // 판매처 (변경: vendorName → salesVendorName)
+  productName: string       // 품목명
+  quantity: number          // 수량
+  unitPrice: number         // 단가
+  totalWithVat: number      // 금액(부가세포함)
+  totalAmount: number       // 금액
+  salesperson: string       // 담당자
+  category: string          // 카테고리
+  margin: number            // 마진
+  marginRate: string        // 마진율
+  purchaseVendorName: string // 매입처 (새로 추가)
 }
 
 /**
@@ -118,7 +119,7 @@ export async function parseExcelFile(file: File): Promise<ParsedData> {
 /**
  * Parse Excel/CSV file for transaction data
  * Expected format:
- * Row 1: 날짜 | 구분 | 거래처 | 품목명 | 수량 | 단가 | 금액(부가세포함) | 금액 | 담당자 | 카테고리 | 마진 | 마진율
+ * Row 1: 날짜 | 구분 | 판매처 | 품목명 | 수량 | 단가 | 금액(부가세포함) | 금액 | 담당자 | 카테고리 | 마진 | 마진율 | 매입처
  * Row 2+: Data rows
  * 
  * Note: 
@@ -163,8 +164,8 @@ export async function parseTransactionExcel(file: File): Promise<TransactionRow[
     try {
       const transactionRow: TransactionRow = {
         date: parseDateValue(cells[0]),
-        type: String(cells[1] || '').trim(),
-        vendorName: String(cells[2] || '').trim(),
+        type: parseType(cells[1]),
+        salesVendorName: String(cells[2] || '').trim(),
         productName: String(cells[3] || '').trim(),
         quantity: parseNumberValue(cells[4]),
         unitPrice: parseNumberValue(cells[5]),
@@ -173,7 +174,8 @@ export async function parseTransactionExcel(file: File): Promise<TransactionRow[
         salesperson: String(cells[8] || '').trim(),
         category: String(cells[9] || '').trim(),
         margin: parseNumberValue(cells[10]),
-        marginRate: String(cells[11] || '').trim(),
+        marginRate: parseMarginRate(cells[11]),
+        purchaseVendorName: String(cells[12] || '').trim(),
       }
       
       rows.push(transactionRow)
@@ -183,7 +185,8 @@ export async function parseTransactionExcel(file: File): Promise<TransactionRow[
     }
   })
   
-  return rows
+  // Filter out invalid rows
+  return rows.filter(row => row.date && row.productName && row.quantity > 0)
 }
 
 /**
@@ -251,6 +254,44 @@ function parseNumberValue(value: Date | number | string | null | undefined): num
   }
   
   return 0
+}
+
+/**
+ * Parse type value to ensure it's in correct format
+ */
+function parseType(value: Date | number | string | null | undefined): string {
+  if (!value) return ''
+  const str = String(value).trim()
+  // Accept both Korean and English
+  if (str === '매출' || str.toUpperCase() === 'SALES') return '매출'
+  if (str === '매입' || str.toUpperCase() === 'PURCHASE') return '매입'
+  return str
+}
+
+/**
+ * Parse margin rate value
+ * Supports both percentage format (20%) and decimal format (0.52 = 52%)
+ */
+function parseMarginRate(value: Date | number | string | null | undefined): string {
+  if (!value) return '0'
+  const str = String(value).trim()
+  
+  // If already has % sign, remove it and return the number
+  if (str.includes('%')) {
+    return str.replace('%', '').trim()
+  }
+  
+  const num = parseFloat(str)
+  if (!isNaN(num)) {
+    // If it's a decimal (0 < num <= 1), convert to percentage
+    if (num > 0 && num <= 1) {
+      return (num * 100).toFixed(2)
+    }
+    // Otherwise return as is
+    return num.toString()
+  }
+  
+  return '0'
 }
 
 /**

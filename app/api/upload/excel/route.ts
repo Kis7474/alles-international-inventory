@@ -76,9 +76,6 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
       
       try {
         // Validate required fields
-        if (!row.vendorName) {
-          throw new Error('거래처명이 비어있습니다.')
-        }
         if (!row.productName) {
           throw new Error('품목명이 비어있습니다.')
         }
@@ -102,24 +99,48 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
           throw new Error('거래 유형이 선택되지 않았습니다.')
         }
         
-        // 1. Find or create vendor
-        const vendor = await findOrCreateVendor(row.vendorName, options.createVendors || false)
-        if (!vendor) {
-          throw new Error(`거래처 '${row.vendorName}'를 찾을 수 없습니다. 자동 생성 옵션을 활성화하세요.`)
+        // 1. Find or create purchase vendor (매입처 - 매입 유형)
+        let purchaseVendor = null
+        if (row.purchaseVendorName) {
+          purchaseVendor = await findOrCreateVendorByType(
+            row.purchaseVendorName,
+            'DOMESTIC_PURCHASE',
+            options.createVendors || false
+          )
+          if (!purchaseVendor && options.createProducts) {
+            throw new Error(`품목 '${row.productName}'의 매입처가 필요합니다. 매입처 열을 입력해주세요.`)
+          }
+          if (purchaseVendor?.isNew) summary.vendorsCreated++
         }
-        if (vendor.isNew) summary.vendorsCreated++
         
-        // 2. Find or create category
+        // 2. Find or create sales vendor (판매처 - 매출 유형)
+        let salesVendor = null
+        if (row.salesVendorName) {
+          salesVendor = await findOrCreateVendorByType(
+            row.salesVendorName,
+            'DOMESTIC_SALES',
+            options.createVendors || false
+          )
+          if (salesVendor?.isNew) summary.vendorsCreated++
+        }
+        
+        // 3. Find or create category
         let category = null
         if (row.category) {
           category = await findOrCreateCategory(row.category, options.createCategories || false)
           if (category && category.isNew) summary.categoriesCreated++
         }
         
-        // 3. Find or create product
-        const product = await findOrCreateProduct(
-          row.productName, 
-          category?.data.id, 
+        // 4. Find or create product (매입처 연결 필수)
+        if (!purchaseVendor && options.createProducts) {
+          throw new Error(`품목 '${row.productName}'의 매입처가 필요합니다. 매입처 열을 입력해주세요.`)
+        }
+        
+        const product = await findOrCreateProductWithVendor(
+          row.productName,
+          purchaseVendor?.data.id || null,
+          category?.data.id,
+          row.unitPrice,
           options.createProducts || false
         )
         if (!product) {
@@ -127,45 +148,66 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
         }
         if (product.isNew) summary.productsCreated++
         
-        // 4. Find or create salesperson
+        // 5. Link product to sales vendor (ProductSalesVendor)
+        if (product && salesVendor) {
+          await prisma.productSalesVendor.upsert({
+            where: {
+              productId_vendorId: {
+                productId: product.data.id,
+                vendorId: salesVendor.data.id,
+              },
+            },
+            update: {},
+            create: {
+              productId: product.data.id,
+              vendorId: salesVendor.data.id,
+            },
+          })
+        }
+        
+        // 6. Find or create salesperson
         let salesperson = null
         if (row.salesperson) {
           salesperson = await findOrCreateSalesperson(row.salesperson, options.createSalespersons || false)
           if (salesperson && salesperson.isNew) summary.salespersonsCreated++
         }
         
-        // 5. Parse date
+        // 7. Parse date
         const transactionDate = new Date(row.date)
         if (isNaN(transactionDate.getTime())) {
           throw new Error(`날짜 형식 오류: ${row.date}`)
         }
         
-        // 6. Calculate VAT amounts
+        // 8. Calculate VAT amounts
         const totalWithVat = row.totalWithVat || row.totalAmount * 1.1
         const supplyAmount = Math.round(totalWithVat / 1.1)
         const vatAmount = totalWithVat - supplyAmount
         
-        // 7. Create SalesRecord (using SalesRecord instead of Transaction)
+        // 9. Create SalesRecord
+        const vendorForTransaction = transactionType === 'SALES' ? salesVendor : purchaseVendor
+        const vendorNameForTransaction = transactionType === 'SALES' ? row.salesVendorName : row.purchaseVendorName
+        
         await prisma.salesRecord.create({
           data: {
             date: transactionDate,
             type: transactionType,
-            vendorId: vendor.data.id,
+            vendorId: vendorForTransaction?.data.id || null,
             productId: product.data.id,
             salespersonId: salesperson?.data.id || (await getDefaultSalesperson()).id,
             categoryId: category?.data.id || (await getDefaultCategory()).id,
             itemName: row.productName,
+            customer: vendorNameForTransaction, // Store vendor name in customer field for backward compatibility
             quantity: row.quantity,
             unitPrice: row.unitPrice,
             amount: row.totalAmount,
             cost: transactionType === 'SALES' ? (row.totalAmount - row.margin) : 0,
             margin: row.margin,
-            marginRate: parseFloat(row.marginRate.replace('%', '')) || 0,
+            marginRate: parseFloat(row.marginRate) || 0,
             vatIncluded: true,
             supplyAmount: supplyAmount,
             vatAmount: vatAmount,
             totalAmount: totalWithVat,
-            notes: `엑셀 업로드 (마진: ${row.margin}, 마진율: ${row.marginRate})`,
+            notes: `엑셀 업로드 (마진: ${row.margin}, 마진율: ${row.marginRate}%)`,
           },
         })
         
@@ -392,7 +434,45 @@ async function findOrCreateVendor(name: string, autoCreate: boolean) {
     data: {
       code: generateCode(name),
       name,
-      type: 'DOMESTIC',
+      type: 'DOMESTIC_PURCHASE',
+      currency: 'KRW',
+    },
+  })
+  
+  return { data: newVendor, isNew: true }
+}
+
+/**
+ * Find or create vendor by specific type
+ */
+async function findOrCreateVendorByType(
+  name: string,
+  type: 'DOMESTIC_PURCHASE' | 'DOMESTIC_SALES' | 'INTERNATIONAL_PURCHASE' | 'INTERNATIONAL_SALES',
+  autoCreate: boolean
+) {
+  if (!name) return null
+  
+  // First try to find by name (case-insensitive)
+  const existing = await prisma.vendor.findFirst({
+    where: { name: { equals: name, mode: 'insensitive' } },
+  })
+  
+  if (existing) {
+    return { data: existing, isNew: false }
+  }
+  
+  if (!autoCreate) {
+    return null
+  }
+  
+  // Create new vendor with specific type
+  const code = `V${Date.now().toString().slice(-6)}`
+  const newVendor = await prisma.vendor.create({
+    data: {
+      code,
+      name,
+      type,
+      currency: type.includes('INTERNATIONAL') ? 'USD' : 'KRW',
     },
   })
   
@@ -438,6 +518,51 @@ async function findOrCreateProduct(name: string, categoryId: number | undefined,
 }
 
 /**
+ * Find or create product with vendor connection
+ */
+async function findOrCreateProductWithVendor(
+  name: string,
+  purchaseVendorId: number | null,
+  categoryId: number | undefined,
+  unitPrice: number,
+  autoCreate: boolean
+) {
+  if (!name) return null
+  
+  // Find existing product (case-insensitive)
+  const existing = await prisma.product.findFirst({
+    where: { name: { equals: name, mode: 'insensitive' } },
+  })
+  
+  if (existing) {
+    return { data: existing, isNew: false }
+  }
+  
+  if (!autoCreate) {
+    return null
+  }
+  
+  if (!purchaseVendorId) {
+    throw new Error(`품목 '${name}'의 매입처가 필요합니다.`)
+  }
+  
+  // Create new product
+  const code = `P${Date.now().toString().slice(-6)}`
+  const newProduct = await prisma.product.create({
+    data: {
+      code,
+      name,
+      unit: 'EA',
+      categoryId: categoryId,
+      purchaseVendorId,
+      defaultPurchasePrice: unitPrice,
+    },
+  })
+  
+  return { data: newProduct, isNew: true }
+}
+
+/**
  * Find or create salesperson
  */
 async function findOrCreateSalesperson(name: string, autoCreate: boolean) {
@@ -468,8 +593,11 @@ async function findOrCreateSalesperson(name: string, autoCreate: boolean) {
  * Find or create category
  */
 async function findOrCreateCategory(name: string, autoCreate: boolean) {
+  if (!name) return null
+  
+  // Try to find by nameKo first (case-insensitive)
   const existing = await prisma.category.findFirst({
-    where: { name },
+    where: { nameKo: { equals: name, mode: 'insensitive' } },
   })
   
   if (existing) {
