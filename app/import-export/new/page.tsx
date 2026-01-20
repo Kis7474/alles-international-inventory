@@ -144,7 +144,11 @@ export default function ImportExportNewPage() {
   
   // 통화 또는 날짜 변경 시 환율 자동 조회
   const fetchExchangeRate = async (currency: string, date: string) => {
-    if (!currency || currency === 'KRW' || !date) {
+    if (!currency || !date) {
+      return
+    }
+    
+    if (currency === 'KRW') {
       setFormData(prev => ({ ...prev, exchangeRate: '1' }))
       return
     }
@@ -158,7 +162,8 @@ export default function ImportExportNewPage() {
         // 가장 최근 환율 사용
         setFormData(prev => ({ ...prev, exchangeRate: rates[0].rate.toString() }))
       } else {
-        // 환율 데이터가 없으면 알림
+        // 환율 데이터가 없으면 빈 값으로 설정
+        setFormData(prev => ({ ...prev, exchangeRate: '' }))
         console.warn(`${currency} 환율 데이터가 없습니다.`)
       }
     } catch (error) {
