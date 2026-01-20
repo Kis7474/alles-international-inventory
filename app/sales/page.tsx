@@ -251,7 +251,7 @@ export default function SalesPage() {
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">거래처</th>
                 <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">수량</th>
                 <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">단가</th>
-                <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">금액</th>
+                <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">총액(부가세제외)</th>
                 <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">마진</th>
                 <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">마진율</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">작업</th>
@@ -283,11 +283,23 @@ export default function SalesPage() {
                   <td className="px-4 py-3 text-right text-gray-900">
                     ₩{formatNumber(record.amount, 0)}
                   </td>
-                  <td className="px-4 py-3 text-right text-gray-900">
-                    {record.type === 'SALES' ? `₩${formatNumber(record.margin, 0)}` : '-'}
+                  <td className="px-4 py-3 text-right">
+                    {record.type === 'SALES' ? (
+                      <span className={record.margin >= 0 ? 'text-green-600' : 'text-red-600'}>
+                        ₩{formatNumber(record.margin, 0)}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
                   </td>
-                  <td className="px-4 py-3 text-right text-gray-900">
-                    {record.type === 'SALES' ? `${record.marginRate.toFixed(1)}%` : '-'}
+                  <td className="px-4 py-3 text-right">
+                    {record.type === 'SALES' ? (
+                      <span className={record.marginRate >= 0 ? 'text-green-600' : 'text-red-600'}>
+                        {record.marginRate.toFixed(1)}%
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <Link

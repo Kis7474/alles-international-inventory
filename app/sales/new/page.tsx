@@ -89,8 +89,7 @@ export default function NewSalesPage() {
       setSalespersons(salespersonsData)
       setCategories(categoriesData)
       setProducts(productsData)
-      // Filter to show only DOMESTIC vendors for sales/purchase
-      setVendors(vendorsData.filter((v: Vendor) => v.type === 'DOMESTIC'))
+      setVendors(vendorsData)
     } catch (error) {
       console.error('Error fetching master data:', error)
       alert('기초 데이터 조회 중 오류가 발생했습니다.')
@@ -207,21 +206,27 @@ export default function NewSalesPage() {
   }
 
   const handleTypeChange = (type: string) => {
-    setFormData((prev) => ({ ...prev, type }))
+    setFormData((prev) => ({ ...prev, type, vendorId: '' })) // Reset vendor when type changes
     
     // 거래 유형 변경 시 품목이 선택되어 있으면 단가 재계산
     if (formData.productId) {
-      if (formData.vendorId) {
-        fetchVendorPrice(parseInt(formData.productId), parseInt(formData.vendorId), formData.date, type)
-      } else {
-        const product = products.find((p) => p.id === parseInt(formData.productId))
-        if (product) {
-          const salesPrice = product.defaultSalesPrice || 0
-          setFormData((prev) => ({ ...prev, type, unitPrice: salesPrice.toString() }))
-        }
+      const product = products.find((p) => p.id === parseInt(formData.productId))
+      if (product) {
+        const salesPrice = product.defaultSalesPrice || 0
+        setFormData((prev) => ({ ...prev, type, vendorId: '', unitPrice: salesPrice.toString() }))
       }
     }
   }
+
+  // Filter vendors based on transaction type
+  const filteredVendors = vendors.filter((vendor) => {
+    if (formData.type === 'PURCHASE') {
+      return vendor.type === 'DOMESTIC_PURCHASE' || vendor.type === 'INTERNATIONAL_PURCHASE'
+    } else if (formData.type === 'SALES') {
+      return vendor.type === 'DOMESTIC_SALES' || vendor.type === 'INTERNATIONAL_SALES'
+    }
+    return true
+  })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -416,7 +421,8 @@ export default function NewSalesPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1 text-gray-700">
-                거래처 선택
+                거래처 선택 {formData.type === 'PURCHASE' && <span className="text-xs text-blue-600">(매입 거래처만 표시)</span>}
+                {formData.type === 'SALES' && <span className="text-xs text-blue-600">(매출 거래처만 표시)</span>}
               </label>
               <select
                 value={formData.vendorId}
@@ -424,7 +430,7 @@ export default function NewSalesPage() {
                 className="w-full px-3 py-2 border rounded-lg text-gray-900"
               >
                 <option value="">직접 입력</option>
-                {vendors.map((vendor) => (
+                {filteredVendors.map((vendor) => (
                   <option key={vendor.id} value={vendor.id}>
                     {vendor.name}
                   </option>
