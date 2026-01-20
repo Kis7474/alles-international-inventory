@@ -59,6 +59,7 @@ export default function OutboundPage() {
   const [deletingMovementId, setDeletingMovementId] = useState<number | null>(null)
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [selectAll, setSelectAll] = useState(false)
+  const [selectedStorageLocation, setSelectedStorageLocation] = useState<'WAREHOUSE' | 'OFFICE'>('WAREHOUSE')
   
   // 필터 상태
   const [filterStartDate, setFilterStartDate] = useState('')
@@ -82,6 +83,11 @@ export default function OutboundPage() {
     fetchInventoryProducts()
   }, [])
 
+  useEffect(() => {
+    fetchInventoryProducts()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedStorageLocation])
+
   const fetchData = async () => {
     try {
       const [itemsRes, historyRes] = await Promise.all([
@@ -104,7 +110,12 @@ export default function OutboundPage() {
   
   const fetchInventoryProducts = async () => {
     try {
-      const res = await fetch('/api/inventory')
+      const params = new URLSearchParams()
+      if (selectedStorageLocation) {
+        params.append('storageLocation', selectedStorageLocation)
+      }
+      
+      const res = await fetch(`/api/inventory?${params.toString()}`)
       const data: InventoryProduct[] = await res.json()
       // Filter to only products with inventory
       setInventoryProducts(data.filter((item) => item.totalQuantity > 0))
@@ -116,7 +127,7 @@ export default function OutboundPage() {
   const handleProductSelect = (productId: string) => {
     const selected = inventoryProducts.find(p => p.productId === parseInt(productId))
     setFormData({ ...formData, productId, itemId: '' })
-    setSelectedProductInfo(selected)
+    setSelectedProductInfo(selected || null)
   }
 
   const handleFilter = async () => {
@@ -347,10 +358,47 @@ export default function OutboundPage() {
         <div className="bg-white p-6 rounded-lg shadow mb-6">
           <h2 className="text-xl font-bold mb-4">출고 등록</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* 보관 위치 선택 */}
+            <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+              <label className="block text-sm font-medium mb-2 text-gray-700">출고 위치</label>
+              <div className="flex gap-4">
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="radio"
+                    value="WAREHOUSE"
+                    checked={selectedStorageLocation === 'WAREHOUSE'}
+                    onChange={() => {
+                      setSelectedStorageLocation('WAREHOUSE')
+                      setFormData({ ...formData, productId: '', quantity: '' })
+                      setSelectedProductInfo(null)
+                    }}
+                    className="mr-2"
+                  />
+                  <span className="text-gray-700">🏭 창고</span>
+                </label>
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="radio"
+                    value="OFFICE"
+                    checked={selectedStorageLocation === 'OFFICE'}
+                    onChange={() => {
+                      setSelectedStorageLocation('OFFICE')
+                      setFormData({ ...formData, productId: '', quantity: '' })
+                      setSelectedProductInfo(null)
+                    }}
+                    className="mr-2"
+                  />
+                  <span className="text-gray-700">🏢 사무실</span>
+                </label>
+              </div>
+            </div>
+            
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  품목 * <span className="text-xs text-blue-600">(재고에 있는 품목만 표시)</span>
+                  품목 * <span className="text-xs text-blue-600">
+                    ({selectedStorageLocation === 'WAREHOUSE' ? '창고' : '사무실'} 재고만 표시)
+                  </span>
                 </label>
                 <select
                   required

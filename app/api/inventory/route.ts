@@ -7,14 +7,27 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const productId = searchParams.get('productId')
     const itemId = searchParams.get('itemId') // 하위 호환성
+    const storageLocation = searchParams.get('storageLocation')
 
     if (productId) {
       // 특정 품목의 LOT별 상세 재고
+      interface LotWhereClause {
+        productId: number
+        quantityRemaining: { gt: number }
+        storageLocation?: string
+      }
+      
+      const whereClause: LotWhereClause = {
+        productId: parseInt(productId),
+        quantityRemaining: { gt: 0 },
+      }
+      
+      if (storageLocation) {
+        whereClause.storageLocation = storageLocation
+      }
+      
       const lots = await prisma.inventoryLot.findMany({
-        where: {
-          productId: parseInt(productId),
-          quantityRemaining: { gt: 0 },
-        },
+        where: whereClause,
         include: {
           product: {
             include: {
@@ -67,12 +80,24 @@ export async function GET(request: NextRequest) {
       })
     } else {
       // 전체 품목별 재고 현황 (Product 기반)
+      interface InventoryWhereClause {
+        productId: { not: null }
+        quantityRemaining: { gt: number }
+        storageLocation?: string
+      }
+      
+      const whereClause: InventoryWhereClause = {
+        productId: { not: null },
+        quantityRemaining: { gt: 0 },
+      }
+      
+      if (storageLocation) {
+        whereClause.storageLocation = storageLocation
+      }
+      
       const inventory = await prisma.inventoryLot.groupBy({
         by: ['productId'],
-        where: {
-          productId: { not: null },
-          quantityRemaining: { gt: 0 },
-        },
+        where: whereClause,
         _sum: {
           quantityRemaining: true,
         },
@@ -90,12 +115,24 @@ export async function GET(request: NextRequest) {
               category: true,
             },
           })
-
+          
+          interface LotDetailWhereClause {
+            productId: number | null
+            quantityRemaining: { gt: number }
+            storageLocation?: string
+          }
+          
+          const lotWhereClause: LotDetailWhereClause = {
+            productId: item.productId,
+            quantityRemaining: { gt: 0 },
+          }
+          
+          if (storageLocation) {
+            lotWhereClause.storageLocation = storageLocation
+          }
+          
           const lots = await prisma.inventoryLot.findMany({
-            where: {
-              productId: item.productId,
-              quantityRemaining: { gt: 0 },
-            },
+            where: lotWhereClause,
             orderBy: { receivedDate: 'asc' },
           })
 

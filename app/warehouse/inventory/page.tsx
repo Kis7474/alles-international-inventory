@@ -35,14 +35,21 @@ export default function InventoryPage() {
   const [inventory, setInventory] = useState<InventoryItem[]>([])
   const [selectedItem, setSelectedItem] = useState<ItemDetail | null>(null)
   const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState<'ALL' | 'WAREHOUSE' | 'OFFICE'>('ALL')
 
   useEffect(() => {
     fetchInventory()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
 
   const fetchInventory = async () => {
     try {
-      const res = await fetch('/api/inventory')
+      const params = new URLSearchParams()
+      if (activeTab !== 'ALL') {
+        params.append('storageLocation', activeTab)
+      }
+      
+      const res = await fetch(`/api/inventory?${params.toString()}`)
       const data = await res.json()
       setInventory(data)
     } catch (error) {
@@ -71,6 +78,40 @@ export default function InventoryPage() {
   return (
     <div>
       <h1 className="text-3xl font-bold mb-6">재고 조회</h1>
+
+      {/* 탭 UI */}
+      <div className="flex border-b mb-6">
+        <button
+          onClick={() => setActiveTab('ALL')}
+          className={`px-6 py-3 font-medium transition-colors ${
+            activeTab === 'ALL'
+              ? 'border-b-2 border-blue-600 text-blue-600'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          📊 전체 재고
+        </button>
+        <button
+          onClick={() => setActiveTab('WAREHOUSE')}
+          className={`px-6 py-3 font-medium transition-colors ${
+            activeTab === 'WAREHOUSE'
+              ? 'border-b-2 border-blue-600 text-blue-600'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          🏭 창고 재고
+        </button>
+        <button
+          onClick={() => setActiveTab('OFFICE')}
+          className={`px-6 py-3 font-medium transition-colors ${
+            activeTab === 'OFFICE'
+              ? 'border-b-2 border-blue-600 text-blue-600'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          🏢 사무실 재고
+        </button>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* 품목별 재고 현황 */}
