@@ -30,6 +30,7 @@ interface VendorProductPrice {
   salesPrice: number | null
   effectiveDate: string
   memo: string | null
+  updatedAt: string
 }
 
 export default function VendorPricesPage() {
@@ -39,7 +40,9 @@ export default function VendorPricesPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
+  const [showHistoryModal, setShowHistoryModal] = useState(false)
   const [editingPrice, setEditingPrice] = useState<VendorProductPrice | null>(null)
+  const [selectedHistory, setSelectedHistory] = useState<VendorProductPrice[]>([])
   
   // Filter state
   const [filterVendorId, setFilterVendorId] = useState<string>('')
@@ -184,6 +187,16 @@ export default function VendorPricesPage() {
     }
   }
 
+  const handleShowHistory = (vendorId: number, productId: number) => {
+    // Get all price history for this vendor-product combination
+    const history = prices
+      .filter(p => p.vendorId === vendorId && p.productId === productId)
+      .sort((a, b) => new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime())
+    
+    setSelectedHistory(history)
+    setShowHistoryModal(true)
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -306,6 +319,12 @@ export default function VendorPricesPage() {
                     {price.memo || '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
+                    <button
+                      onClick={() => handleShowHistory(price.vendorId, price.productId)}
+                      className="text-purple-600 hover:text-purple-900 mr-3"
+                    >
+                      이력
+                    </button>
                     <button
                       onClick={() => handleEdit(price)}
                       className="text-blue-600 hover:text-blue-900 mr-3"
@@ -452,6 +471,110 @@ export default function VendorPricesPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 가격 이력 모달 */}
+      {showHistoryModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <h2 className="text-2xl font-bold mb-6 text-gray-900">가격 변경 이력</h2>
+            
+            {selectedHistory.length > 0 && (
+              <div className="mb-4 p-4 bg-blue-50 rounded-md">
+                <div className="text-sm text-gray-700">
+                  <strong>거래처:</strong> {selectedHistory[0].vendor.name} | 
+                  <strong className="ml-2">품목:</strong> {selectedHistory[0].product.name}
+                </div>
+              </div>
+            )}
+
+            <div className="overflow-x-auto">
+              <table className="min-w-full">
+                <thead className="bg-gray-50 border-b">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                      적용일자
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
+                      매입가
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
+                      매출가
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
+                      매입가 변동
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
+                      매출가 변동
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                      메모
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                      변경일시
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {selectedHistory.map((price, index) => {
+                    const prevPrice = selectedHistory[index + 1]
+                    const purchaseDiff = prevPrice && price.purchasePrice && prevPrice.purchasePrice 
+                      ? price.purchasePrice - prevPrice.purchasePrice 
+                      : null
+                    const salesDiff = prevPrice && price.salesPrice && prevPrice.salesPrice 
+                      ? price.salesPrice - prevPrice.salesPrice 
+                      : null
+
+                    return (
+                      <tr key={price.id} className={index === 0 ? 'bg-green-50' : 'hover:bg-gray-50'}>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                          {new Date(price.effectiveDate).toLocaleDateString('ko-KR')}
+                          {index === 0 && <span className="ml-2 text-xs text-green-600 font-semibold">현재</span>}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">
+                          {price.purchasePrice ? formatCurrency(price.purchasePrice) : '-'}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">
+                          {price.salesPrice ? formatCurrency(price.salesPrice) : '-'}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-right">
+                          {purchaseDiff !== null ? (
+                            <span className={purchaseDiff > 0 ? 'text-red-600' : purchaseDiff < 0 ? 'text-blue-600' : 'text-gray-500'}>
+                              {purchaseDiff > 0 ? '+' : ''}{formatCurrency(purchaseDiff)}
+                            </span>
+                          ) : '-'}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-right">
+                          {salesDiff !== null ? (
+                            <span className={salesDiff > 0 ? 'text-red-600' : salesDiff < 0 ? 'text-blue-600' : 'text-gray-500'}>
+                              {salesDiff > 0 ? '+' : ''}{formatCurrency(salesDiff)}
+                            </span>
+                          ) : '-'}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-900">
+                          {price.memo || '-'}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                          {new Date(price.updatedAt).toLocaleString('ko-KR')}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex justify-end mt-6">
+              <button
+                type="button"
+                onClick={() => setShowHistoryModal(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
+              >
+                닫기
+              </button>
+            </div>
           </div>
         </div>
       )}
