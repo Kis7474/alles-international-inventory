@@ -167,14 +167,14 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // 창고 또는 사무실 입고 처리 (storageType === 'WAREHOUSE' or 'OFFICE')
-    if ((storageType === 'WAREHOUSE' || storageType === 'OFFICE') && type === 'IMPORT' && unitCost) {
-      await prisma.inventoryLot.create({
+    // ★★★ 창고 또는 사무실 보관인 경우 자동 입고 처리 ★★★
+    if ((storageType === 'WAREHOUSE' || storageType === 'OFFICE') && type === 'IMPORT') {
+      const inventoryLot = await prisma.inventoryLot.create({
         data: {
           productId: parseInt(productId),
           vendorId: parseInt(vendorId),
           salespersonId: salespersonId ? parseInt(salespersonId) : null,
-          lotCode: `IE-${record.id}`,
+          lotCode: `IE-${record.id}-${Date.now().toString().slice(-4)}`,
           receivedDate: new Date(date),
           quantityReceived: parseFloat(quantity),
           quantityRemaining: parseFloat(quantity),
@@ -182,11 +182,13 @@ export async function POST(request: NextRequest) {
           dutyAmount: dutyAmount ? parseFloat(dutyAmount) : 0,
           domesticFreight: shippingCost ? parseFloat(shippingCost) : 0,
           otherCost: otherCost ? parseFloat(otherCost) : 0,
-          unitCost,
+          unitCost: unitCost || 0,
           storageLocation: storageType, // 'WAREHOUSE' 또는 'OFFICE'
           importExportId: record.id,
         },
       })
+      
+      console.log('Auto inventory created:', inventoryLot.id)
     }
 
     return NextResponse.json(record, { status: 201 })

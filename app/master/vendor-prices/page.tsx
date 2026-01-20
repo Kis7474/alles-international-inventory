@@ -7,6 +7,7 @@ interface Vendor {
   id: number
   code: string
   name: string
+  type: string
 }
 
 interface Product {
@@ -38,6 +39,7 @@ export default function VendorPricesPage() {
   const [filteredPrices, setFilteredPrices] = useState<VendorProductPrice[]>([])
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [products, setProducts] = useState<Product[]>([])
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [showHistoryModal, setShowHistoryModal] = useState(false)
@@ -187,14 +189,37 @@ export default function VendorPricesPage() {
     }
   }
 
-  const handleShowHistory = (vendorId: number, productId: number) => {
-    // Get all price history for this vendor-product combination
-    const history = prices
-      .filter(p => p.vendorId === vendorId && p.productId === productId)
-      .sort((a, b) => new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime())
+  const handleVendorChange = async (vendorId: string) => {
+    setFormData({ ...formData, vendorId, productId: '' })
     
-    setSelectedHistory(history)
-    setShowHistoryModal(true)
+    if (!vendorId) {
+      setFilteredProducts([])
+      return
+    }
+    
+    // Fetch products that are sold to this vendor (해당 거래처에 판매하는 품목)
+    try {
+      const res = await fetch(`/api/products?salesVendorId=${vendorId}`)
+      const productsData = await res.json()
+      setFilteredProducts(productsData)
+    } catch (error) {
+      console.error('Error fetching products for vendor:', error)
+      setFilteredProducts([])
+    }
+  }
+
+  const handleShowHistory = async (vendorId: number, productId: number) => {
+    try {
+      const res = await fetch(
+        `/api/vendor-product-prices/history?vendorId=${vendorId}&productId=${productId}`
+      )
+      const history = await res.json()
+      setSelectedHistory(history)
+      setShowHistoryModal(true)
+    } catch (error) {
+      console.error('Error fetching price history:', error)
+      alert('가격 이력을 불러오는 중 오류가 발생했습니다.')
+    }
   }
 
   if (loading) {
@@ -363,38 +388,45 @@ export default function VendorPricesPage() {
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    거래처 *
+                    거래처 (판매처) *
                   </label>
                   <select
                     required
                     value={formData.vendorId}
-                    onChange={(e) => setFormData({ ...formData, vendorId: e.target.value })}
+                    onChange={(e) => handleVendorChange(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                     disabled={!!editingPrice}
                   >
-                    <option value="">선택</option>
-                    {vendors.map((vendor) => (
-                      <option key={vendor.id} value={vendor.id}>
-                        {vendor.name}
-                      </option>
-                    ))}
+                    <option value="">거래처를 선택하세요</option>
+                    {vendors
+                      .filter(v => v.type === 'DOMESTIC_SALES' || v.type === 'INTERNATIONAL_SALES')
+                      .map((vendor) => (
+                        <option key={vendor.id} value={vendor.id}>
+                          [{vendor.code}] {vendor.name}
+                        </option>
+                      ))}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     품목 *
+                    {formData.vendorId && (
+                      <span className="text-xs text-blue-600 ml-1">
+                        (선택한 거래처에 판매하는 품목만 표시 - {filteredProducts.length}개)
+                      </span>
+                    )}
                   </label>
                   <select
                     required
                     value={formData.productId}
                     onChange={(e) => handleProductChange(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                    disabled={!!editingPrice}
+                    disabled={!formData.vendorId || !!editingPrice}
                   >
-                    <option value="">선택</option>
-                    {products.map((product) => (
+                    <option value="">{formData.vendorId ? '품목을 선택하세요' : '거래처를 먼저 선택하세요'}</option>
+                    {filteredProducts.map((product) => (
                       <option key={product.id} value={product.id}>
-                        {product.name}
+                        {product.name} ({product.code})
                       </option>
                     ))}
                   </select>

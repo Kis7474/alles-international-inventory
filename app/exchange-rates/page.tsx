@@ -17,6 +17,7 @@ export default function ExchangeRatesPage() {
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [editingRate, setEditingRate] = useState<ExchangeRate | null>(null)
   const [updating, setUpdating] = useState(false)
+  const [lastUpdate, setLastUpdate] = useState<string | null>(null)
   
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -102,10 +103,11 @@ export default function ExchangeRatesPage() {
       const data = await res.json()
       
       if (data.success) {
-        alert(data.message)
+        alert(`환율이 업데이트되었습니다. (${data.updatedCount}개 통화)`)
+        setLastUpdate(data.updatedAt)
         await fetchRates()
       } else {
-        alert(data.error || '환율 업데이트에 실패했습니다.')
+        alert(data.message || data.error || '환율 업데이트에 실패했습니다.')
       }
     } catch (error) {
       console.error('Error auto-updating rates:', error)
@@ -113,6 +115,10 @@ export default function ExchangeRatesPage() {
     } finally {
       setUpdating(false)
     }
+  }
+
+  const handleRefresh = () => {
+    fetchRates()
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -205,12 +211,25 @@ export default function ExchangeRatesPage() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">환율 관리</h1>
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">환율 관리</h1>
+          {lastUpdate && (
+            <p className="text-sm text-gray-500 mt-1">
+              마지막 업데이트: {new Date(lastUpdate).toLocaleString('ko-KR')}
+            </p>
+          )}
+        </div>
         <div className="flex gap-2">
           <button
+            onClick={handleRefresh}
+            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+          >
+            🔄 새로고침
+          </button>
+          <button
             onClick={() => setShowSettingsModal(true)}
-            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
           >
             ⚙️ 설정
           </button>
@@ -219,7 +238,7 @@ export default function ExchangeRatesPage() {
             disabled={updating}
             className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
-            {updating ? '업데이트 중...' : '🔄 환율 자동 업데이트'}
+            {updating ? '업데이트 중...' : '📡 환율 자동 업데이트'}
           </button>
           <button
             onClick={() => setShowModal(true)}
@@ -234,7 +253,7 @@ export default function ExchangeRatesPage() {
       {rates.length > 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
           <div className="text-sm text-blue-800">
-            💡 마지막 업데이트: {new Date(rates[0].date).toLocaleString('ko-KR')}
+            💡 최근 환율 데이터: {new Date(rates[0].date).toLocaleDateString('ko-KR')}
             {rates[0].source && ` • 출처: ${rates[0].source}`}
           </div>
         </div>

@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-// 한국수출입은행 환율 API (무료, API 키 불필요)
+// 한국수출입은행 환율 API
 const KOREAEXIM_API_URL = 'https://www.koreaexim.go.kr/site/program/financial/exchangeJSON'
 
 interface KoreaEximRate {
-  result: number
+  result?: number
   cur_unit: string
   cur_nm: string
   ttb: string
@@ -21,153 +21,134 @@ interface KoreaEximRate {
 // POST /api/exchange-rates/auto-update - 환율 자동 업데이트
 export async function POST() {
   try {
-    // 한국수출입은행 API 사용 (API 키 불필요)
-    // 공식 데이터 제공처이며 무료로 사용 가능
+    // 설정에서 API 키 가져오기
+    const settings = await prisma.systemSetting.findUnique({
+      where: { key: 'EXCHANGE_RATE_SETTINGS' },
+    })
+    
+    let apiKey = process.env.KOREAEXIM_API_KEY || ''
+    if (settings?.value) {
+      try {
+        const parsed = JSON.parse(settings.value)
+        apiKey = parsed.koreaeximApiKey || parsed.koreaexim_api_key || apiKey
+      } catch {
+        console.warn('Failed to parse exchange rate settings')
+      }
+    }
+    
+    if (!apiKey) {
+      return NextResponse.json({ 
+        success: false, 
+        message: 'API 키가 설정되지 않았습니다. 환율 설정에서 한국수출입은행 API 키를 입력해주세요.' 
+      }, { status: 400 })
+    }
+    
+    // 오늘 날짜 (YYYYMMDD 형식)
     const today = new Date()
-    const dateStr = today.toISOString().split('T')[0].replace(/-/g, '')
+    const searchDate = today.toISOString().slice(0, 10).replace(/-/g, '')
     
-    const authKey = process.env.KOREAEXIM_API_KEY || '' // API 키 없으면 빈 문자열
-    const url = authKey
-      ? `${KOREAEXIM_API_URL}?authkey=${authKey}&searchdate=${dateStr}&data=AP01`
-      : `${KOREAEXIM_API_URL}?authkey=sample&searchdate=${dateStr}&data=AP01` // 샘플 키로 시도
+    // 한국수출입은행 API 호출
+    const response = await fetch(
+      `${KOREAEXIM_API_URL}?authkey=${apiKey}&searchdate=${searchDate}&data=AP01`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    )
     
-    const response = await fetch(url)
-    const data: KoreaEximRate[] = await response.json()
+    if (!response.ok) {
+      throw new Error(`API 응답 오류: ${response.status}`)
+    }
     
-    if (!Array.isArray(data) || data.length === 0) {
-      // API 실패 시 기본 환율 데이터 사용 (더미 데이터)
-      const defaultRates = [
-        { currency: 'USD', rate: 1300, source: 'DEFAULT' },
-        { currency: 'JPY', rate: 900, source: 'DEFAULT' },
-        { currency: 'EUR', rate: 1400, source: 'DEFAULT' },
-        { currency: 'CNY', rate: 180, source: 'DEFAULT' },
-      ]
-      
-      for (const rateData of defaultRates) {
-        await prisma.exchangeRate.upsert({
-          where: {
-            date_currency: {
-              date: new Date(today.toISOString().split('T')[0]),
-              currency: rateData.currency,
-            },
-          },
-          update: {
-            rate: rateData.rate,
-            source: rateData.source,
-          },
-          create: {
-            date: new Date(today.toISOString().split('T')[0]),
-            currency: rateData.currency,
-            rate: rateData.rate,
-            source: rateData.source,
-          },
-        })
+    let data: KoreaEximRate[] = await response.json()
+    
+    // API 결과 확인 (결과가 없으면 전날 데이터 조회)
+    if (!data || !Array.isArray(data) || data.length === 0 || (data[0]?.result === 4)) {
+      // 주말이나 공휴일인 경우 전날 데이터 시도 (최대 3일 전까지)
+      for (let daysAgo = 1; daysAgo <= 3; daysAgo++) {
+        const pastDate = new Date(today)
+        pastDate.setDate(pastDate.getDate() - daysAgo)
+        const pastDateStr = pastDate.toISOString().slice(0, 10).replace(/-/g, '')
+        
+        const retryResponse = await fetch(
+          `${KOREAEXIM_API_URL}?authkey=${apiKey}&searchdate=${pastDateStr}&data=AP01`
+        )
+        const retryData = await retryResponse.json()
+        
+        if (retryData && Array.isArray(retryData) && retryData.length > 0 && retryData[0]?.result !== 4) {
+          data = retryData
+          break
+        }
       }
       
-      return NextResponse.json({
-        success: true,
-        message: '기본 환율 데이터가 적용되었습니다.',
-        updatedCount: defaultRates.length,
-      })
+      if (!data || !Array.isArray(data) || data.length === 0) {
+        return NextResponse.json({ 
+          success: false, 
+          message: '환율 데이터를 가져올 수 없습니다. 주말이나 공휴일일 수 있습니다.' 
+        }, { status: 400 })
+      }
     }
     
-    // 통화 코드 매핑
-    const currencyMap: Record<string, string> = {
-      'USD': 'USD',
-      'JPY(100)': 'JPY',
-      'EUR': 'EUR',
-      'CNH': 'CNY', // 위안화
-      'GBP': 'GBP',
-    }
-    
+    // 환율 데이터 저장
+    const targetCurrencies = ['USD', 'EUR', 'JPY(100)', 'CNH', 'GBP']
     let updatedCount = 0
     
-    for (const rateItem of data) {
-      const currency = currencyMap[rateItem.cur_unit]
-      if (!currency) continue
+    for (const item of data) {
+      // 통화 코드 매핑
+      let currency = item.cur_unit
+      if (currency === 'JPY(100)') currency = 'JPY'
+      if (currency === 'CNH') currency = 'CNY'
       
-      // 매매기준율 사용
-      let rate = parseFloat(rateItem.deal_bas_r.replace(/,/g, ''))
-      
-      // JPY는 100엔 기준이므로 1엔당 환율로 변환
-      if (currency === 'JPY') {
-        rate = rate / 100
+      if (!targetCurrencies.some(c => c === item.cur_unit || c === currency)) {
+        continue
       }
       
-      if (isNaN(rate) || rate <= 0) continue
+      // 매매기준율 파싱 (쉼표 제거)
+      const rate = parseFloat(item.deal_bas_r?.replace(/,/g, '')) || 0
+      if (rate <= 0) continue
+      
+      // JPY는 100엔 기준이므로 1엔 단위로 변환
+      const finalRate = item.cur_unit === 'JPY(100)' ? rate / 100 : rate
+      
+      // 데이터베이스에 저장/업데이트 (오늘 날짜 기준, 시간은 00:00:00)
+      const dateOnly = new Date(today.toISOString().split('T')[0])
       
       await prisma.exchangeRate.upsert({
         where: {
           date_currency: {
-            date: new Date(today.toISOString().split('T')[0]),
             currency,
+            date: dateOnly,
           },
         },
         update: {
-          rate,
-          source: 'KOREAEXIM_API',
+          rate: finalRate,
+          source: 'KOREAEXIM',
         },
         create: {
-          date: new Date(today.toISOString().split('T')[0]),
           currency,
-          rate,
-          source: 'KOREAEXIM_API',
+          date: dateOnly,
+          rate: finalRate,
+          source: 'KOREAEXIM',
         },
       })
       
       updatedCount++
     }
     
-    return NextResponse.json({
-      success: true,
+    return NextResponse.json({ 
+      success: true, 
       message: `환율이 업데이트되었습니다. (${updatedCount}개 통화)`,
       updatedCount,
+      updatedAt: new Date().toISOString(),
     })
-  } catch (error) {
-    console.error('Error updating exchange rates:', error)
     
-    // 에러 발생 시에도 기본 환율 적용
-    try {
-      const today = new Date()
-      const defaultRates = [
-        { currency: 'USD', rate: 1300, source: 'DEFAULT' },
-        { currency: 'JPY', rate: 900, source: 'DEFAULT' },
-        { currency: 'EUR', rate: 1400, source: 'DEFAULT' },
-        { currency: 'CNY', rate: 180, source: 'DEFAULT' },
-      ]
-      
-      for (const rateData of defaultRates) {
-        await prisma.exchangeRate.upsert({
-          where: {
-            date_currency: {
-              date: new Date(today.toISOString().split('T')[0]),
-              currency: rateData.currency,
-            },
-          },
-          update: {
-            rate: rateData.rate,
-            source: rateData.source,
-          },
-          create: {
-            date: new Date(today.toISOString().split('T')[0]),
-            currency: rateData.currency,
-            rate: rateData.rate,
-            source: rateData.source,
-          },
-        })
-      }
-      
-      return NextResponse.json({
-        success: true,
-        message: 'API 오류로 기본 환율이 적용되었습니다.',
-        updatedCount: defaultRates.length,
-      })
-    } catch (fallbackError) {
-      console.error('Error in fallback mechanism:', fallbackError)
-      return NextResponse.json(
-        { error: '환율 업데이트 중 오류가 발생했습니다.' },
-        { status: 500 }
-      )
-    }
+  } catch (error) {
+    console.error('Exchange rate update error:', error)
+    return NextResponse.json({ 
+      success: false,
+      error: error instanceof Error ? error.message : '환율 업데이트 중 오류가 발생했습니다.' 
+    }, { status: 500 })
   }
 }
