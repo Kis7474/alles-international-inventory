@@ -30,8 +30,8 @@ export async function GET(request: NextRequest) {
       orderBy: { code: 'asc' },
     })
     
-    // 통합 카테고리가 없으면 기존 ProductCategory 반환
-    if (categories.length === 0 && !searchName) {
+    // 검색 필터가 없고 통합 카테고리가 없으면 기존 ProductCategory 반환
+    if (!searchName && categories.length === 0) {
       const productCategories = await prisma.productCategory.findMany({
         orderBy: { code: 'asc' },
       })
