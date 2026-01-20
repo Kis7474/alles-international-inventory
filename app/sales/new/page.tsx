@@ -46,6 +46,7 @@ interface Product {
 
 interface Vendor {
   id: number
+  code: string
   name: string
   type: string
 }

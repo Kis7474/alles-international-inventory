@@ -11,7 +11,13 @@ export async function GET(request: NextRequest) {
 
     if (productId) {
       // 특정 품목의 LOT별 상세 재고
-      const whereClause: any = {
+      interface LotWhereClause {
+        productId: number
+        quantityRemaining: { gt: number }
+        storageLocation?: string
+      }
+      
+      const whereClause: LotWhereClause = {
         productId: parseInt(productId),
         quantityRemaining: { gt: 0 },
       }
@@ -74,7 +80,13 @@ export async function GET(request: NextRequest) {
       })
     } else {
       // 전체 품목별 재고 현황 (Product 기반)
-      const whereClause: any = {
+      interface InventoryWhereClause {
+        productId: { not: null }
+        quantityRemaining: { gt: number }
+        storageLocation?: string
+      }
+      
+      const whereClause: InventoryWhereClause = {
         productId: { not: null },
         quantityRemaining: { gt: 0 },
       }
@@ -103,8 +115,14 @@ export async function GET(request: NextRequest) {
               category: true,
             },
           })
-
-          const lotWhereClause: any = {
+          
+          interface LotDetailWhereClause {
+            productId: number | null
+            quantityRemaining: { gt: number }
+            storageLocation?: string
+          }
+          
+          const lotWhereClause: LotDetailWhereClause = {
             productId: item.productId,
             quantityRemaining: { gt: 0 },
           }

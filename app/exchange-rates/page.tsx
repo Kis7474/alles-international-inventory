@@ -15,6 +15,7 @@ export default function ExchangeRatesPage() {
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingRate, setEditingRate] = useState<ExchangeRate | null>(null)
+  const [updating, setUpdating] = useState(false)
   
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -37,6 +38,26 @@ export default function ExchangeRatesPage() {
       console.error('Error fetching rates:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleAutoUpdate = async () => {
+    setUpdating(true)
+    try {
+      const res = await fetch('/api/exchange-rates/auto-update', { method: 'POST' })
+      const data = await res.json()
+      
+      if (data.success) {
+        alert(data.message)
+        await fetchRates()
+      } else {
+        alert(data.error || '환율 업데이트에 실패했습니다.')
+      }
+    } catch (error) {
+      console.error('Error auto-updating rates:', error)
+      alert('환율 업데이트 중 오류가 발생했습니다.')
+    } finally {
+      setUpdating(false)
     }
   }
 
@@ -132,13 +153,32 @@ export default function ExchangeRatesPage() {
     <div>
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold text-gray-900">환율 관리</h1>
-        <button
-          onClick={() => setShowModal(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          + 환율 등록
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleAutoUpdate}
+            disabled={updating}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+          >
+            {updating ? '업데이트 중...' : '🔄 환율 자동 업데이트'}
+          </button>
+          <button
+            onClick={() => setShowModal(true)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            + 수동 등록
+          </button>
+        </div>
       </div>
+
+      {/* 마지막 업데이트 정보 */}
+      {rates.length > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <div className="text-sm text-blue-800">
+            💡 마지막 업데이트: {new Date(rates[0].date).toLocaleString('ko-KR')}
+            {rates[0].source && ` • 출처: ${rates[0].source}`}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {Object.entries(ratesByCurrency).map(([currency, currencyRates]) => {

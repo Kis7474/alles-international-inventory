@@ -52,7 +52,6 @@ export default function ImportExportNewPage() {
   const [availableProducts, setAvailableProducts] = useState<Product[]>([])
   
   // Search states
-  const [vendorSearch, setVendorSearch] = useState('')
   const [productSearch, setProductSearch] = useState('')
   
   // Form data
@@ -307,16 +306,11 @@ export default function ImportExportNewPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
               >
                 <option value="">선택하세요</option>
-                {vendors
-                  .filter(v => 
-                    v.name.toLowerCase().includes(vendorSearch.toLowerCase()) ||
-                    v.code.toLowerCase().includes(vendorSearch.toLowerCase())
-                  )
-                  .map((vendor) => (
-                    <option key={vendor.id} value={vendor.id}>
-                      [{vendor.code}] {vendor.name}
-                    </option>
-                  ))}
+                {vendors.map((vendor) => (
+                  <option key={vendor.id} value={vendor.id}>
+                    [{vendor.code}] {vendor.name}
+                  </option>
+                ))}
               </select>
             </div>
             
