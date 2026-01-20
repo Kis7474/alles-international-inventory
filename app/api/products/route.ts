@@ -32,12 +32,18 @@ export async function GET(request: Request) {
       where,
       include: {
         category: true,
+        purchaseVendor: true,
+        salesVendors: {
+          include: {
+            vendor: true,
+          },
+        },
         priceHistory: {
           orderBy: { effectiveDate: 'desc' },
           take: 1,
         },
       },
-      orderBy: { code: 'asc' },
+      orderBy: { id: 'asc' },
     })
     
     return NextResponse.json(products)
@@ -59,20 +65,34 @@ export async function POST(request: Request) {
       description,
       defaultPurchasePrice,
       defaultSalesPrice,
+      purchaseVendorId,
+      salesVendorIds,
     } = body
     
     const product = await prisma.product.create({
       data: {
-        code,
+        code: code || null,
         name,
-        unit,
+        unit: unit || 'EA',
         categoryId: categoryId ? parseInt(categoryId) : null,
         description,
         defaultPurchasePrice: defaultPurchasePrice ? parseFloat(defaultPurchasePrice) : null,
         defaultSalesPrice: defaultSalesPrice ? parseFloat(defaultSalesPrice) : null,
+        purchaseVendorId: parseInt(purchaseVendorId),
+        salesVendors: salesVendorIds && salesVendorIds.length > 0 ? {
+          create: salesVendorIds.map((vendorId: string) => ({
+            vendorId: parseInt(vendorId),
+          })),
+        } : undefined,
       },
       include: {
         category: true,
+        purchaseVendor: true,
+        salesVendors: {
+          include: {
+            vendor: true,
+          },
+        },
       },
     })
     
@@ -96,21 +116,40 @@ export async function PUT(request: Request) {
       description,
       defaultPurchasePrice,
       defaultSalesPrice,
+      purchaseVendorId,
+      salesVendorIds,
     } = body
+    
+    // First, delete existing sales vendor relationships
+    await prisma.productSalesVendor.deleteMany({
+      where: { productId: parseInt(id) },
+    })
     
     const product = await prisma.product.update({
       where: { id: parseInt(id) },
       data: {
-        code,
+        code: code || null,
         name,
-        unit,
+        unit: unit || 'EA',
         categoryId: categoryId ? parseInt(categoryId) : null,
         description,
         defaultPurchasePrice: defaultPurchasePrice ? parseFloat(defaultPurchasePrice) : null,
         defaultSalesPrice: defaultSalesPrice ? parseFloat(defaultSalesPrice) : null,
+        purchaseVendorId: parseInt(purchaseVendorId),
+        salesVendors: salesVendorIds && salesVendorIds.length > 0 ? {
+          create: salesVendorIds.map((vendorId: string) => ({
+            vendorId: parseInt(vendorId),
+          })),
+        } : undefined,
       },
       include: {
         category: true,
+        purchaseVendor: true,
+        salesVendors: {
+          include: {
+            vendor: true,
+          },
+        },
       },
     })
     
