@@ -1,14 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-// GET - 재고 조회
+// GET - 재고 조회 (Product 기반)
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const itemId = searchParams.get('itemId')
+    const productId = searchParams.get('productId')
+    const itemId = searchParams.get('itemId') // 하위 호환성
 
-    if (itemId) {
+    if (productId) {
       // 특정 품목의 LOT별 상세 재고
+      const lots = await prisma.inventoryLot.findMany({
+        where: {
+          productId: parseInt(productId),
+          quantityRemaining: { gt: 0 },
+        },
+        include: {
+          product: {
+            include: {
+              purchaseVendor: true,
+              category: true,
+            },
+          },
+        },
+        orderBy: [
+          { receivedDate: 'asc' },
+          { id: 'asc' },
+        ],
+      })
+
+      const totalQuantity = lots.reduce(
+        (sum, lot) => sum + lot.quantityRemaining,
+        0
+      )
+
+      return NextResponse.json({
+        productId: parseInt(productId),
+        totalQuantity,
+        lots,
+      })
+    } else if (itemId) {
+      // 하위 호환성: 기존 Item 기반 재고 조회
       const lots = await prisma.inventoryLot.findMany({
         where: {
           itemId: parseInt(itemId),
@@ -34,45 +66,64 @@ export async function GET(request: NextRequest) {
         lots,
       })
     } else {
-      // 전체 품목별 재고 현황
-      const items = await prisma.item.findMany({
-        include: {
-          lots: {
+      // 전체 품목별 재고 현황 (Product 기반)
+      const inventory = await prisma.inventoryLot.groupBy({
+        by: ['productId'],
+        where: {
+          productId: { not: null },
+          quantityRemaining: { gt: 0 },
+        },
+        _sum: {
+          quantityRemaining: true,
+        },
+        _count: {
+          id: true,
+        },
+      })
+
+      const result = await Promise.all(
+        inventory.map(async (item) => {
+          const product = await prisma.product.findUnique({
+            where: { id: item.productId! },
+            include: {
+              purchaseVendor: true,
+              category: true,
+            },
+          })
+
+          const lots = await prisma.inventoryLot.findMany({
             where: {
+              productId: item.productId,
               quantityRemaining: { gt: 0 },
             },
-          },
-        },
-        orderBy: { code: 'asc' },
-      })
+            orderBy: { receivedDate: 'asc' },
+          })
 
-      const inventory = items.map((item) => {
-        const totalQuantity = item.lots.reduce(
-          (sum, lot) => sum + lot.quantityRemaining,
-          0
-        )
-        const totalValue = item.lots.reduce(
-          (sum, lot) => sum + lot.quantityRemaining * lot.unitCost,
-          0
-        )
-        // 소수점 2자리로 반올림하여 금액 표시
-        const roundedTotalValue = Math.round(totalValue * 100) / 100
-        const avgUnitCost =
-          totalQuantity > 0 ? Math.round((totalValue / totalQuantity) * 100) / 100 : 0
+          const totalValue = lots.reduce(
+            (sum, lot) => sum + lot.quantityRemaining * lot.unitCost,
+            0
+          )
+          
+          const totalQuantity = item._sum.quantityRemaining || 0
+          const avgUnitCost = totalQuantity > 0 ? Math.round((totalValue / totalQuantity) * 100) / 100 : 0
 
-        return {
-          id: item.id,
-          code: item.code,
-          name: item.name,
-          unit: item.unit,
-          totalQuantity,
-          avgUnitCost,
-          totalValue: roundedTotalValue,
-          lotCount: item.lots.length,
-        }
-      })
+          return {
+            productId: item.productId,
+            productName: product?.name,
+            productCode: product?.code,
+            unit: product?.unit,
+            purchaseVendor: product?.purchaseVendor?.name,
+            category: product?.category?.nameKo,
+            totalQuantity,
+            avgUnitCost,
+            totalValue: Math.round(totalValue * 100) / 100,
+            lotCount: item._count.id,
+            lots,
+          }
+        })
+      )
 
-      return NextResponse.json(inventory)
+      return NextResponse.json(result)
     }
   } catch (error) {
     console.error('Error fetching inventory:', error)
