@@ -26,8 +26,10 @@ export async function POST() {
     const today = new Date()
     const dateStr = today.toISOString().split('T')[0].replace(/-/g, '')
     
-    const authKey = process.env.KOREAEXIM_API_KEY || 'sample' // API 키 없이도 사용 가능
-    const url = `${KOREAEXIM_API_URL}?authkey=${authKey}&searchdate=${dateStr}&data=AP01`
+    const authKey = process.env.KOREAEXIM_API_KEY || '' // API 키 없으면 빈 문자열
+    const url = authKey
+      ? `${KOREAEXIM_API_URL}?authkey=${authKey}&searchdate=${dateStr}&data=AP01`
+      : `${KOREAEXIM_API_URL}?authkey=sample&searchdate=${dateStr}&data=AP01` // 샘플 키로 시도
     
     const response = await fetch(url)
     const data: KoreaEximRate[] = await response.json()
@@ -160,7 +162,8 @@ export async function POST() {
         message: 'API 오류로 기본 환율이 적용되었습니다.',
         updatedCount: defaultRates.length,
       })
-    } catch {
+    } catch (fallbackError) {
+      console.error('Error in fallback mechanism:', fallbackError)
       return NextResponse.json(
         { error: '환율 업데이트 중 오류가 발생했습니다.' },
         { status: 500 }
