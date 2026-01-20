@@ -135,6 +135,7 @@ export function calculateAdjustedCost(baseCost: number, feeRate: number, storage
 export function calculateStorageMonths(startDate: Date, endDate: Date = new Date()): number {
   const diffTime = Math.abs(endDate.getTime() - startDate.getTime())
   const diffDays = diffTime / (1000 * 60 * 60 * 24)
-  const months = diffDays / 30.44 // Average days per month
+  // Using 30.44 as average days per month (365.25 / 12)
+  const months = diffDays / 30.44
   return Math.round(months * 10) / 10
 }

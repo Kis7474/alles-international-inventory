@@ -87,7 +87,17 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
         }
         
         // Determine transaction type: use row.type if provided, otherwise use options.transactionType
-        let transactionType = row.type ? (row.type === '매출' ? 'SALES' : row.type === '매입' ? 'PURCHASE' : '') : options.transactionType
+        const rowType = row.type?.trim()
+        let transactionType = ''
+        
+        if (rowType === '매출') {
+          transactionType = 'SALES'
+        } else if (rowType === '매입') {
+          transactionType = 'PURCHASE'
+        } else if (options.transactionType) {
+          transactionType = options.transactionType
+        }
+        
         if (!transactionType) {
           throw new Error('거래 유형이 선택되지 않았습니다.')
         }

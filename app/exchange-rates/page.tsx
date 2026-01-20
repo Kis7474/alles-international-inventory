@@ -57,7 +57,15 @@ export default function ExchangeRatesPage() {
       const res = await fetch('/api/settings?key=exchange_rate_settings')
       const data = await res.json()
       if (data && data.value) {
-        setSettings({ ...settings, ...data.value })
+        // Merge settings with validation
+        setSettings(prev => ({
+          source: data.value.source || prev.source,
+          koreaexim_api_key: data.value.koreaexim_api_key || prev.koreaexim_api_key,
+          openexchange_api_key: data.value.openexchange_api_key || prev.openexchange_api_key,
+          smbs_api_key: data.value.smbs_api_key || prev.smbs_api_key,
+          auto_update_time: data.value.auto_update_time || prev.auto_update_time,
+          target_currencies: data.value.target_currencies || prev.target_currencies,
+        }))
       }
     } catch (error) {
       console.error('Error fetching settings:', error)

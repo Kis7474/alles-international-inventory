@@ -120,6 +120,10 @@ export async function parseExcelFile(file: File): Promise<ParsedData> {
  * Expected format:
  * Row 1: 날짜 | 구분 | 거래처 | 품목명 | 수량 | 단가 | 금액(부가세포함) | 금액 | 담당자 | 카테고리 | 마진 | 마진율
  * Row 2+: Data rows
+ * 
+ * Note: 
+ * - 금액(부가세포함): Total amount including VAT
+ * - 금액: Supply amount excluding VAT
  */
 export async function parseTransactionExcel(file: File): Promise<TransactionRow[]> {
   const buffer = await file.arrayBuffer()

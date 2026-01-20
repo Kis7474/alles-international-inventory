@@ -183,15 +183,22 @@ export default function ImportExportEditPage() {
         memo: data.memo || '',
       })
       
-      // Filter products based on vendor
-      const filtered = products.filter(p => p.purchaseVendorId === data.vendorId)
-      setAvailableProducts(filtered)
+      // Wait for products to be loaded before filtering
+      // This will be handled by the useEffect that watches products and vendorId
     } catch (error) {
       console.error('Error fetching record:', error)
       alert('데이터 로딩 중 오류가 발생했습니다.')
       router.push('/import-export')
     }
   }
+
+  // Update available products when products or vendorId changes
+  useEffect(() => {
+    if (formData.vendorId && products.length > 0) {
+      const filtered = products.filter(p => p.purchaseVendorId === parseInt(formData.vendorId))
+      setAvailableProducts(filtered)
+    }
+  }, [formData.vendorId, products])
 
   const fetchExchangeRates = async () => {
     try {
