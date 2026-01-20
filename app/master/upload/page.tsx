@@ -113,8 +113,8 @@ export default function ExcelUploadPage() {
 
   const downloadTemplate = () => {
     // Create a simple CSV template
-    const headers = ['날짜', '거래처', '품목명', '수량', '단가', '금액(부가세포함)', '금액', '담당자', '카테고리', '마진', '마진율']
-    const exampleRow = ['2024-01-15', 'ABC상사', '품목A', '10', '1000', '11000', '10000', '홍길동', '전자제품', '2000', '20%']
+    const headers = ['날짜', '구분', '거래처', '품목명', '수량', '단가', '금액(부가세포함)', '금액', '담당자', '카테고리', '마진', '마진율']
+    const exampleRow = ['2024-01-15', '매출', 'ABC상사', '품목A', '10', '1000', '11000', '10000', '홍길동', '전자제품', '2000', '20%']
     
     const csvContent = [
       headers.join(','),
@@ -250,11 +250,12 @@ export default function ExcelUploadPage() {
               <div className="text-sm text-gray-700 space-y-2">
                 <div className="font-medium">거래 내역 엑셀 파일 구조:</div>
                 <pre className="bg-white p-3 rounded border border-gray-200 overflow-x-auto text-xs">
-{`날짜         | 거래처  | 품목명 | 수량 | 단가 | 금액(부가세포함) | 금액  | 담당자 | 카테고리 | 마진 | 마진율
-2024-01-15  | ABC상사 | 품목A  | 10   | 1000 | 11000           | 10000 | 홍길동 | 전자제품 | 2000 | 20%`}
+{`날짜         | 구분  | 거래처  | 품목명 | 수량 | 단가 | 금액(부가세포함) | 금액  | 담당자 | 카테고리 | 마진 | 마진율
+2024-01-15  | 매출  | ABC상사 | 품목A  | 10   | 1000 | 11000           | 10000 | 홍길동 | 전자제품 | 2000 | 20%`}
                 </pre>
                 <div className="text-xs text-gray-600">
                   * 날짜 형식: 2024-01-15, 2024.01.15, 2024/01/15 모두 지원<br />
+                  * 구분: 매출 또는 매입<br />
                   * 마진율은 &apos;%&apos; 포함 가능 (예: 20% 또는 20)<br />
                   * 템플릿 다운로드 버튼을 클릭하여 예제 파일을 받을 수 있습니다
                 </div>

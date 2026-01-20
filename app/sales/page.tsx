@@ -30,6 +30,9 @@ interface SalesRecord {
   marginRate: number
   salesperson: Salesperson
   category: Category
+  vendor: { name: string } | null
+  vatIncluded: boolean
+  totalAmount: number | null
   notes: string | null
 }
 
@@ -353,13 +356,14 @@ export default function SalesPage() {
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">날짜</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">구분</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">담당자</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">카테고리</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">품목명</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">거래처</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">품목명</th>
                 <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">수량</th>
                 <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">단가</th>
-                <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">총액(부가세제외)</th>
+                <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">금액(부가세포함)</th>
+                <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">금액</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">담당자</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">카테고리</th>
                 <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">마진</th>
                 <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">마진율</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">작업</th>
@@ -386,10 +390,10 @@ export default function SalesPage() {
                       {record.type === 'SALES' ? '매출' : '매입'}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-gray-900">{record.salesperson.name}</td>
-                  <td className="px-4 py-3 text-gray-900">{record.category.nameKo}</td>
+                  <td className="px-4 py-3 text-gray-900">
+                    {record.vendor?.name || record.customer || '-'}
+                  </td>
                   <td className="px-4 py-3 text-gray-900">{record.itemName}</td>
-                  <td className="px-4 py-3 text-gray-900">{record.customer || '-'}</td>
                   <td className="px-4 py-3 text-right text-gray-900">
                     {formatNumber(record.quantity, 2)}
                   </td>
@@ -397,8 +401,13 @@ export default function SalesPage() {
                     ₩{formatNumber(record.unitPrice, 0)}
                   </td>
                   <td className="px-4 py-3 text-right text-gray-900">
+                    ₩{formatNumber(record.totalAmount || record.amount, 0)}
+                  </td>
+                  <td className="px-4 py-3 text-right text-gray-900">
                     ₩{formatNumber(record.amount, 0)}
                   </td>
+                  <td className="px-4 py-3 text-gray-900">{record.salesperson.name}</td>
+                  <td className="px-4 py-3 text-gray-900">{record.category.nameKo}</td>
                   <td className="px-4 py-3 text-right">
                     {record.type === 'SALES' ? (
                       <span className={record.margin >= 0 ? 'text-green-600' : 'text-red-600'}>
@@ -435,7 +444,7 @@ export default function SalesPage() {
               ))}
               {sales.length === 0 && (
                 <tr>
-                  <td colSpan={13} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={14} className="px-4 py-8 text-center text-gray-500">
                     등록된 매입매출 내역이 없습니다.
                   </td>
                 </tr>

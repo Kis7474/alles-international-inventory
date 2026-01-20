@@ -103,3 +103,39 @@ export function formatMonth(date: Date | string): string {
   const month = String(d.getMonth() + 1).padStart(2, '0')
   return `${year}-${month}`
 }
+
+/**
+ * Calculate warehouse fee rate for a given period
+ * @param monthlyFee Monthly warehouse fee
+ * @param avgInventoryValue Average monthly warehouse inventory value
+ * @returns Warehouse fee rate as decimal (e.g., 0.05 for 5%)
+ */
+export function calculateWarehouseFeeRate(monthlyFee: number, avgInventoryValue: number): number {
+  if (avgInventoryValue === 0) return 0
+  return monthlyFee / avgInventoryValue
+}
+
+/**
+ * Calculate adjusted cost with warehouse fee
+ * @param baseCost Base unit cost
+ * @param feeRate Warehouse fee rate (decimal)
+ * @param storageMonths Number of months in storage
+ * @returns Adjusted cost including warehouse fee
+ */
+export function calculateAdjustedCost(baseCost: number, feeRate: number, storageMonths: number): number {
+  return baseCost + (baseCost * feeRate * storageMonths)
+}
+
+/**
+ * Calculate storage months between two dates
+ * @param startDate Start date
+ * @param endDate End date (defaults to now)
+ * @returns Number of months (rounded to 1 decimal)
+ */
+export function calculateStorageMonths(startDate: Date, endDate: Date = new Date()): number {
+  const diffTime = Math.abs(endDate.getTime() - startDate.getTime())
+  const diffDays = diffTime / (1000 * 60 * 60 * 24)
+  // Using 30.44 as average days per month (365.25 / 12)
+  const months = diffDays / 30.44
+  return Math.round(months * 10) / 10
+}

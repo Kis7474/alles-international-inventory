@@ -13,6 +13,7 @@ export interface ParsedData {
 
 export interface TransactionRow {
   date: string           // 날짜
+  type: string           // 구분 (매출/매입)
   vendorName: string     // 거래처
   productName: string    // 품목명
   quantity: number       // 수량
@@ -117,8 +118,12 @@ export async function parseExcelFile(file: File): Promise<ParsedData> {
 /**
  * Parse Excel/CSV file for transaction data
  * Expected format:
- * Row 1: 날짜 | 거래처 | 품목명 | 수량 | 단가 | 금액(부가세포함) | 금액 | 담당자 | 카테고리 | 마진 | 마진율
+ * Row 1: 날짜 | 구분 | 거래처 | 품목명 | 수량 | 단가 | 금액(부가세포함) | 금액 | 담당자 | 카테고리 | 마진 | 마진율
  * Row 2+: Data rows
+ * 
+ * Note: 
+ * - 금액(부가세포함): Total amount including VAT
+ * - 금액: Supply amount excluding VAT
  */
 export async function parseTransactionExcel(file: File): Promise<TransactionRow[]> {
   const buffer = await file.arrayBuffer()
@@ -158,16 +163,17 @@ export async function parseTransactionExcel(file: File): Promise<TransactionRow[
     try {
       const transactionRow: TransactionRow = {
         date: parseDateValue(cells[0]),
-        vendorName: String(cells[1] || '').trim(),
-        productName: String(cells[2] || '').trim(),
-        quantity: parseNumberValue(cells[3]),
-        unitPrice: parseNumberValue(cells[4]),
-        totalWithVat: parseNumberValue(cells[5]),
-        totalAmount: parseNumberValue(cells[6]),
-        salesperson: String(cells[7] || '').trim(),
-        category: String(cells[8] || '').trim(),
-        margin: parseNumberValue(cells[9]),
-        marginRate: String(cells[10] || '').trim(),
+        type: String(cells[1] || '').trim(),
+        vendorName: String(cells[2] || '').trim(),
+        productName: String(cells[3] || '').trim(),
+        quantity: parseNumberValue(cells[4]),
+        unitPrice: parseNumberValue(cells[5]),
+        totalWithVat: parseNumberValue(cells[6]),
+        totalAmount: parseNumberValue(cells[7]),
+        salesperson: String(cells[8] || '').trim(),
+        category: String(cells[9] || '').trim(),
+        margin: parseNumberValue(cells[10]),
+        marginRate: String(cells[11] || '').trim(),
       }
       
       rows.push(transactionRow)

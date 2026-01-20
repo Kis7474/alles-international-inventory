@@ -216,6 +216,15 @@ model ExchangeRate {
   @@unique([date, currency])
 }
 
+// 시스템 설정 (환율 자동 업데이트 등)
+model SystemSetting {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 // ============================================
 // 창고 관리
 // ============================================
