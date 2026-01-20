@@ -97,11 +97,14 @@ export async function GET(request: NextRequest) {
 
     const categoryData = await Promise.all(
       categoryStats.map(async (stat) => {
-        const category = await prisma.productCategory.findUnique({
-          where: { id: stat.categoryId },
-        })
+        let category = null
+        if (stat.categoryId) {
+          category = await prisma.productCategory.findUnique({
+            where: { id: stat.categoryId },
+          })
+        }
         return {
-          category,
+          category: category || null,
           totalSales: stat._sum.amount || 0,
           totalMargin: stat._sum.margin || 0,
           count: stat._count.id,
