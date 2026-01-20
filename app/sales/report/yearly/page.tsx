@@ -45,7 +45,7 @@ interface YearlyReport {
   categoryStats: Array<{
     category: {
       nameKo: string
-    }
+    } | null
     totalSales: number
     totalMargin: number
     count: number
@@ -241,7 +241,7 @@ export default function YearlyReportPage() {
                       .slice(0, 10)
                       .map((stat, idx) => (
                         <tr key={idx} className="border-b">
-                          <td className="py-2 text-gray-900">{stat.category.nameKo}</td>
+                          <td className="py-2 text-gray-900">{stat.category?.nameKo || '미분류'}</td>
                           <td className="py-2 text-right text-gray-900">
                             ₩{formatNumber(stat.totalSales, 0)}
                           </td>
@@ -260,7 +260,13 @@ export default function YearlyReportPage() {
                   <BarChart
                     data={report.categoryStats
                       .sort((a, b) => b.totalSales - a.totalSales)
-                      .slice(0, 10)}
+                      .slice(0, 10)
+                      .map(stat => ({
+                        ...stat,
+                        category: {
+                          nameKo: stat.category?.nameKo || '미분류'
+                        }
+                      }))}
                     layout="vertical"
                   >
                     <CartesianGrid strokeDasharray="3 3" />

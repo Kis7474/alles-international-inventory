@@ -104,6 +104,14 @@ export default function ImportExportNewPage() {
     formData.vatIncluded,
   ])
 
+  // 통화 또는 날짜 변경 시 환율 자동 조회
+  useEffect(() => {
+    if (formData.currency && formData.currency !== 'KRW' && formData.date) {
+      fetchExchangeRate(formData.currency, formData.date)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const fetchMasterData = async () => {
     try {
       const [productsRes, vendorsRes, salespeopleRes, categoriesRes] = await Promise.all([
@@ -131,6 +139,30 @@ export default function ImportExportNewPage() {
       alert('마스터 데이터 로딩 중 오류가 발생했습니다.')
     } finally {
       setLoading(false)
+    }
+  }
+  
+  // 통화 또는 날짜 변경 시 환율 자동 조회
+  const fetchExchangeRate = async (currency: string, date: string) => {
+    if (!currency || currency === 'KRW' || !date) {
+      setFormData(prev => ({ ...prev, exchangeRate: '1' }))
+      return
+    }
+    
+    try {
+      // 해당 날짜 이전의 가장 최근 환율 조회
+      const res = await fetch(`/api/exchange-rates?currency=${currency}&date=${date}`)
+      const rates = await res.json()
+      
+      if (rates && rates.length > 0) {
+        // 가장 최근 환율 사용
+        setFormData(prev => ({ ...prev, exchangeRate: rates[0].rate.toString() }))
+      } else {
+        // 환율 데이터가 없으면 알림
+        console.warn(`${currency} 환율 데이터가 없습니다.`)
+      }
+    } catch (error) {
+      console.error('Error fetching exchange rate:', error)
     }
   }
   
@@ -194,6 +226,18 @@ export default function ImportExportNewPage() {
     } else {
       setAvailableProducts([])
     }
+  }
+
+  // 통화 변경 핸들러
+  const handleCurrencyChange = (currency: string) => {
+    setFormData(prev => ({ ...prev, currency }))
+    fetchExchangeRate(currency, formData.date)
+  }
+
+  // 날짜 변경 핸들러
+  const handleDateChange = (date: string) => {
+    setFormData(prev => ({ ...prev, date }))
+    fetchExchangeRate(formData.currency, date)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -272,7 +316,7 @@ export default function ImportExportNewPage() {
                 type="date"
                 name="date"
                 value={formData.date}
-                onChange={handleChange}
+                onChange={(e) => handleDateChange(e.target.value)}
                 required
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
               />
@@ -405,20 +449,22 @@ export default function ImportExportNewPage() {
               <select
                 name="currency"
                 value={formData.currency}
-                onChange={handleChange}
+                onChange={(e) => handleCurrencyChange(e.target.value)}
                 required
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
               >
-                <option value="USD">USD</option>
-                <option value="EUR">EUR</option>
-                <option value="JPY">JPY</option>
-                <option value="CNY">CNY</option>
+                <option value="USD">USD (미국 달러)</option>
+                <option value="EUR">EUR (유로)</option>
+                <option value="JPY">JPY (일본 엔)</option>
+                <option value="CNY">CNY (중국 위안)</option>
+                <option value="KRW">KRW (원화)</option>
               </select>
             </div>
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                환율 <span className="text-red-500">*</span>
+                환율 (원/외화) <span className="text-red-500">*</span>
+                <span className="text-xs text-blue-600 ml-2">(자동 조회됨)</span>
               </label>
               <input
                 type="number"
@@ -427,9 +473,12 @@ export default function ImportExportNewPage() {
                 onChange={handleChange}
                 required
                 step="0.01"
-                placeholder="예: 1350.50"
+                placeholder="환율이 자동으로 입력됩니다"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
               />
+              <p className="text-xs text-gray-500 mt-1">
+                환율 데이터가 없으면 환율 관리에서 먼저 등록하세요.
+              </p>
             </div>
             
             <div>

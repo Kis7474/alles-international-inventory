@@ -27,7 +27,7 @@ interface MonthlyReport {
   categoryStats: Array<{
     category: {
       nameKo: string
-    }
+    } | null
     totalSales: number
     totalMargin: number
     count: number
@@ -228,7 +228,7 @@ export default function MonthlyReportPage() {
                       .sort((a, b) => b.totalSales - a.totalSales)
                       .map((stat, idx) => (
                         <tr key={idx} className="border-b">
-                          <td className="py-2 text-gray-900">{stat.category.nameKo}</td>
+                          <td className="py-2 text-gray-900">{stat.category?.nameKo || '미분류'}</td>
                           <td className="py-2 text-right text-gray-900">
                             ₩{formatNumber(stat.totalSales, 0)}
                           </td>
@@ -253,7 +253,7 @@ export default function MonthlyReportPage() {
                           .sort((a, b) => b.totalSales - a.totalSales)
                           .slice(0, 6)
                           .map((stat) => ({
-                            name: stat.category.nameKo,
+                            name: stat.category?.nameKo || '미분류',
                             value: stat.totalSales,
                           }))}
                         cx="50%"
