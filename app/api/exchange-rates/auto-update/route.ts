@@ -23,14 +23,14 @@ export async function POST() {
   try {
     // 설정에서 API 키 가져오기
     const settings = await prisma.systemSetting.findUnique({
-      where: { key: 'EXCHANGE_RATE_SETTINGS' },
+      where: { key: 'exchange_rate_settings' },
     })
     
     let apiKey = process.env.KOREAEXIM_API_KEY || ''
     if (settings?.value) {
       try {
         const parsed = JSON.parse(settings.value)
-        apiKey = parsed.koreaeximApiKey || parsed.koreaexim_api_key || apiKey
+        apiKey = parsed.koreaexim_api_key || parsed.koreaeximApiKey || apiKey
       } catch {
         console.warn('Failed to parse exchange rate settings')
       }
