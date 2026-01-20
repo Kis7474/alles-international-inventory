@@ -85,7 +85,10 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
         if (!row.quantity || row.quantity <= 0) {
           throw new Error('수량이 유효하지 않습니다.')
         }
-        if (!options.transactionType) {
+        
+        // Determine transaction type: use row.type if provided, otherwise use options.transactionType
+        let transactionType = row.type ? (row.type === '매출' ? 'SALES' : row.type === '매입' ? 'PURCHASE' : '') : options.transactionType
+        if (!transactionType) {
           throw new Error('거래 유형이 선택되지 않았습니다.')
         }
         
@@ -136,7 +139,7 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
         await prisma.salesRecord.create({
           data: {
             date: transactionDate,
-            type: options.transactionType!,
+            type: transactionType,
             vendorId: vendor.data.id,
             productId: product.data.id,
             salespersonId: salesperson?.data.id || (await getDefaultSalesperson()).id,
@@ -145,7 +148,7 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
             quantity: row.quantity,
             unitPrice: row.unitPrice,
             amount: row.totalAmount,
-            cost: options.transactionType === 'SALES' ? (row.totalAmount - row.margin) : 0,
+            cost: transactionType === 'SALES' ? (row.totalAmount - row.margin) : 0,
             margin: row.margin,
             marginRate: parseFloat(row.marginRate.replace('%', '')) || 0,
             vatIncluded: true,
