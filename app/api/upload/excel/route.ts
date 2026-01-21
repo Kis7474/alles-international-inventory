@@ -489,7 +489,7 @@ async function handlePriceMatrixUpload(file: File, options: UploadOptions) {
 /**
  * Handle Service category entry
  */
-async function handleServiceEntry(row: ExcelRow, summary: UploadSummary, _options: UploadOptions) {
+async function handleServiceEntry(row: ExcelRow, summary: UploadSummary) {
   // Find or create sales vendor
   let salesVendor = null
   if (row.salesVendorName) {
@@ -557,7 +557,7 @@ async function handleServiceEntry(row: ExcelRow, summary: UploadSummary, _option
 /**
  * Handle Project category entry
  */
-async function handleProjectEntry(row: ExcelRow, summary: UploadSummary, _options: UploadOptions) {
+async function handleProjectEntry(row: ExcelRow, summary: UploadSummary) {
   // Find or create project
   const existingProject = await prisma.project.findFirst({
     where: { name: row.productName }
