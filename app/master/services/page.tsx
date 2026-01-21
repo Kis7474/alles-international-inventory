@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { formatCurrency } from '@/lib/utils'
 
 interface Category {
   id: number

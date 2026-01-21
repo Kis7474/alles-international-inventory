@@ -61,7 +61,7 @@ export async function POST() {
         headers: {
           'Content-Type': 'application/json',
         },
-        // @ts-ignore - Node.js fetch accepts agent option
+        // @ts-expect-error - Node.js fetch accepts agent option
         agent: httpsAgent,
       }
     )
@@ -83,7 +83,7 @@ export async function POST() {
         const retryResponse = await fetch(
           `${KOREAEXIM_API_URL}?authkey=${apiKey}&searchdate=${pastDateStr}&data=AP01`,
           {
-            // @ts-ignore - Node.js fetch accepts agent option
+            // @ts-expect-error - Node.js fetch accepts agent option
             agent: httpsAgent,
           }
         )
