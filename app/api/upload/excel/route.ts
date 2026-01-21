@@ -13,6 +13,32 @@ interface UploadOptions {
   createCategories?: boolean
 }
 
+interface UploadSummary {
+  totalRows?: number
+  successRows?: number
+  failedRows?: number
+  vendorsCreated: number
+  vendorsUpdated?: number
+  productsCreated: number
+  productsUpdated?: number
+  pricesCreated?: number
+  pricesUpdated?: number
+  salespersonsCreated?: number
+  categoriesCreated?: number
+  transactionsCreated?: number
+  servicesCreated?: number
+  projectsCreated?: number
+}
+
+interface ExcelRow {
+  productName?: string
+  salesVendorName?: string
+  category?: string
+  serviceHours?: number
+  description?: string
+  [key: string]: unknown
+}
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
@@ -463,7 +489,7 @@ async function handlePriceMatrixUpload(file: File, options: UploadOptions) {
 /**
  * Handle Service category entry
  */
-async function handleServiceEntry(row: any, summary: any, options: UploadOptions) {
+async function handleServiceEntry(row: ExcelRow, summary: UploadSummary, _options: UploadOptions) {
   // Find or create sales vendor
   let salesVendor = null
   if (row.salesVendorName) {
@@ -531,7 +557,7 @@ async function handleServiceEntry(row: any, summary: any, options: UploadOptions
 /**
  * Handle Project category entry
  */
-async function handleProjectEntry(row: any, summary: any, options: UploadOptions) {
+async function handleProjectEntry(row: ExcelRow, summary: UploadSummary, _options: UploadOptions) {
   // Find or create project
   const existingProject = await prisma.project.findFirst({
     where: { name: row.productName }
@@ -539,8 +565,7 @@ async function handleProjectEntry(row: any, summary: any, options: UploadOptions
   
   if (existingProject) {
     // Update project with non-blank fields
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const updateData: any = {}
+    const updateData: Record<string, unknown> = {}
     
     if (row.salesVendorName) {
       updateData.customer = row.salesVendorName
