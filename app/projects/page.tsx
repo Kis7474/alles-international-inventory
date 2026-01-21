@@ -8,8 +8,7 @@ interface Project {
   id: number
   code: string
   name: string
-  customerId: number
-  customer: { name: string }
+  customer?: string
   startDate: string
   endDate: string | null
   status: string
@@ -133,9 +132,7 @@ export default function ProjectsPage() {
 
   const getStatusBadge = (status: string) => {
     const statusMap: Record<string, { label: string; className: string }> = {
-      PLANNING: { label: '기획', className: 'bg-gray-100 text-gray-800' },
       IN_PROGRESS: { label: '진행중', className: 'bg-blue-100 text-blue-800' },
-      ON_HOLD: { label: '보류', className: 'bg-yellow-100 text-yellow-800' },
       COMPLETED: { label: '완료', className: 'bg-green-100 text-green-800' },
       CANCELLED: { label: '취소', className: 'bg-red-100 text-red-800' },
     }
@@ -196,9 +193,7 @@ export default function ProjectsPage() {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
             >
               <option value="">전체</option>
-              <option value="PLANNING">기획</option>
               <option value="IN_PROGRESS">진행중</option>
-              <option value="ON_HOLD">보류</option>
               <option value="COMPLETED">완료</option>
               <option value="CANCELLED">취소</option>
             </select>
@@ -300,7 +295,7 @@ export default function ProjectsPage() {
                     {project.name}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {project.customer.name}
+                    {project.customer}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {new Date(project.startDate).toLocaleDateString('ko-KR')}

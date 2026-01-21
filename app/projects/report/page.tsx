@@ -47,9 +47,7 @@ export default function ProjectReportPage() {
 
   const getStatusLabel = (status: string) => {
     const statusMap: Record<string, string> = {
-      PLANNING: '기획',
       IN_PROGRESS: '진행중',
-      ON_HOLD: '보류',
       COMPLETED: '완료',
       CANCELLED: '취소',
     }
@@ -58,9 +56,7 @@ export default function ProjectReportPage() {
 
   const getStatusColor = (status: string) => {
     const colorMap: Record<string, string> = {
-      PLANNING: 'bg-gray-100 text-gray-800',
       IN_PROGRESS: 'bg-blue-100 text-blue-800',
-      ON_HOLD: 'bg-yellow-100 text-yellow-800',
       COMPLETED: 'bg-green-100 text-green-800',
       CANCELLED: 'bg-red-100 text-red-800',
     }

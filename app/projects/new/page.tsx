@@ -4,27 +4,19 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatCurrency } from '@/lib/utils'
 
-interface Vendor {
-  id: number
-  code: string
-  name: string
-  type: string
-}
+
 
 export default function ProjectsNewPage() {
   const router = useRouter()
-  const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
-  
-  const [vendors, setVendors] = useState<Vendor[]>([])
   
   const [formData, setFormData] = useState({
     code: '',
     name: '',
-    customerId: '',
+    customer: '',
     startDate: new Date().toISOString().split('T')[0],
     endDate: '',
-    status: 'PLANNING',
+    status: 'IN_PROGRESS',
     currency: 'KRW',
     exchangeRate: '1',
     partsCost: '',
@@ -43,10 +35,6 @@ export default function ProjectsNewPage() {
   })
 
   useEffect(() => {
-    fetchMasterData()
-  }, [])
-  
-  useEffect(() => {
     calculateValues()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -57,21 +45,6 @@ export default function ProjectsNewPage() {
     formData.otherCost,
     formData.salesPrice,
   ])
-
-  const fetchMasterData = async () => {
-    try {
-      const res = await fetch('/api/vendors')
-      const vendorsData = await res.json()
-      setVendors(vendorsData.filter((v: Vendor) => 
-        v.type === 'DOMESTIC_SALES' || v.type === 'INTERNATIONAL_SALES'
-      ))
-    } catch (error) {
-      console.error('Error fetching master data:', error)
-      alert('마스터 데이터 로딩 중 오류가 발생했습니다.')
-    } finally {
-      setLoading(false)
-    }
-  }
   
   const calculateValues = () => {
     const partsCost = parseFloat(formData.partsCost) || 0
@@ -94,11 +67,6 @@ export default function ProjectsNewPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    if (!formData.customerId) {
-      alert('고객사를 선택해주세요.')
-      return
-    }
     
     setSubmitting(true)
     
@@ -127,14 +95,6 @@ export default function ProjectsNewPage() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: value }))
-  }
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-xl text-gray-700">로딩 중...</div>
-      </div>
-    )
   }
 
   return (
@@ -185,22 +145,16 @@ export default function ProjectsNewPage() {
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                고객사 <span className="text-red-500">*</span>
+                고객사
               </label>
-              <select
-                name="customerId"
-                value={formData.customerId}
+              <input
+                type="text"
+                name="customer"
+                value={formData.customer}
                 onChange={handleChange}
-                required
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-              >
-                <option value="">선택하세요</option>
-                {vendors.map((vendor) => (
-                  <option key={vendor.id} value={vendor.id}>
-                    [{vendor.code}] {vendor.name}
-                  </option>
-                ))}
-              </select>
+                placeholder="고객사명을 입력하세요"
+              />
             </div>
             
             <div>
@@ -214,9 +168,7 @@ export default function ProjectsNewPage() {
                 required
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
               >
-                <option value="PLANNING">기획</option>
                 <option value="IN_PROGRESS">진행중</option>
-                <option value="ON_HOLD">보류</option>
                 <option value="COMPLETED">완료</option>
                 <option value="CANCELLED">취소</option>
               </select>

@@ -4,12 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { formatCurrency } from '@/lib/utils'
 
-interface Vendor {
-  id: number
-  code: string
-  name: string
-  type: string
-}
+
 
 export default function ProjectDetailPage() {
   const router = useRouter()
@@ -18,15 +13,13 @@ export default function ProjectDetailPage() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   
-  const [vendors, setVendors] = useState<Vendor[]>([])
-  
   const [formData, setFormData] = useState({
     code: '',
     name: '',
-    customerId: '',
+    customer: '',
     startDate: '',
     endDate: '',
-    status: 'PLANNING',
+    status: 'IN_PROGRESS',
     currency: 'KRW',
     exchangeRate: '1',
     partsCost: '',
@@ -45,7 +38,6 @@ export default function ProjectDetailPage() {
   })
 
   useEffect(() => {
-    fetchMasterData()
     fetchProject()
   }, [])
   
@@ -61,21 +53,6 @@ export default function ProjectDetailPage() {
     formData.salesPrice,
   ])
 
-  const fetchMasterData = async () => {
-    try {
-      const res = await fetch('/api/vendors')
-      const vendorsData = await res.json()
-      setVendors(vendorsData.filter((v: Vendor) => 
-        v.type === 'DOMESTIC_SALES' || v.type === 'INTERNATIONAL_SALES'
-      ))
-    } catch (error) {
-      console.error('Error fetching master data:', error)
-      alert('마스터 데이터 로딩 중 오류가 발생했습니다.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const fetchProject = async () => {
     try {
       const res = await fetch(`/api/projects?id=${id}`)
@@ -87,7 +64,7 @@ export default function ProjectDetailPage() {
       setFormData({
         code: data.code,
         name: data.name,
-        customerId: data.customerId.toString(),
+        customer: data.customer || '',
         startDate: new Date(data.startDate).toISOString().split('T')[0],
         endDate: data.endDate ? new Date(data.endDate).toISOString().split('T')[0] : '',
         status: data.status,
@@ -101,6 +78,7 @@ export default function ProjectDetailPage() {
         salesPrice: data.salesPrice.toString(),
         description: data.description || '',
       })
+      setLoading(false)
     } catch (error) {
       console.error('Error fetching project:', error)
       alert('데이터 로딩 중 오류가 발생했습니다.')
@@ -129,11 +107,6 @@ export default function ProjectDetailPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    if (!formData.customerId) {
-      alert('고객사를 선택해주세요.')
-      return
-    }
     
     setSubmitting(true)
     
@@ -219,22 +192,16 @@ export default function ProjectDetailPage() {
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                고객사 <span className="text-red-500">*</span>
+                고객사
               </label>
-              <select
-                name="customerId"
-                value={formData.customerId}
+              <input
+                type="text"
+                name="customer"
+                value={formData.customer}
                 onChange={handleChange}
-                required
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-              >
-                <option value="">선택하세요</option>
-                {vendors.map((vendor) => (
-                  <option key={vendor.id} value={vendor.id}>
-                    [{vendor.code}] {vendor.name}
-                  </option>
-                ))}
-              </select>
+                placeholder="고객사명을 입력하세요"
+              />
             </div>
             
             <div>
@@ -248,9 +215,7 @@ export default function ProjectDetailPage() {
                 required
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
               >
-                <option value="PLANNING">기획</option>
                 <option value="IN_PROGRESS">진행중</option>
-                <option value="ON_HOLD">보류</option>
                 <option value="COMPLETED">완료</option>
                 <option value="CANCELLED">취소</option>
               </select>
