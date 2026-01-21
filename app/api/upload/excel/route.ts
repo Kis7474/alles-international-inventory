@@ -150,6 +150,7 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
         
         // Update product's default purchase price and sales price if provided
         if (product.data.id) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const updateData: any = {}
           
           // 매입가 → 기본 매입가

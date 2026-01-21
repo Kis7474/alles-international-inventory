@@ -209,7 +209,7 @@ export async function PUT(request: Request) {
     const marginRate = sPrice > 0 ? (margin / sPrice) * 100 : 0
 
     // Update project
-    const project = await prisma.project.update({
+    await prisma.project.update({
       where: { id: parseInt(id) },
       data: {
         code,

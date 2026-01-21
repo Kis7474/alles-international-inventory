@@ -48,11 +48,23 @@ const menuItems: MenuItem[] = [
     ],
   },
   {
+    label: '프로젝트',
+    icon: '🚀',
+    submenu: [
+      { href: '/projects', label: '프로젝트 목록', icon: '📋' },
+      { href: '/projects/new', label: '프로젝트 등록', icon: '➕' },
+      { href: '/projects/report', label: '프로젝트 리포트', icon: '📊' },
+    ],
+  },
+  {
     label: '설정',
     icon: '⚙️',
     submenu: [
       { href: '/sales/vendors', label: '거래처', icon: '🏢' },
       { href: '/master/products', label: '품목', icon: '📦' },
+      { href: '/master/materials', label: '재료', icon: '🧱' },
+      { href: '/master/parts', label: '부품', icon: '⚙️' },
+      { href: '/master/services', label: '서비스', icon: '🔧' },
       { href: '/categories', label: '카테고리', icon: '📋' },
       { href: '/salesperson', label: '담당자', icon: '👤' },
       { href: '/master/vendor-prices', label: '가격', icon: '💰' },
@@ -72,6 +84,9 @@ export default function Sidebar() {
   )
   const [warehouseOpen, setWarehouseOpen] = useState(
     pathname.startsWith('/warehouse')
+  )
+  const [projectsOpen, setProjectsOpen] = useState(
+    pathname.startsWith('/projects')
   )
   const [masterOpen, setMasterOpen] = useState(
     pathname.startsWith('/sales/vendors') || pathname.startsWith('/sales/product-status') ||
@@ -110,14 +125,17 @@ export default function Sidebar() {
                   const isSales = item.label === '매입/매출'
                   const isImportExport = item.label === '수입/수출'
                   const isWarehouse = item.label === '재고 관리'
+                  const isProjects = item.label === '프로젝트'
                   const isMaster = item.label === '설정'
-                  const isExpanded = isSales ? salesOpen : isImportExport ? importExportOpen : isWarehouse ? warehouseOpen : isMaster ? masterOpen : false
+                  const isExpanded = isSales ? salesOpen : isImportExport ? importExportOpen : isWarehouse ? warehouseOpen : isProjects ? projectsOpen : isMaster ? masterOpen : false
                   const toggleFunc = isSales
                     ? () => setSalesOpen(!salesOpen)
                     : isImportExport
                     ? () => setImportExportOpen(!importExportOpen)
                     : isWarehouse 
-                    ? () => setWarehouseOpen(!warehouseOpen) 
+                    ? () => setWarehouseOpen(!warehouseOpen)
+                    : isProjects
+                    ? () => setProjectsOpen(!projectsOpen)
                     : isMaster
                     ? () => setMasterOpen(!masterOpen)
                     : () => {}
