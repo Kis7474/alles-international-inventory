@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 
 interface Salesperson {
   id: number
-  code: string
+  code?: string
   name: string
   commissionRate: number
 }
@@ -15,7 +15,6 @@ export default function SalespersonPage() {
   const [showForm, setShowForm] = useState(false)
   const [editingSalesperson, setEditingSalesperson] = useState<Salesperson | null>(null)
   const [formData, setFormData] = useState({
-    code: '',
     name: '',
     commissionRate: '',
   })
@@ -77,7 +76,6 @@ export default function SalespersonPage() {
   const handleEdit = (salesperson: Salesperson) => {
     setEditingSalesperson(salesperson)
     setFormData({
-      code: salesperson.code,
       name: salesperson.name,
       commissionRate: (salesperson.commissionRate * 100).toString(),
     })
@@ -109,7 +107,6 @@ export default function SalespersonPage() {
 
   const resetForm = () => {
     setFormData({
-      code: '',
       name: '',
       commissionRate: '',
     })
@@ -146,22 +143,7 @@ export default function SalespersonPage() {
             {editingSalesperson ? '담당자 수정' : '담당자 등록'}
           </h2>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1 text-gray-700">
-                  담당자 코드 *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.code}
-                  onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg text-gray-900"
-                  placeholder="BS, IK, YR, SJ 등"
-                  disabled={!!editingSalesperson}
-                />
-              </div>
-
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1 text-gray-700">
                   담당자 이름 *
@@ -221,7 +203,6 @@ export default function SalespersonPage() {
           <table className="min-w-full">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">코드</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">이름</th>
                 <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">커미션율</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">작업</th>
@@ -230,8 +211,7 @@ export default function SalespersonPage() {
             <tbody className="divide-y divide-gray-200">
               {salespersons.map((person) => (
                 <tr key={person.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-gray-900 font-medium">{person.code}</td>
-                  <td className="px-4 py-3 text-gray-900">{person.name}</td>
+                  <td className="px-4 py-3 text-gray-900 font-medium">{person.name}</td>
                   <td className="px-4 py-3 text-right text-gray-900">
                     {(person.commissionRate * 100).toFixed(1)}%
                   </td>
@@ -253,7 +233,7 @@ export default function SalespersonPage() {
               ))}
               {salespersons.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={3} className="px-4 py-8 text-center text-gray-500">
                     등록된 담당자가 없습니다.
                   </td>
                 </tr>

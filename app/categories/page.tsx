@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 
 interface Category {
   id: number
-  code: string
+  code?: string
   name: string
   nameKo: string
 }
@@ -21,7 +21,6 @@ export default function CategoriesPage() {
   const [filterSearchName, setFilterSearchName] = useState('')
   
   const [formData, setFormData] = useState({
-    code: '',
     name: '',
     nameKo: '',
   })
@@ -104,7 +103,6 @@ export default function CategoriesPage() {
   const handleEdit = (category: Category) => {
     setEditingCategory(category)
     setFormData({
-      code: category.code,
       name: category.name,
       nameKo: category.nameKo,
     })
@@ -181,7 +179,6 @@ export default function CategoriesPage() {
 
   const resetForm = () => {
     setFormData({
-      code: '',
       name: '',
       nameKo: '',
     })
@@ -231,7 +228,7 @@ export default function CategoriesPage() {
               type="text"
               value={filterSearchName}
               onChange={(e) => setFilterSearchName(e.target.value)}
-              placeholder="코드, 영문명, 한글명으로 검색"
+              placeholder="영문명, 한글명으로 검색"
               className="w-full px-3 py-2 border rounded-lg text-gray-900"
             />
           </div>
@@ -263,22 +260,7 @@ export default function CategoriesPage() {
             {editingCategory ? '카테고리 수정' : '카테고리 등록'}
           </h2>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1 text-gray-700">
-                  카테고리 코드 *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.code}
-                  onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-                  className="w-full px-3 py-2 border rounded-lg text-gray-900"
-                  placeholder="MACHINE, PARTS 등"
-                  disabled={!!editingCategory}
-                />
-              </div>
-
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1 text-gray-700">
                   영문명 *
@@ -346,7 +328,6 @@ export default function CategoriesPage() {
                     className="w-4 h-4 rounded"
                   />
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">코드</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">영문명</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">한글명</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">작업</th>
@@ -363,8 +344,7 @@ export default function CategoriesPage() {
                       className="w-4 h-4 rounded"
                     />
                   </td>
-                  <td className="px-4 py-3 text-gray-900 font-medium">{category.code}</td>
-                  <td className="px-4 py-3 text-gray-900">{category.name}</td>
+                  <td className="px-4 py-3 text-gray-900 font-medium">{category.name}</td>
                   <td className="px-4 py-3 text-gray-900">{category.nameKo}</td>
                   <td className="px-4 py-3">
                     <button
@@ -384,7 +364,7 @@ export default function CategoriesPage() {
               ))}
               {categories.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
                     등록된 카테고리가 없습니다.
                   </td>
                 </tr>
