@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { calculateImportCost } from '@/lib/utils'
+import { calculateImportCost, distributeCostsAcrossItems } from '@/lib/utils'
 
 interface ItemInput {
   productId: string
@@ -213,6 +213,15 @@ export async function POST(request: NextRequest) {
     if ((storageType === 'WAREHOUSE' || storageType === 'OFFICE') && type === 'IMPORT') {
       if (isMultiItem) {
         // Multi-item: create inventory lot for each item
+        const costs = distributeCostsAcrossItems({
+          goodsAmount: goodsAmount ? parseFloat(goodsAmount) : null,
+          dutyAmount: dutyAmount ? parseFloat(dutyAmount) : null,
+          shippingCost: shippingCost ? parseFloat(shippingCost) : null,
+          otherCost: otherCost ? parseFloat(otherCost) : null,
+          exchangeRate: parseFloat(exchangeRate),
+          itemCount: (items as ItemInput[]).length,
+        })
+        
         await Promise.all((items as ItemInput[]).map((item, index) => {
           return prisma.inventoryLot.create({
             data: {
@@ -223,10 +232,10 @@ export async function POST(request: NextRequest) {
               receivedDate: new Date(date),
               quantityReceived: parseFloat(item.quantity),
               quantityRemaining: parseFloat(item.quantity),
-              goodsAmount: goodsAmount ? parseFloat(goodsAmount) * parseFloat(exchangeRate) / (items as ItemInput[]).length : 0,
-              dutyAmount: dutyAmount ? parseFloat(dutyAmount) / (items as ItemInput[]).length : 0,
-              domesticFreight: shippingCost ? parseFloat(shippingCost) / (items as ItemInput[]).length : 0,
-              otherCost: otherCost ? parseFloat(otherCost) / (items as ItemInput[]).length : 0,
+              goodsAmount: costs.goodsAmountPerItem,
+              dutyAmount: costs.dutyAmountPerItem,
+              domesticFreight: costs.shippingCostPerItem,
+              otherCost: costs.otherCostPerItem,
               unitCost: unitCost || 0,
               storageLocation: storageType,
               importExportId: record.id,
