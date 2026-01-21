@@ -112,9 +112,9 @@ export default function ExcelUploadPage() {
   }
 
   const downloadTemplate = () => {
-    // Create a simple CSV template with new format
-    const headers = ['날짜', '구분', '판매처', '품목명', '수량', '단가', '금액(부가세포함)', '금액', '담당자', '카테고리', '마진', '마진율', '매입처']
-    const exampleRow = ['2024-01-15', '매출', 'ABC상사', '품목A', '10', '1000', '11000', '10000', '홍길동', '전자제품', '2000', '20%', 'XYZ공급']
+    // Create a simple CSV template with new format including purchase price
+    const headers = ['날짜', '구분', '판매처', '품목명', '수량', '판매단가', '금액(부가세포함)', '금액', '담당자', '카테고리', '마진', '마진율', '매입처', '매입가']
+    const exampleRow = ['2024-01-15', '매출', 'ABC상사', '품목A', '10', '1000', '11000', '10000', '홍길동', '전자제품', '2000', '20%', 'XYZ공급', '800']
     
     const csvContent = [
       headers.join(','),
@@ -250,8 +250,8 @@ export default function ExcelUploadPage() {
               <div className="text-sm text-gray-700 space-y-2">
                 <div className="font-medium">거래 내역 엑셀 파일 구조:</div>
                 <pre className="bg-white p-3 rounded border border-gray-200 overflow-x-auto text-xs">
-{`날짜         | 구분  | 판매처  | 품목명 | 수량 | 단가 | 금액(부가세포함) | 금액  | 담당자 | 카테고리 | 마진 | 마진율 | 매입처
-2024-01-15  | 매출  | ABC상사 | 품목A  | 10   | 1000 | 11000           | 10000 | 홍길동 | 전자제품 | 2000 | 20%   | XYZ공급`}
+{`날짜         | 구분  | 판매처  | 품목명 | 수량 | 판매단가 | 금액(부가세포함) | 금액  | 담당자 | 카테고리 | 마진 | 마진율 | 매입처  | 매입가
+2024-01-15  | 매출  | ABC상사 | 품목A  | 10   | 1000    | 11000           | 10000 | 홍길동 | 전자제품 | 2000 | 20%   | XYZ공급 | 800`}
                 </pre>
                 <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded">
                   <p className="text-yellow-800 text-xs font-medium mb-2">
@@ -259,6 +259,7 @@ export default function ExcelUploadPage() {
                   </p>
                   <ul className="text-xs text-yellow-700 space-y-1 list-disc list-inside">
                     <li><strong>매입처</strong> 열은 필수입니다. 품목 생성 시 매입처가 연결됩니다.</li>
+                    <li><strong>매입가</strong> 열이 새로 추가되었습니다. 입력 시 품목의 기본 매입가로 자동 저장됩니다.</li>
                     <li><strong>판매처</strong>는 매출 거래처로, <strong>매입처</strong>는 매입 거래처로 자동 등록됩니다.</li>
                     <li>마진율은 백분율(20%) 또는 소수(0.2) 형식 모두 지원합니다.</li>
                   </ul>
@@ -266,6 +267,8 @@ export default function ExcelUploadPage() {
                 <div className="text-xs text-gray-600 mt-3">
                   * 날짜 형식: 2024-01-15, 2024.01.15, 2024/01/15 모두 지원<br />
                   * 구분: 매출 또는 매입<br />
+                  * 판매단가: 매출 시 판매 단가<br />
+                  * 매입가: 품목의 기본 매입가로 자동 저장 (선택 사항)<br />
                   * 템플릿 다운로드 버튼을 클릭하여 예제 파일을 받을 수 있습니다
                 </div>
               </div>

@@ -17,14 +17,15 @@ export interface TransactionRow {
   salesVendorName: string   // 판매처 (변경: vendorName → salesVendorName)
   productName: string       // 품목명
   quantity: number          // 수량
-  unitPrice: number         // 단가
+  unitPrice: number         // 판매단가
   totalWithVat: number      // 금액(부가세포함)
   totalAmount: number       // 금액
   salesperson: string       // 담당자
   category: string          // 카테고리
   margin: number            // 마진
   marginRate: string        // 마진율
-  purchaseVendorName: string // 매입처 (새로 추가)
+  purchaseVendorName: string // 매입처
+  purchasePrice: number     // 매입가 (새로 추가)
 }
 
 /**
@@ -119,12 +120,13 @@ export async function parseExcelFile(file: File): Promise<ParsedData> {
 /**
  * Parse Excel/CSV file for transaction data
  * Expected format:
- * Row 1: 날짜 | 구분 | 판매처 | 품목명 | 수량 | 단가 | 금액(부가세포함) | 금액 | 담당자 | 카테고리 | 마진 | 마진율 | 매입처
+ * Row 1: 날짜 | 구분 | 판매처 | 품목명 | 수량 | 판매단가 | 금액(부가세포함) | 금액 | 담당자 | 카테고리 | 마진 | 마진율 | 매입처 | 매입가
  * Row 2+: Data rows
  * 
  * Note: 
  * - 금액(부가세포함): Total amount including VAT
  * - 금액: Supply amount excluding VAT
+ * - 매입가: Purchase price for updating product base purchase price
  */
 export async function parseTransactionExcel(file: File): Promise<TransactionRow[]> {
   const buffer = await file.arrayBuffer()
@@ -176,6 +178,7 @@ export async function parseTransactionExcel(file: File): Promise<TransactionRow[
         margin: parseNumberValue(cells[10]),
         marginRate: parseMarginRate(cells[11]),
         purchaseVendorName: String(cells[12] || '').trim(),
+        purchasePrice: parseNumberValue(cells[13]),  // 새로 추가된 매입가 컬럼
       }
       
       rows.push(transactionRow)
