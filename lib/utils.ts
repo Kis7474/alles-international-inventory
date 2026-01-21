@@ -71,6 +71,33 @@ export function calculateImportCost(data: {
 }
 
 /**
+ * 다중 품목에 대한 비용 분배
+ */
+export function distributeCostsAcrossItems({
+  goodsAmount,
+  dutyAmount,
+  shippingCost,
+  otherCost,
+  exchangeRate,
+  itemCount,
+}: {
+  goodsAmount: number | null
+  dutyAmount: number | null
+  shippingCost: number | null
+  otherCost: number | null
+  exchangeRate: number
+  itemCount: number
+}) {
+  const count = itemCount || 1
+  return {
+    goodsAmountPerItem: goodsAmount ? (goodsAmount * exchangeRate) / count : 0,
+    dutyAmountPerItem: dutyAmount ? dutyAmount / count : 0,
+    shippingCostPerItem: shippingCost ? shippingCost / count : 0,
+    otherCostPerItem: otherCost ? otherCost / count : 0,
+  }
+}
+
+/**
  * 원가 계산 (소수점 6자리)
  */
 export function calculateUnitCost(

@@ -37,12 +37,51 @@ interface Category {
   nameKo: string
 }
 
+interface ImportExportItem {
+  id: number
+  productId: number
+  product: Product
+  quantity: number
+  unitPrice: number
+  amount: number
+  krwAmount: number
+}
+
 interface ExchangeRate {
   id: number
   date: string
   currency: string
   rate: number
   source: string | null
+}
+
+interface ImportExportData {
+  id: number
+  date: string
+  type: string
+  productId: number | null
+  product: Product | null
+  vendor: Vendor
+  salesperson: Salesperson | null
+  category: Category | null
+  quantity: number | null
+  currency: string
+  exchangeRate: number
+  foreignAmount: number
+  krwAmount: number
+  goodsAmount: number | null
+  dutyAmount: number | null
+  shippingCost: number | null
+  otherCost: number | null
+  totalCost: number | null
+  unitCost: number | null
+  storageType: string | null
+  vatIncluded: boolean
+  supplyAmount: number | null
+  vatAmount: number | null
+  totalAmount: number | null
+  memo: string | null
+  items: ImportExportItem[]
 }
 
 export default function ImportExportEditPage() {
@@ -64,6 +103,9 @@ export default function ImportExportEditPage() {
   // Exchange rate auto-fetch
   const [exchangeRates, setExchangeRates] = useState<ExchangeRate[]>([])
   const [autoFetchedRate, setAutoFetchedRate] = useState(false)
+  
+  // Store record data for displaying items
+  const [recordData, setRecordData] = useState<ImportExportData | null>(null)
   
   // Form data
   const [formData, setFormData] = useState({
@@ -161,16 +203,16 @@ export default function ImportExportEditPage() {
       if (!res.ok) {
         throw new Error('Record not found')
       }
-      const data = await res.json()
+      const data: ImportExportData = await res.json()
       
       setFormData({
         date: new Date(data.date).toISOString().split('T')[0],
         type: data.type,
-        productId: data.productId.toString(),
-        vendorId: data.vendorId.toString(),
-        salespersonId: data.salespersonId?.toString() || '',
-        categoryId: data.categoryId?.toString() || '',
-        quantity: data.quantity.toString(),
+        productId: data.productId?.toString() || '',
+        vendorId: data.vendor.id.toString(),
+        salespersonId: data.salesperson?.id.toString() || '',
+        categoryId: data.category?.id.toString() || '',
+        quantity: data.quantity?.toString() || '',
         currency: data.currency,
         exchangeRate: data.exchangeRate.toString(),
         foreignAmount: data.foreignAmount.toString(),
@@ -182,6 +224,9 @@ export default function ImportExportEditPage() {
         vatIncluded: data.vatIncluded,
         memo: data.memo || '',
       })
+      
+      // Store record data for displaying items
+      setRecordData(data)
       
       // Wait for products to be loaded before filtering
       // This will be handled by the useEffect that watches products and vendorId
@@ -485,6 +530,61 @@ export default function ImportExportEditPage() {
             </div>
           </div>
         </div>
+
+        {/* 품목 목록 (다중 품목인 경우 표시) */}
+        {recordData && recordData.items && recordData.items.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">등록된 품목 목록</h2>
+            <div className="overflow-x-auto">
+              <table className="min-w-full bg-white border border-gray-200">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">품목</th>
+                    <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">수량</th>
+                    <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">단가 ({recordData.currency})</th>
+                    <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">금액 ({recordData.currency})</th>
+                    <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">원화 금액</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recordData.items.map((item) => (
+                    <tr key={item.id} className="border-b">
+                      <td className="px-4 py-2 text-sm text-gray-900">
+                        [{item.product.code}] {item.product.name}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-900 text-right">
+                        {item.quantity.toLocaleString()} {item.product.unit}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-900 text-right">
+                        {formatCurrency(item.unitPrice)}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-900 text-right font-semibold">
+                        {formatCurrency(item.amount)}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-900 text-right">
+                        {formatCurrency(item.krwAmount)}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="bg-gray-50 font-semibold">
+                    <td colSpan={3} className="px-4 py-2 text-sm text-gray-900 text-right">
+                      합계:
+                    </td>
+                    <td className="px-4 py-2 text-sm text-gray-900 text-right">
+                      {formatCurrency(recordData.items.reduce((sum, item) => sum + item.amount, 0))} {recordData.currency}
+                    </td>
+                    <td className="px-4 py-2 text-sm text-gray-900 text-right">
+                      {formatCurrency(recordData.items.reduce((sum, item) => sum + item.krwAmount, 0))}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              * 다중 품목으로 등록된 거래입니다. 수정이 필요한 경우 해당 거래를 삭제하고 다시 등록하세요.
+            </p>
+          </div>
+        )}
 
         {/* 외화 정보 */}
         <div className="mb-8">

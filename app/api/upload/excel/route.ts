@@ -148,14 +148,28 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
         }
         if (product.isNew) summary.productsCreated++
         
-        // Update product's default purchase price if purchasePrice is provided
-        if (row.purchasePrice && row.purchasePrice > 0 && product.data.id) {
-          await prisma.product.update({
-            where: { id: product.data.id },
-            data: { 
-              defaultPurchasePrice: row.purchasePrice 
-            }
-          })
+        // Update product's default purchase price and sales price if provided
+        if (product.data.id) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const updateData: any = {}
+          
+          // 매입가 → 기본 매입가
+          if (row.purchasePrice && row.purchasePrice > 0) {
+            updateData.defaultPurchasePrice = row.purchasePrice
+          }
+          
+          // 판매단가 → 기본 매출가
+          if (row.unitPrice && row.unitPrice > 0) {
+            updateData.defaultSalesPrice = row.unitPrice
+          }
+          
+          // Update if there's any data to update
+          if (Object.keys(updateData).length > 0) {
+            await prisma.product.update({
+              where: { id: product.data.id },
+              data: updateData
+            })
+          }
         }
         
         // 5. Link product to sales vendor (ProductSalesVendor)

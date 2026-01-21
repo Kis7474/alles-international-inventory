@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { calculateImportCost } from '@/lib/utils'
+import { calculateImportCost, distributeCostsAcrossItems } from '@/lib/utils'
+
+interface ItemInput {
+  productId: string
+  quantity: string
+  unitPrice: string
+}
 
 // GET /api/import-export - 수입/수출 목록 조회 또는 단일 조회
 export async function GET(request: NextRequest) {
@@ -20,6 +26,11 @@ export async function GET(request: NextRequest) {
           vendor: true,
           salesperson: true,
           category: true,
+          items: {
+            include: {
+              product: true,
+            },
+          },
         },
       })
       
@@ -94,10 +105,24 @@ export async function POST(request: NextRequest) {
       storageType,
       vatIncluded,
       memo,
+      items,
     } = body
 
+    // Check if using multi-item mode
+    const isMultiItem = items && Array.isArray(items) && items.length > 0
+
+    // Calculate total foreign amount
+    let totalForeignAmount = 0
+    if (isMultiItem) {
+      totalForeignAmount = (items as ItemInput[]).reduce((sum, item) => {
+        return sum + (parseFloat(item.quantity) * parseFloat(item.unitPrice))
+      }, 0)
+    } else {
+      totalForeignAmount = parseFloat(foreignAmount)
+    }
+
     // 원화 환산 금액
-    const krwAmount = foreignAmount * exchangeRate
+    const krwAmount = totalForeignAmount * parseFloat(exchangeRate)
 
     // 수입 원가 계산 (수입인 경우)
     let totalCost = null
@@ -110,7 +135,7 @@ export async function POST(request: NextRequest) {
         dutyAmount: parseFloat(dutyAmount || 0),
         shippingCost: parseFloat(shippingCost || 0),
         otherCost: parseFloat(otherCost || 0),
-        quantity: parseFloat(quantity),
+        quantity: isMultiItem ? (items as ItemInput[]).reduce((sum, item) => sum + parseFloat(item.quantity), 0) : parseFloat(quantity),
       })
       totalCost = costCalc.totalCost
       unitCost = costCalc.unitCost
@@ -133,62 +158,115 @@ export async function POST(request: NextRequest) {
       totalAmount = supplyAmount + vatAmount
     }
 
-    const record = await prisma.importExport.create({
-      data: {
-        date: new Date(date),
-        type,
-        productId: parseInt(productId),
-        vendorId: parseInt(vendorId),
-        salespersonId: salespersonId ? parseInt(salespersonId) : null,
-        categoryId: categoryId ? parseInt(categoryId) : null,
-        quantity: parseFloat(quantity),
-        currency,
-        exchangeRate: parseFloat(exchangeRate),
-        foreignAmount: parseFloat(foreignAmount),
-        krwAmount,
-        goodsAmount: goodsAmount ? parseFloat(goodsAmount) : null,
-        dutyAmount: dutyAmount ? parseFloat(dutyAmount) : null,
-        shippingCost: shippingCost ? parseFloat(shippingCost) : null,
-        otherCost: otherCost ? parseFloat(otherCost) : null,
-        totalCost,
-        unitCost,
-        storageType: storageType || null,
-        vatIncluded: vatIncluded || false,
-        supplyAmount,
-        vatAmount,
-        totalAmount,
-        memo: memo || null,
-      },
-      include: {
-        product: true,
-        vendor: true,
-        salesperson: true,
-        category: true,
-      },
+    const record = await prisma.$transaction(async (tx) => {
+      const newRecord = await tx.importExport.create({
+        data: {
+          date: new Date(date),
+          type,
+          productId: isMultiItem ? null : parseInt(productId),
+          vendorId: parseInt(vendorId),
+          salespersonId: salespersonId ? parseInt(salespersonId) : null,
+          categoryId: categoryId ? parseInt(categoryId) : null,
+          quantity: isMultiItem ? null : parseFloat(quantity),
+          currency,
+          exchangeRate: parseFloat(exchangeRate),
+          foreignAmount: totalForeignAmount,
+          krwAmount,
+          goodsAmount: goodsAmount ? parseFloat(goodsAmount) : null,
+          dutyAmount: dutyAmount ? parseFloat(dutyAmount) : null,
+          shippingCost: shippingCost ? parseFloat(shippingCost) : null,
+          otherCost: otherCost ? parseFloat(otherCost) : null,
+          totalCost,
+          unitCost,
+          storageType: storageType || null,
+          vatIncluded: vatIncluded || false,
+          supplyAmount,
+          vatAmount,
+          totalAmount,
+          memo: memo || null,
+        },
+        include: {
+          product: true,
+          vendor: true,
+          salesperson: true,
+          category: true,
+        },
+      })
+
+      // Create items if multi-item mode
+      if (isMultiItem) {
+        await Promise.all((items as ItemInput[]).map((item) => {
+          const itemAmount = parseFloat(item.quantity) * parseFloat(item.unitPrice)
+          return tx.importExportItem.create({
+            data: {
+              importExportId: newRecord.id,
+              productId: parseInt(item.productId),
+              quantity: parseFloat(item.quantity),
+              unitPrice: parseFloat(item.unitPrice),
+              amount: itemAmount,
+              krwAmount: itemAmount * parseFloat(exchangeRate),
+            },
+          })
+        }))
+      }
+
+      return newRecord
     })
 
     // ★★★ 창고 또는 사무실 보관인 경우 자동 입고 처리 ★★★
     if ((storageType === 'WAREHOUSE' || storageType === 'OFFICE') && type === 'IMPORT') {
-      const inventoryLot = await prisma.inventoryLot.create({
-        data: {
-          productId: parseInt(productId),
-          vendorId: parseInt(vendorId),
-          salespersonId: salespersonId ? parseInt(salespersonId) : null,
-          lotCode: `IE-${record.id}-${Date.now().toString().slice(-4)}`,
-          receivedDate: new Date(date),
-          quantityReceived: parseFloat(quantity),
-          quantityRemaining: parseFloat(quantity),
-          goodsAmount: goodsAmount ? parseFloat(goodsAmount) * parseFloat(exchangeRate) : 0,
-          dutyAmount: dutyAmount ? parseFloat(dutyAmount) : 0,
-          domesticFreight: shippingCost ? parseFloat(shippingCost) : 0,
-          otherCost: otherCost ? parseFloat(otherCost) : 0,
-          unitCost: unitCost || 0,
-          storageLocation: storageType, // 'WAREHOUSE' 또는 'OFFICE'
-          importExportId: record.id,
-        },
-      })
-      
-      console.log('Auto inventory created:', inventoryLot.id)
+      if (isMultiItem) {
+        // Multi-item: create inventory lot for each item
+        const costs = distributeCostsAcrossItems({
+          goodsAmount: goodsAmount ? parseFloat(goodsAmount) : null,
+          dutyAmount: dutyAmount ? parseFloat(dutyAmount) : null,
+          shippingCost: shippingCost ? parseFloat(shippingCost) : null,
+          otherCost: otherCost ? parseFloat(otherCost) : null,
+          exchangeRate: parseFloat(exchangeRate),
+          itemCount: (items as ItemInput[]).length,
+        })
+        
+        await Promise.all((items as ItemInput[]).map((item, index) => {
+          return prisma.inventoryLot.create({
+            data: {
+              productId: parseInt(item.productId),
+              vendorId: parseInt(vendorId),
+              salespersonId: salespersonId ? parseInt(salespersonId) : null,
+              lotCode: `IE-${record.id}-${index + 1}-${Date.now().toString().slice(-4)}`,
+              receivedDate: new Date(date),
+              quantityReceived: parseFloat(item.quantity),
+              quantityRemaining: parseFloat(item.quantity),
+              goodsAmount: costs.goodsAmountPerItem,
+              dutyAmount: costs.dutyAmountPerItem,
+              domesticFreight: costs.shippingCostPerItem,
+              otherCost: costs.otherCostPerItem,
+              unitCost: unitCost || 0,
+              storageLocation: storageType,
+              importExportId: record.id,
+            },
+          })
+        }))
+      } else {
+        // Single item
+        await prisma.inventoryLot.create({
+          data: {
+            productId: parseInt(productId),
+            vendorId: parseInt(vendorId),
+            salespersonId: salespersonId ? parseInt(salespersonId) : null,
+            lotCode: `IE-${record.id}-${Date.now().toString().slice(-4)}`,
+            receivedDate: new Date(date),
+            quantityReceived: parseFloat(quantity),
+            quantityRemaining: parseFloat(quantity),
+            goodsAmount: goodsAmount ? parseFloat(goodsAmount) * parseFloat(exchangeRate) : 0,
+            dutyAmount: dutyAmount ? parseFloat(dutyAmount) : 0,
+            domesticFreight: shippingCost ? parseFloat(shippingCost) : 0,
+            otherCost: otherCost ? parseFloat(otherCost) : 0,
+            unitCost: unitCost || 0,
+            storageLocation: storageType,
+            importExportId: record.id,
+          },
+        })
+      }
     }
 
     return NextResponse.json(record, { status: 201 })
@@ -224,9 +302,23 @@ export async function PUT(request: NextRequest) {
       storageType,
       vatIncluded,
       memo,
+      items,
     } = body
 
-    const krwAmount = foreignAmount * exchangeRate
+    // Check if using multi-item mode
+    const isMultiItem = items && Array.isArray(items) && items.length > 0
+
+    // Calculate total foreign amount
+    let totalForeignAmount = 0
+    if (isMultiItem) {
+      totalForeignAmount = (items as ItemInput[]).reduce((sum, item) => {
+        return sum + (parseFloat(item.quantity) * parseFloat(item.unitPrice))
+      }, 0)
+    } else {
+      totalForeignAmount = parseFloat(foreignAmount)
+    }
+
+    const krwAmount = totalForeignAmount * parseFloat(exchangeRate)
 
     let totalCost = null
     let unitCost = null
@@ -238,7 +330,7 @@ export async function PUT(request: NextRequest) {
         dutyAmount: parseFloat(dutyAmount || 0),
         shippingCost: parseFloat(shippingCost || 0),
         otherCost: parseFloat(otherCost || 0),
-        quantity: parseFloat(quantity),
+        quantity: isMultiItem ? (items as ItemInput[]).reduce((sum, item) => sum + parseFloat(item.quantity), 0) : parseFloat(quantity),
       })
       totalCost = costCalc.totalCost
       unitCost = costCalc.unitCost
@@ -260,19 +352,24 @@ export async function PUT(request: NextRequest) {
       totalAmount = supplyAmount + vatAmount
     }
 
+    // Delete existing items
+    await prisma.importExportItem.deleteMany({
+      where: { importExportId: parseInt(id) },
+    })
+
     const record = await prisma.importExport.update({
       where: { id: parseInt(id) },
       data: {
         date: new Date(date),
         type,
-        productId: parseInt(productId),
+        productId: isMultiItem ? null : parseInt(productId),
         vendorId: parseInt(vendorId),
         salespersonId: salespersonId ? parseInt(salespersonId) : null,
         categoryId: categoryId ? parseInt(categoryId) : null,
-        quantity: parseFloat(quantity),
+        quantity: isMultiItem ? null : parseFloat(quantity),
         currency,
         exchangeRate: parseFloat(exchangeRate),
-        foreignAmount: parseFloat(foreignAmount),
+        foreignAmount: totalForeignAmount,
         krwAmount,
         goodsAmount: goodsAmount ? parseFloat(goodsAmount) : null,
         dutyAmount: dutyAmount ? parseFloat(dutyAmount) : null,
@@ -294,6 +391,23 @@ export async function PUT(request: NextRequest) {
         category: true,
       },
     })
+
+    // Create new items if multi-item mode
+    if (isMultiItem) {
+      await Promise.all((items as ItemInput[]).map((item) => {
+        const itemAmount = parseFloat(item.quantity) * parseFloat(item.unitPrice)
+        return prisma.importExportItem.create({
+          data: {
+            importExportId: record.id,
+            productId: parseInt(item.productId),
+            quantity: parseFloat(item.quantity),
+            unitPrice: parseFloat(item.unitPrice),
+            amount: itemAmount,
+            krwAmount: itemAmount * parseFloat(exchangeRate),
+          },
+        })
+      }))
+    }
 
     return NextResponse.json(record)
   } catch (error) {
