@@ -3,17 +3,36 @@
 import { useEffect, useState } from 'react'
 import { formatCurrency } from '@/lib/utils'
 
+interface Category {
+  id: number
+  code: string
+  name: string
+  nameKo: string
+}
+
+interface Vendor {
+  id: number
+  code: string
+  name: string
+  type: string
+}
+
 interface Service {
   id: number
   code: string | null
   name: string
   description: string | null
-  hourlyRate: number | null
-  defaultHours: number | null
+  serviceHours: number | null
+  salesVendorId: number | null
+  salesVendor: Vendor | null
+  categoryId: number | null
+  category: Category | null
 }
 
 export default function MasterServicesPage() {
   const [services, setServices] = useState<Service[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
+  const [vendors, setVendors] = useState<Vendor[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingService, setEditingService] = useState<Service | null>(null)
@@ -26,8 +45,9 @@ export default function MasterServicesPage() {
     code: '',
     name: '',
     description: '',
-    hourlyRate: '',
-    defaultHours: '',
+    serviceHours: '',
+    salesVendorId: '',
+    categoryId: '',
   })
 
   useEffect(() => {
@@ -36,9 +56,17 @@ export default function MasterServicesPage() {
 
   const fetchData = async () => {
     try {
-      const res = await fetch('/api/services')
-      const data = await res.json()
-      setServices(data)
+      const [servicesRes, categoriesRes, vendorsRes] = await Promise.all([
+        fetch('/api/services'),
+        fetch('/api/categories'),
+        fetch('/api/vendors'),
+      ])
+      const servicesData = await servicesRes.json()
+      const categoriesData = await categoriesRes.json()
+      const vendorsData = await vendorsRes.json()
+      setServices(servicesData)
+      setCategories(categoriesData)
+      setVendors(vendorsData)
     } catch (error) {
       console.error('Error fetching data:', error)
     } finally {
@@ -167,8 +195,9 @@ export default function MasterServicesPage() {
       code: service.code || '',
       name: service.name,
       description: service.description || '',
-      hourlyRate: service.hourlyRate?.toString() || '',
-      defaultHours: service.defaultHours?.toString() || '',
+      serviceHours: service.serviceHours?.toString() || '',
+      salesVendorId: service.salesVendorId?.toString() || '',
+      categoryId: service.categoryId?.toString() || '',
     })
     setShowModal(true)
   }
@@ -180,8 +209,9 @@ export default function MasterServicesPage() {
       code: '',
       name: '',
       description: '',
-      hourlyRate: '',
-      defaultHours: '',
+      serviceHours: '',
+      salesVendorId: '',
+      categoryId: '',
     })
   }
 
@@ -273,10 +303,13 @@ export default function MasterServicesPage() {
                   설명
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  시간당 요금
+                  서비스 시간
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  기본 시간
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                  매출처
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                  카테고리
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">
                   관리
@@ -304,10 +337,13 @@ export default function MasterServicesPage() {
                     {service.description || '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                    {service.hourlyRate ? formatCurrency(service.hourlyRate) + '/시간' : '-'}
+                    {service.serviceHours ? service.serviceHours + '시간' : '-'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                    {service.defaultHours ? service.defaultHours + '시간' : '-'}
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {service.salesVendor?.name || '-'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {service.category?.nameKo || '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
                     <button
@@ -385,29 +421,55 @@ export default function MasterServicesPage() {
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    시간당 요금 (₩)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.hourlyRate}
-                    onChange={(e) => setFormData({ ...formData, hourlyRate: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    기본 시간
+                    서비스 시간 (선택)
                   </label>
                   <input
                     type="number"
                     step="0.1"
-                    value={formData.defaultHours}
-                    onChange={(e) => setFormData({ ...formData, defaultHours: e.target.value })}
+                    value={formData.serviceHours}
+                    onChange={(e) => setFormData({ ...formData, serviceHours: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                     placeholder="시간 단위"
                   />
                 </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    매출처
+                  </label>
+                  <select
+                    value={formData.salesVendorId}
+                    onChange={(e) => setFormData({ ...formData, salesVendorId: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                  >
+                    <option value="">선택하세요</option>
+                    {vendors
+                      .filter(v => v.type === 'DOMESTIC_SALES' || v.type === 'INTERNATIONAL_SALES')
+                      .map((vendor) => (
+                        <option key={vendor.id} value={vendor.id}>
+                          [{vendor.code}] {vendor.name}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  카테고리
+                </label>
+                <select
+                  value={formData.categoryId}
+                  onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                >
+                  <option value="">선택</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.nameKo}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="flex justify-end gap-2">
