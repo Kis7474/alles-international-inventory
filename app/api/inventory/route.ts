@@ -106,6 +106,31 @@ export async function GET(request: NextRequest) {
         },
       })
 
+      // 창고료 조회 (현재 월)
+      const now = new Date()
+      const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+      
+      const storageExpenses = await prisma.storageExpense.findMany({
+        where: {
+          period: currentPeriod,
+        },
+      })
+      
+      // 총 창고료
+      const totalStorageExpense = storageExpenses.reduce(
+        (sum, expense) => sum + expense.amount, 0
+      )
+      
+      // 총 재고 수량 계산
+      const totalInventoryQuantity = inventory.reduce(
+        (sum, item) => sum + (item._sum.quantityRemaining || 0), 0
+      )
+      
+      // 단위당 창고료 배분 (수량 기준)
+      const storageExpensePerUnit = totalInventoryQuantity > 0 
+        ? totalStorageExpense / totalInventoryQuantity 
+        : 0
+
       const result = await Promise.all(
         inventory.map(async (item) => {
           const product = await prisma.product.findUnique({
@@ -142,7 +167,16 @@ export async function GET(request: NextRequest) {
           )
           
           const totalQuantity = item._sum.quantityRemaining || 0
-          const avgUnitCost = totalQuantity > 0 ? Math.round((totalValue / totalQuantity) * 100) / 100 : 0
+          const avgUnitCostWithoutStorage = totalQuantity > 0 ? Math.round((totalValue / totalQuantity) * 100) / 100 : 0
+          
+          // 창고료 반영된 평균 단가
+          const avgUnitCost = avgUnitCostWithoutStorage + storageExpensePerUnit
+          
+          // 배분된 창고료
+          const allocatedStorageExpense = storageExpensePerUnit * totalQuantity
+          
+          // 창고료 포함 총 가치
+          const totalValueWithStorage = avgUnitCost * totalQuantity
 
           return {
             productId: item.productId,
@@ -152,10 +186,16 @@ export async function GET(request: NextRequest) {
             purchaseVendor: product?.purchaseVendor?.name,
             category: product?.category?.nameKo,
             totalQuantity,
-            avgUnitCost,
+            avgUnitCost: Math.round(avgUnitCost * 100) / 100,
+            avgUnitCostWithoutStorage: avgUnitCostWithoutStorage,
+            allocatedStorageExpense: Math.round(allocatedStorageExpense * 100) / 100,
             totalValue: Math.round(totalValue * 100) / 100,
+            totalValueWithStorage: Math.round(totalValueWithStorage * 100) / 100,
             lotCount: item._count.id,
             lots,
+            // 창고료 정보
+            storageExpensePerUnit: Math.round(storageExpensePerUnit * 100) / 100,
+            totalStorageExpense: totalStorageExpense,
           }
         })
       )
