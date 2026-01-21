@@ -28,7 +28,7 @@ export default function ProjectDetailPage() {
     shippingCost: '',
     otherCost: '',
     salesPrice: '',
-    description: '',
+    memo: '',
   })
   
   const [calculated, setCalculated] = useState({
@@ -76,7 +76,7 @@ export default function ProjectDetailPage() {
         shippingCost: data.shippingCost?.toString() || '',
         otherCost: data.otherCost?.toString() || '',
         salesPrice: data.salesPrice.toString(),
-        description: data.description || '',
+        memo: data.memo || '',
       })
       setLoading(false)
     } catch (error) {
@@ -406,8 +406,8 @@ export default function ProjectDetailPage() {
         <div className="mb-8">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">설명</h2>
           <textarea
-            name="description"
-            value={formData.description}
+            name="memo"
+            value={formData.memo}
             onChange={handleChange}
             rows={4}
             placeholder="프로젝트 설명을 입력하세요"
