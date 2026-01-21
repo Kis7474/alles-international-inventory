@@ -121,7 +121,7 @@ model VendorProductPrice {
 // 통합 담당자 마스터
 model Salesperson {
   id              Int            @id @default(autoincrement())
-  code            String         @unique  // BS, IK, YR, SJ
+  code            String?        @unique  // BS, IK, YR, SJ (optional)
   name            String
   commissionRate  Float          @default(0)  // IK는 0.15
   
@@ -137,7 +137,7 @@ model Salesperson {
 // 통합 카테고리 마스터
 model Category {
   id              Int            @id @default(autoincrement())
-  code            String         @unique
+  code            String?        @unique  // Optional
   name            String         // Machine, Parts, Fount 등
   nameKo          String         // 기계, 부품, 약물및습수액 등
   

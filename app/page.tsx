@@ -89,48 +89,109 @@ export default function Home() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-8 text-gray-900">매입매출장부 대시보드</h1>
+      {/* 헤더 */}
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">대시보드</h1>
+        <p className="text-gray-500">{new Date().toLocaleDateString('ko-KR', { 
+          year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' 
+        })}</p>
+      </div>
 
       {/* 당월 요약 카드 */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-lg shadow">
-          <div className="text-gray-600 text-sm mb-2">당월 총매출</div>
-          <div className="text-3xl font-bold text-blue-600">
-            ₩{formatNumber(data.currentMonth.totalSales, 0)}
-          </div>
-          <div className={`text-sm mt-2 ${data.growth.salesGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-            {data.growth.salesGrowth >= 0 ? '▲' : '▼'} {Math.abs(data.growth.salesGrowth).toFixed(1)}% (전월 대비)
-          </div>
-        </div>
-        
-        <div className="bg-white p-6 rounded-lg shadow">
-          <div className="text-gray-600 text-sm mb-2">당월 총마진</div>
-          <div className="text-3xl font-bold text-green-600">
-            ₩{formatNumber(data.currentMonth.totalMargin, 0)}
-          </div>
-          <div className={`text-sm mt-2 ${data.growth.marginGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-            {data.growth.marginGrowth >= 0 ? '▲' : '▼'} {Math.abs(data.growth.marginGrowth).toFixed(1)}% (전월 대비)
+        <div className="bg-white p-6 rounded-lg shadow border-l-4 border-blue-500">
+          <div className="flex justify-between items-start">
+            <div>
+              <div className="text-gray-600 text-sm mb-2">당월 총매출</div>
+              <div className="text-3xl font-bold text-blue-600">
+                ₩{formatNumber(data.currentMonth.totalSales, 0)}
+              </div>
+              <div className={`text-sm mt-2 ${data.growth.salesGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {data.growth.salesGrowth >= 0 ? '▲' : '▼'} {Math.abs(data.growth.salesGrowth).toFixed(1)}% (전월 대비)
+              </div>
+            </div>
+            <span className="text-3xl">💰</span>
           </div>
         </div>
         
-        <div className="bg-white p-6 rounded-lg shadow">
-          <div className="text-gray-600 text-sm mb-2">당월 마진율</div>
-          <div className="text-3xl font-bold text-purple-600">
-            {data.currentMonth.totalMarginRate.toFixed(1)}%
-          </div>
-          <div className="text-sm text-gray-500 mt-2">
-            평균 마진율
+        <div className="bg-white p-6 rounded-lg shadow border-l-4 border-green-500">
+          <div className="flex justify-between items-start">
+            <div>
+              <div className="text-gray-600 text-sm mb-2">당월 총마진</div>
+              <div className="text-3xl font-bold text-green-600">
+                ₩{formatNumber(data.currentMonth.totalMargin, 0)}
+              </div>
+              <div className={`text-sm mt-2 ${data.growth.marginGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {data.growth.marginGrowth >= 0 ? '▲' : '▼'} {Math.abs(data.growth.marginGrowth).toFixed(1)}% (전월 대비)
+              </div>
+            </div>
+            <span className="text-3xl">📈</span>
           </div>
         </div>
         
-        <div className="bg-white p-6 rounded-lg shadow">
-          <div className="text-gray-600 text-sm mb-2">당월 거래 건수</div>
-          <div className="text-3xl font-bold text-orange-600">
-            {data.currentMonth.count}건
+        <div className="bg-white p-6 rounded-lg shadow border-l-4 border-purple-500">
+          <div className="flex justify-between items-start">
+            <div>
+              <div className="text-gray-600 text-sm mb-2">당월 마진율</div>
+              <div className="text-3xl font-bold text-purple-600">
+                {data.currentMonth.totalMarginRate.toFixed(1)}%
+              </div>
+              <div className="text-sm text-gray-500 mt-2">
+                평균 마진율
+              </div>
+            </div>
+            <span className="text-3xl">📊</span>
           </div>
-          <div className="text-sm text-gray-500 mt-2">
-            매입매출 합계
+        </div>
+        
+        <div className="bg-white p-6 rounded-lg shadow border-l-4 border-orange-500">
+          <div className="flex justify-between items-start">
+            <div>
+              <div className="text-gray-600 text-sm mb-2">당월 거래 건수</div>
+              <div className="text-3xl font-bold text-orange-600">
+                {data.currentMonth.count}건
+              </div>
+              <div className="text-sm text-gray-500 mt-2">
+                매입매출 합계
+              </div>
+            </div>
+            <span className="text-3xl">📦</span>
           </div>
+        </div>
+      </div>
+
+      {/* 빠른 액세스 */}
+      <div className="bg-white rounded-lg shadow p-6 mb-8">
+        <h2 className="text-xl font-bold mb-4 text-gray-900">빠른 액세스</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <a 
+            href="/sales"
+            className="flex flex-col items-center p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors group"
+          >
+            <span className="text-2xl mb-2 group-hover:scale-110 transition-transform">➕</span>
+            <span className="text-sm text-gray-700 group-hover:text-blue-700">매출/매입 등록</span>
+          </a>
+          <a 
+            href="/import-export/new"
+            className="flex flex-col items-center p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors group"
+          >
+            <span className="text-2xl mb-2 group-hover:scale-110 transition-transform">🌍</span>
+            <span className="text-sm text-gray-700 group-hover:text-blue-700">수입/수출 등록</span>
+          </a>
+          <a 
+            href="/warehouse/lots"
+            className="flex flex-col items-center p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors group"
+          >
+            <span className="text-2xl mb-2 group-hover:scale-110 transition-transform">📥</span>
+            <span className="text-sm text-gray-700 group-hover:text-blue-700">입고 등록</span>
+          </a>
+          <a 
+            href="/warehouse/inventory"
+            className="flex flex-col items-center p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors group"
+          >
+            <span className="text-2xl mb-2 group-hover:scale-110 transition-transform">📊</span>
+            <span className="text-sm text-gray-700 group-hover:text-blue-700">재고 조회</span>
+          </a>
         </div>
       </div>
 

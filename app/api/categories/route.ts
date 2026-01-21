@@ -8,7 +8,6 @@ export async function GET(request: NextRequest) {
 
     interface WhereClause {
       OR?: Array<{
-        code?: { contains: string }
         name?: { contains: string }
         nameKo?: { contains: string }
       }>
@@ -18,7 +17,6 @@ export async function GET(request: NextRequest) {
 
     if (searchName) {
       where.OR = [
-        { code: { contains: searchName } },
         { name: { contains: searchName } },
         { nameKo: { contains: searchName } },
       ]
@@ -27,7 +25,7 @@ export async function GET(request: NextRequest) {
     // 통합 카테고리 우선 조회, 없으면 ProductCategory 조회
     const categories = await prisma.category.findMany({
       where,
-      orderBy: { code: 'asc' },
+      orderBy: { name: 'asc' },
     })
     
     // 검색 필터가 없고 통합 카테고리가 없으면 기존 ProductCategory 반환
@@ -51,11 +49,10 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { code, name, nameKo } = body
+    const { name, nameKo } = body
 
     const category = await prisma.category.create({
       data: {
-        code,
         name,
         nameKo,
       },
@@ -74,12 +71,11 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
-    const { id, code, name, nameKo } = body
+    const { id, name, nameKo } = body
 
     const category = await prisma.category.update({
       where: { id: parseInt(id) },
       data: {
-        code,
         name,
         nameKo,
       },

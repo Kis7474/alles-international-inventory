@@ -148,6 +148,16 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
         }
         if (product.isNew) summary.productsCreated++
         
+        // Update product's default purchase price if purchasePrice is provided
+        if (row.purchasePrice && row.purchasePrice > 0 && product.data.id) {
+          await prisma.product.update({
+            where: { id: product.data.id },
+            data: { 
+              defaultPurchasePrice: row.purchasePrice 
+            }
+          })
+        }
+        
         // 5. Link product to sales vendor (ProductSalesVendor)
         if (product && salesVendor) {
           await prisma.productSalesVendor.upsert({
