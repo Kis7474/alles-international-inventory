@@ -89,8 +89,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '프로젝트명을 입력해주세요.' }, { status: 400 })
     }
     if (!startDate) {
-      return NextResponse.json({ error: '시작일을 입력해주세요.' }, { status: 400 })
+      return NextResponse.json({ error: '시작월을 입력해주세요.' }, { status: 400 })
     }
+
+    // Convert YYYY-MM format to Date (first day of the month)
+    const startDateObj = new Date(startDate + '-01')
+    const endDateObj = endDate ? new Date(endDate + '-01') : null
 
     // Calculate total cost and margin
     const totalCost = (parseFloat(partsCost) || 0) + 
@@ -105,11 +109,11 @@ export async function POST(request: Request) {
 
     const project = await prisma.project.create({
       data: {
-        code,
+        code: code || null,
         name,
         customer,
-        startDate: new Date(startDate),
-        endDate: endDate ? new Date(endDate) : null,
+        startDate: startDateObj,
+        endDate: endDateObj,
         status: status || 'IN_PROGRESS',
         currency: currency || 'KRW',
         exchangeRate: parseFloat(exchangeRate) || 1,
@@ -197,6 +201,10 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'ID가 필요합니다.' }, { status: 400 })
     }
 
+    // Convert YYYY-MM format to Date (first day of the month)
+    const startDateObj = new Date(startDate + '-01')
+    const endDateObj = endDate ? new Date(endDate + '-01') : null
+
     // Calculate total cost and margin
     const totalCost = (parseFloat(partsCost) || 0) + 
                      (parseFloat(laborCost) || 0) + 
@@ -212,11 +220,11 @@ export async function PUT(request: Request) {
     await prisma.project.update({
       where: { id: parseInt(id) },
       data: {
-        code,
+        code: code || null,
         name,
         customer,
-        startDate: new Date(startDate),
-        endDate: endDate ? new Date(endDate) : null,
+        startDate: startDateObj,
+        endDate: endDateObj,
         status,
         currency,
         exchangeRate: parseFloat(exchangeRate) || 1,
