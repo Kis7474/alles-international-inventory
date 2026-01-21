@@ -513,7 +513,7 @@ async function handleServiceEntry(row: any, summary: any, options: UploadOptions
     }
   } else {
     // Create new service
-    const code = `S${Date.now().toString().slice(-6)}`
+    const code = `SVC-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`
     await prisma.service.create({
       data: {
         code,
@@ -560,7 +560,7 @@ async function handleProjectEntry(row: any, summary: any, options: UploadOptions
     }
   } else {
     // Create new project
-    const code = `P${Date.now().toString().slice(-6)}`
+    const code = `PRJ-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`
     const startDate = row.date ? new Date(row.date) : new Date()
     const salesPrice = (row.unitPrice || 0) * (row.quantity || 1)
     
