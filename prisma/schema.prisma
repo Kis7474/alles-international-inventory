@@ -40,6 +40,7 @@ model Product {
   vendorPrices          VendorProductPrice[]   // 거래처별 특별가
   salesRecords          SalesRecord[]          // 매입매출
   importExports         ImportExport[]         // 수입/수출
+  importExportItems     ImportExportItem[]     // 수입/수출 품목 상세
   inventoryLots         InventoryLot[]         // 창고 입고
   
   createdAt             DateTime  @default(now())
@@ -95,6 +96,10 @@ model Vendor {
   importExports   ImportExport[]
   inventoryLots   InventoryLot[]
   
+  // 재료/부품 매입처
+  materials       Material[]  @relation("MaterialPurchaseVendor")
+  parts           Part[]      @relation("PartPurchaseVendor")
+  
   createdAt       DateTime              @default(now())
   updatedAt       DateTime              @updatedAt
 }
@@ -145,6 +150,8 @@ model Category {
   products        Product[]
   salesRecords    SalesRecord[]
   importExports   ImportExport[]
+  materials       Material[]
+  parts           Part[]
   
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
@@ -161,8 +168,8 @@ model ImportExport {
   type            String       // IMPORT(수입) or EXPORT(수출)
   
   // 마스터 연결 (통합)
-  productId       Int
-  product         Product      @relation(fields: [productId], references: [id])
+  productId       Int?         // 단일 품목용 (하위 호환성)
+  product         Product?     @relation(fields: [productId], references: [id])
   vendorId        Int
   vendor          Vendor       @relation(fields: [vendorId], references: [id])
   salespersonId   Int?
@@ -170,13 +177,16 @@ model ImportExport {
   categoryId      Int?
   category        Category?    @relation(fields: [categoryId], references: [id])
   
-  // 수량 및 금액
-  quantity        Float
+  // 다중 품목 지원
+  items           ImportExportItem[]
+  
+  // 수량 및 금액 (단일 품목용, 하위 호환성)
+  quantity        Float?
   
   // 외화 정보
   currency        String       // USD, EUR, JPY 등
   exchangeRate    Float        // 환율 (직접 입력)
-  foreignAmount   Float        // 외화 금액
+  foreignAmount   Float        // 외화 금액 (총액)
   krwAmount       Float        // 원화 환산 금액
   
   // 수입 원가 구성 (수입 시)
@@ -386,4 +396,170 @@ model SalesProductPrice {
   updatedAt      DateTime     @updatedAt
 
   @@index([productId, effectiveDate])
+}
+
+// ============================================
+// 수입/수출 다중 품목
+// ============================================
+
+// 수입/수출 품목 상세 (다중 품목 지원)
+model ImportExportItem {
+  id              Int          @id @default(autoincrement())
+  importExportId  Int
+  importExport    ImportExport @relation(fields: [importExportId], references: [id], onDelete: Cascade)
+  productId       Int
+  product         Product      @relation(fields: [productId], references: [id])
+  
+  quantity        Float
+  unitPrice       Float        // 단가 (외화)
+  amount          Float        // 금액 (외화) = quantity * unitPrice
+  krwAmount       Float        // 원화 환산 금액
+  
+  memo            String?
+  
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  
+  @@index([importExportId])
+}
+
+// ============================================
+// 품목 테이블 분리 (재료, 부품, 서비스)
+// ============================================
+
+// 재료 (Material)
+model Material {
+  id                    Int       @id @default(autoincrement())
+  code                  String?   @unique
+  name                  String
+  unit                  String    @default("EA")
+  categoryId            Int?
+  category              Category? @relation(fields: [categoryId], references: [id])
+  description           String?
+  
+  purchaseVendorId      Int
+  purchaseVendor        Vendor    @relation("MaterialPurchaseVendor", fields: [purchaseVendorId], references: [id])
+  
+  defaultPurchasePrice  Float?
+  defaultSalesPrice     Float?
+  
+  projectItems          ProjectItem[]
+  
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+}
+
+// 부품 (Part)
+model Part {
+  id                    Int       @id @default(autoincrement())
+  code                  String?   @unique
+  name                  String
+  unit                  String    @default("EA")
+  categoryId            Int?
+  category              Category? @relation(fields: [categoryId], references: [id])
+  description           String?
+  
+  purchaseVendorId      Int
+  purchaseVendor        Vendor    @relation("PartPurchaseVendor", fields: [purchaseVendorId], references: [id])
+  
+  defaultPurchasePrice  Float?
+  defaultSalesPrice     Float?
+  
+  projectItems          ProjectItem[]
+  
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+}
+
+// 서비스 (Service) - 작업 기록용
+model Service {
+  id                Int       @id @default(autoincrement())
+  code              String?   @unique
+  name              String    // 서비스명
+  description       String?
+  
+  // 기본 단가 정보
+  hourlyRate        Float?    // 시간당 단가
+  defaultHours      Float?    // 기본 작업시간
+  
+  projectItems      ProjectItem[]
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+// ============================================
+// 프로젝트 관리
+// ============================================
+
+// 프로젝트
+model Project {
+  id              Int          @id @default(autoincrement())
+  code            String?      @unique
+  name            String       // 프로젝트명
+  customer        String?      // 고객사
+  
+  startDate       DateTime     // 시작일
+  endDate         DateTime?    // 종료일
+  status          String       @default("IN_PROGRESS") // IN_PROGRESS, COMPLETED, CANCELLED
+  
+  // 통화 정보
+  currency        String       @default("KRW") // KRW, USD, EUR
+  exchangeRate    Float        @default(1)
+  
+  // 원가 항목
+  partsCost       Float        @default(0) // 부품 원가
+  laborCost       Float        @default(0) // 인건비 원가
+  customsCost     Float        @default(0) // 관세
+  shippingCost    Float        @default(0) // 운송료
+  otherCost       Float        @default(0) // 기타 비용
+  totalCost       Float        @default(0) // 총 원가
+  
+  // 판매 및 마진
+  salesPrice      Float        @default(0) // 판매가
+  margin          Float        @default(0) // 마진 = 판매가 - 총 원가
+  marginRate      Float        @default(0) // 마진율 = 마진 / 판매가 × 100
+  
+  memo            String?
+  
+  items           ProjectItem[]
+  
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
+
+// 프로젝트 품목 상세
+model ProjectItem {
+  id          Int       @id @default(autoincrement())
+  projectId   Int
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  itemType    String    // MATERIAL, PART, SERVICE
+  
+  // 품목 참조 (하나만 사용)
+  materialId  Int?
+  material    Material? @relation(fields: [materialId], references: [id])
+  partId      Int?
+  part        Part?     @relation(fields: [partId], references: [id])
+  serviceId   Int?
+  service     Service?  @relation(fields: [serviceId], references: [id])
+  
+  itemName    String    // 품목명 (직접 입력 또는 품목에서 가져옴)
+  
+  // 수량 및 단가
+  quantity    Float
+  unitPrice   Float     // 단가
+  amount      Float     // 금액 = quantity * unitPrice
+  
+  // 서비스 전용 필드
+  workDate    DateTime? // 작업일
+  workHours   Float?    // 작업시간
+  engineer    String?   // 담당 엔지니어
+  
+  memo        String?
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@index([projectId])
 }
