@@ -54,6 +54,19 @@ export default function ImportExportNewPage() {
   // Search states
   const [productSearch, setProductSearch] = useState('')
   
+  // Multi-item support
+  interface ItemEntry {
+    productId: string
+    quantity: string
+    unitPrice: string
+  }
+  const [items, setItems] = useState<ItemEntry[]>([])
+  const [currentItem, setCurrentItem] = useState<ItemEntry>({
+    productId: '',
+    quantity: '',
+    unitPrice: ''
+  })
+  
   // Form data
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -102,6 +115,7 @@ export default function ImportExportNewPage() {
     formData.shippingCost,
     formData.otherCost,
     formData.vatIncluded,
+    items,
   ])
 
   // 통화 또는 날짜 변경 시 환율 자동 조회
@@ -169,7 +183,16 @@ export default function ImportExportNewPage() {
   const calculateValues = () => {
     const quantity = parseFloat(formData.quantity) || 0
     const exchangeRate = parseFloat(formData.exchangeRate) || 0
-    const foreignAmount = parseFloat(formData.foreignAmount) || 0
+    let foreignAmount = parseFloat(formData.foreignAmount) || 0
+    
+    // If items exist, calculate total from items
+    if (items.length > 0) {
+      foreignAmount = items.reduce((sum, item) => {
+        const itemAmount = (parseFloat(item.quantity) || 0) * (parseFloat(item.unitPrice) || 0)
+        return sum + itemAmount
+      }, 0)
+    }
+    
     const goodsAmount = parseFloat(formData.goodsAmount) || 0
     const dutyAmount = parseFloat(formData.dutyAmount) || 0
     const shippingCost = parseFloat(formData.shippingCost) || 0
@@ -240,22 +263,52 @@ export default function ImportExportNewPage() {
     fetchExchangeRate(formData.currency, date)
   }
 
+  const handleAddItem = () => {
+    if (!currentItem.productId || !currentItem.quantity || !currentItem.unitPrice) {
+      alert('품목, 수량, 단가를 모두 입력해주세요.')
+      return
+    }
+    
+    setItems([...items, currentItem])
+    setCurrentItem({
+      productId: '',
+      quantity: '',
+      unitPrice: ''
+    })
+  }
+  
+  const handleRemoveItem = (index: number) => {
+    setItems(items.filter((_, i) => i !== index))
+  }
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
     // Validation
-    if (!formData.productId || !formData.vendorId || !formData.quantity) {
-      alert('필수 항목을 입력해주세요.')
+    if (!formData.vendorId) {
+      alert('거래처를 선택해주세요.')
       return
+    }
+    
+    // Check if using items or single product
+    if (items.length === 0) {
+      if (!formData.productId || !formData.quantity) {
+        alert('품목과 수량을 입력하거나 품목 목록에 항목을 추가해주세요.')
+        return
+      }
     }
     
     setSubmitting(true)
     
     try {
+      const payload = items.length > 0 
+        ? { ...formData, items } 
+        : formData
+      
       const res = await fetch('/api/import-export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       })
       
       if (res.ok) {
@@ -430,12 +483,147 @@ export default function ImportExportNewPage() {
                 name="quantity"
                 value={formData.quantity}
                 onChange={handleChange}
-                required
+                required={items.length === 0}
                 step="0.01"
+                disabled={items.length > 0}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 disabled:bg-gray-100"
+              />
+              {items.length > 0 && (
+                <p className="text-xs text-gray-500 mt-1">품목 목록 사용 중</p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* 품목 목록 (다중 품목) */}
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">품목 목록</h2>
+          <p className="text-sm text-gray-600 mb-4">
+            여러 품목을 한 번에 등록하려면 아래에서 품목을 추가하세요. 품목 목록을 사용하면 위의 단일 품목 및 수량 입력은 무시됩니다.
+          </p>
+          
+          {/* 품목 추가 폼 */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                품목
+              </label>
+              <select
+                value={currentItem.productId}
+                onChange={(e) => setCurrentItem({ ...currentItem, productId: e.target.value })}
+                disabled={!formData.vendorId}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+              >
+                <option value="">{formData.vendorId ? '품목 선택' : '거래처 먼저 선택'}</option>
+                {availableProducts.map((product) => (
+                  <option key={product.id} value={product.id}>
+                    [{product.code}] {product.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                수량
+              </label>
+              <input
+                type="number"
+                value={currentItem.quantity}
+                onChange={(e) => setCurrentItem({ ...currentItem, quantity: e.target.value })}
+                step="0.01"
+                placeholder="수량"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
               />
             </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                단가 (외화)
+              </label>
+              <input
+                type="number"
+                value={currentItem.unitPrice}
+                onChange={(e) => setCurrentItem({ ...currentItem, unitPrice: e.target.value })}
+                step="0.01"
+                placeholder="단가"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                &nbsp;
+              </label>
+              <button
+                type="button"
+                onClick={handleAddItem}
+                className="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+              >
+                품목 추가
+              </button>
+            </div>
           </div>
+          
+          {/* 품목 목록 테이블 */}
+          {items.length > 0 && (
+            <div className="overflow-x-auto">
+              <table className="min-w-full bg-white border border-gray-200">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">품목</th>
+                    <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">수량</th>
+                    <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">단가</th>
+                    <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">금액</th>
+                    <th className="px-4 py-2 text-center text-sm font-medium text-gray-700 border-b">삭제</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item, index) => {
+                    const product = products.find(p => p.id === parseInt(item.productId))
+                    const amount = (parseFloat(item.quantity) || 0) * (parseFloat(item.unitPrice) || 0)
+                    return (
+                      <tr key={index} className="border-b">
+                        <td className="px-4 py-2 text-sm text-gray-900">
+                          {product ? `[${product.code}] ${product.name}` : '-'}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-900 text-right">
+                          {parseFloat(item.quantity).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-900 text-right">
+                          {parseFloat(item.unitPrice).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-900 text-right font-semibold">
+                          {amount.toLocaleString()}
+                        </td>
+                        <td className="px-4 py-2 text-center">
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveItem(index)}
+                            className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700"
+                          >
+                            삭제
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                  <tr className="bg-gray-50 font-semibold">
+                    <td colSpan={3} className="px-4 py-2 text-sm text-gray-900 text-right">
+                      총 외화 금액:
+                    </td>
+                    <td className="px-4 py-2 text-sm text-gray-900 text-right">
+                      {items.reduce((sum, item) => {
+                        const amount = (parseFloat(item.quantity) || 0) * (parseFloat(item.unitPrice) || 0)
+                        return sum + amount
+                      }, 0).toLocaleString()} {formData.currency}
+                    </td>
+                    <td></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         {/* 외화 정보 */}
@@ -484,15 +672,20 @@ export default function ImportExportNewPage() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 외화 금액 <span className="text-red-500">*</span>
+                {items.length > 0 && <span className="text-xs text-green-600 ml-2">(품목 목록에서 자동 계산됨)</span>}
               </label>
               <input
                 type="number"
                 name="foreignAmount"
-                value={formData.foreignAmount}
+                value={items.length > 0 ? items.reduce((sum, item) => {
+                  const amount = (parseFloat(item.quantity) || 0) * (parseFloat(item.unitPrice) || 0)
+                  return sum + amount
+                }, 0) : formData.foreignAmount}
                 onChange={handleChange}
-                required
+                required={items.length === 0}
                 step="0.01"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                disabled={items.length > 0}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 disabled:bg-gray-100"
               />
             </div>
           </div>
