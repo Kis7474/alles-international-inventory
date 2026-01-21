@@ -114,7 +114,7 @@ export async function GET(request: NextRequest) {
       categoryStats.map(async (stat) => {
         let category = null
         if (stat.categoryId) {
-          category = await prisma.productCategory.findUnique({
+          category = await prisma.category.findUnique({
             where: { id: stat.categoryId },
           })
         }
