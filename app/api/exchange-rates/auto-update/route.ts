@@ -39,8 +39,15 @@ function fetchWithSSLBypass(url: string, maxRedirects = 5): Promise<KoreaEximRat
     const req = https.request(options, (res) => {
       // 리다이렉트 처리 (301, 302, 303, 307, 308)
       if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        const redirectUrl = new URL(res.headers.location, url).toString()
-        fetchWithSSLBypass(redirectUrl, maxRedirects - 1)
+        const redirectUrl = new URL(res.headers.location, url)
+        
+        // HTTPS 프로토콜만 허용 (보안)
+        if (redirectUrl.protocol !== 'https:') {
+          reject(new Error('안전하지 않은 리다이렉트'))
+          return
+        }
+        
+        fetchWithSSLBypass(redirectUrl.toString(), maxRedirects - 1)
           .then(resolve)
           .catch(reject)
         return
