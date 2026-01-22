@@ -232,9 +232,9 @@ export default function UnipassSettingsPage() {
           <ol className="list-decimal list-inside space-y-1 text-sm text-blue-800">
             <li>유니패스 오픈API 신청 (https://unipass.customs.go.kr/csp/index.do)</li>
             <li>발급받은 API 인증키를 위 입력란에 입력</li>
-            <li>"연결 테스트" 버튼으로 API 연결 확인</li>
-            <li>"설정 저장" 버튼으로 설정 저장</li>
-            <li>"통관 현황 보기"에서 BL번호로 통관 정보 조회</li>
+            <li>&ldquo;연결 테스트&rdquo; 버튼으로 API 연결 확인</li>
+            <li>&ldquo;설정 저장&rdquo; 버튼으로 설정 저장</li>
+            <li>&ldquo;통관 현황 보기&rdquo;에서 BL번호로 통관 정보 조회</li>
           </ol>
         </div>
       </div>

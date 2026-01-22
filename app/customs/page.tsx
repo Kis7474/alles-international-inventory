@@ -40,6 +40,7 @@ export default function CustomsPage() {
 
   useEffect(() => {
     fetchClearances()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter])
 
   const fetchClearances = async () => {

@@ -70,7 +70,7 @@ function fetchWithSSLBypass(url: string): Promise<string> {
 /**
  * XML을 JSON으로 파싱
  */
-function parseXml(xml: string): Promise<any> {
+function parseXml(xml: string): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
     parseString(xml, { explicitArray: false, mergeAttrs: true }, (err, result) => {
       if (err) {
