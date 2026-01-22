@@ -13,6 +13,32 @@ interface UploadOptions {
   createCategories?: boolean
 }
 
+interface UploadSummary {
+  totalRows?: number
+  successRows?: number
+  failedRows?: number
+  vendorsCreated: number
+  vendorsUpdated?: number
+  productsCreated: number
+  productsUpdated?: number
+  pricesCreated?: number
+  pricesUpdated?: number
+  salespersonsCreated?: number
+  categoriesCreated?: number
+  transactionsCreated?: number
+  servicesCreated?: number
+  projectsCreated?: number
+}
+
+interface ExcelRow {
+  productName?: string
+  salesVendorName?: string
+  category?: string
+  serviceHours?: number
+  description?: string
+  [key: string]: unknown
+}
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
@@ -83,6 +109,23 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
           throw new Error('수량이 유효하지 않습니다.')
         }
         
+        // Determine item category and handle branching
+        const categoryName = row.category?.trim()
+        
+        // Branch based on category
+        if (categoryName === 'Service' || categoryName === '서비스') {
+          // Create/update Service entry
+          await handleServiceEntry(row, summary, options)
+          summary.successRows++
+          continue
+        } else if (categoryName === 'Project' || categoryName === '프로젝트') {
+          // Create/update Project entry
+          await handleProjectEntry(row, summary, options)
+          summary.successRows++
+          continue
+        }
+        
+        // Otherwise, handle as Material/Part (existing logic)
         // Determine transaction type: use row.type if provided, otherwise use options.transactionType
         const rowType = row.type?.trim()
         let transactionType = ''
@@ -440,6 +483,134 @@ async function handlePriceMatrixUpload(file: File, options: UploadOptions) {
       { error: `가격 데이터 업로드 중 오류가 발생했습니다: ${error}` },
       { status: 500 }
     )
+  }
+}
+
+/**
+ * Handle Service category entry
+ */
+async function handleServiceEntry(row: ExcelRow, summary: UploadSummary) {
+  // Find or create sales vendor
+  let salesVendor = null
+  if (row.salesVendorName) {
+    salesVendor = await findOrCreateVendorByType(
+      row.salesVendorName,
+      'DOMESTIC_SALES',
+      options.createVendors || false
+    )
+    if (salesVendor?.isNew) summary.vendorsCreated++
+  }
+  
+  // Find or create category
+  let category = null
+  if (row.category) {
+    category = await findOrCreateCategory(row.category, options.createCategories || false)
+    if (category?.isNew) summary.categoriesCreated++
+  }
+  
+  // Find or create service
+  const existingService = await prisma.service.findFirst({
+    where: { name: row.productName }
+  })
+  
+  if (existingService) {
+    // Update service with non-blank fields
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const updateData: any = {}
+    
+    if (row.serviceHours && row.serviceHours > 0) {
+      updateData.serviceHours = row.serviceHours
+    }
+    if (salesVendor) {
+      updateData.salesVendorId = salesVendor.data.id
+    }
+    if (category) {
+      updateData.categoryId = category.data.id
+    }
+    if (row.description) {
+      updateData.description = row.description
+    }
+    
+    if (Object.keys(updateData).length > 0) {
+      await prisma.service.update({
+        where: { id: existingService.id },
+        data: updateData
+      })
+    }
+  } else {
+    // Create new service
+    const code = `SVC-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`
+    await prisma.service.create({
+      data: {
+        code,
+        name: row.productName,
+        description: row.description || null,
+        serviceHours: row.serviceHours && row.serviceHours > 0 ? row.serviceHours : null,
+        salesVendorId: salesVendor?.data.id || null,
+        categoryId: category?.data.id || null,
+      }
+    })
+    summary.productsCreated++
+  }
+}
+
+/**
+ * Handle Project category entry
+ */
+async function handleProjectEntry(row: ExcelRow, summary: UploadSummary) {
+  // Find or create project
+  const existingProject = await prisma.project.findFirst({
+    where: { name: row.productName }
+  })
+  
+  if (existingProject) {
+    // Update project with non-blank fields
+    const updateData: Record<string, unknown> = {}
+    
+    if (row.salesVendorName) {
+      updateData.customer = row.salesVendorName
+    }
+    if (row.unitPrice && row.unitPrice > 0) {
+      updateData.salesPrice = row.unitPrice * (row.quantity || 1)
+    }
+    if (row.description) {
+      updateData.memo = row.description
+    }
+    
+    if (Object.keys(updateData).length > 0) {
+      await prisma.project.update({
+        where: { id: existingProject.id },
+        data: updateData
+      })
+    }
+  } else {
+    // Create new project
+    const code = `PRJ-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`
+    const startDate = row.date ? new Date(row.date) : new Date()
+    const salesPrice = (row.unitPrice || 0) * (row.quantity || 1)
+    
+    await prisma.project.create({
+      data: {
+        code,
+        name: row.productName,
+        customer: row.salesVendorName || null,
+        startDate: startDate,
+        status: 'IN_PROGRESS',
+        currency: 'KRW',
+        exchangeRate: 1,
+        partsCost: 0,
+        laborCost: 0,
+        customsCost: 0,
+        shippingCost: 0,
+        otherCost: 0,
+        totalCost: 0,
+        salesPrice: salesPrice,
+        margin: salesPrice,
+        marginRate: 100,
+        memo: row.description || null,
+      }
+    })
+    summary.productsCreated++
   }
 }
 

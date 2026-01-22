@@ -33,6 +33,7 @@ export async function GET(request: Request) {
       include: {
         category: true,
         purchaseVendor: true,
+        salesVendor: true,
       },
       orderBy: { id: 'asc' },
     })
@@ -55,8 +56,8 @@ export async function POST(request: Request) {
       categoryId,
       description,
       defaultPurchasePrice,
-      defaultSalesPrice,
       purchaseVendorId,
+      salesVendorId,
     } = body
 
     // Validation
@@ -75,12 +76,13 @@ export async function POST(request: Request) {
         categoryId: categoryId ? parseInt(categoryId) : null,
         description,
         defaultPurchasePrice: defaultPurchasePrice ? parseFloat(defaultPurchasePrice) : null,
-        defaultSalesPrice: defaultSalesPrice ? parseFloat(defaultSalesPrice) : null,
         purchaseVendorId: parseInt(purchaseVendorId),
+        salesVendorId: salesVendorId ? parseInt(salesVendorId) : null,
       },
       include: {
         category: true,
         purchaseVendor: true,
+        salesVendor: true,
       },
     })
 
@@ -103,8 +105,8 @@ export async function PUT(request: Request) {
       categoryId,
       description,
       defaultPurchasePrice,
-      defaultSalesPrice,
       purchaseVendorId,
+      salesVendorId,
     } = body
 
     if (!id) {
@@ -120,12 +122,13 @@ export async function PUT(request: Request) {
         categoryId: categoryId ? parseInt(categoryId) : null,
         description,
         defaultPurchasePrice: defaultPurchasePrice ? parseFloat(defaultPurchasePrice) : null,
-        defaultSalesPrice: defaultSalesPrice ? parseFloat(defaultSalesPrice) : null,
         purchaseVendorId: parseInt(purchaseVendorId),
+        salesVendorId: salesVendorId ? parseInt(salesVendorId) : null,
       },
       include: {
         category: true,
         purchaseVendor: true,
+        salesVendor: true,
       },
     })
 

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import https from 'https'
 
 // 한국수출입은행 환율 API
 const KOREAEXIM_API_URL = 'https://www.koreaexim.go.kr/site/program/financial/exchangeJSON'
@@ -47,6 +48,11 @@ export async function POST() {
     const today = new Date()
     const searchDate = today.toISOString().slice(0, 10).replace(/-/g, '')
     
+    // SSL 검증 우회를 위한 agent 생성
+    const httpsAgent = new https.Agent({
+      rejectUnauthorized: false
+    })
+    
     // 한국수출입은행 API 호출
     const response = await fetch(
       `${KOREAEXIM_API_URL}?authkey=${apiKey}&searchdate=${searchDate}&data=AP01`,
@@ -55,6 +61,8 @@ export async function POST() {
         headers: {
           'Content-Type': 'application/json',
         },
+        // @ts-expect-error - Node.js fetch accepts agent option
+        agent: httpsAgent,
       }
     )
     
@@ -73,7 +81,11 @@ export async function POST() {
         const pastDateStr = pastDate.toISOString().slice(0, 10).replace(/-/g, '')
         
         const retryResponse = await fetch(
-          `${KOREAEXIM_API_URL}?authkey=${apiKey}&searchdate=${pastDateStr}&data=AP01`
+          `${KOREAEXIM_API_URL}?authkey=${apiKey}&searchdate=${pastDateStr}&data=AP01`,
+          {
+            // @ts-expect-error - Node.js fetch accepts agent option
+            agent: httpsAgent,
+          }
         )
         const retryData = await retryResponse.json()
         

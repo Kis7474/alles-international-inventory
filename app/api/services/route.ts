@@ -25,6 +25,10 @@ export async function GET(request: Request) {
     
     const services = await prisma.service.findMany({
       where,
+      include: {
+        category: true,
+        salesVendor: true,
+      },
       orderBy: { id: 'asc' },
     })
     
@@ -43,8 +47,9 @@ export async function POST(request: Request) {
       code,
       name,
       description,
-      hourlyRate,
-      defaultHours,
+      serviceHours,
+      salesVendorId,
+      categoryId,
     } = body
 
     // Validation
@@ -57,8 +62,13 @@ export async function POST(request: Request) {
         code,
         name,
         description,
-        hourlyRate: hourlyRate ? parseFloat(hourlyRate) : null,
-        defaultHours: defaultHours ? parseFloat(defaultHours) : null,
+        serviceHours: serviceHours ? parseFloat(serviceHours) : null,
+        salesVendorId: salesVendorId ? parseInt(salesVendorId) : null,
+        categoryId: categoryId ? parseInt(categoryId) : null,
+      },
+      include: {
+        category: true,
+        salesVendor: true,
       },
     })
 
@@ -78,8 +88,9 @@ export async function PUT(request: Request) {
       code,
       name,
       description,
-      hourlyRate,
-      defaultHours,
+      serviceHours,
+      salesVendorId,
+      categoryId,
     } = body
 
     if (!id) {
@@ -92,8 +103,13 @@ export async function PUT(request: Request) {
         code,
         name,
         description,
-        hourlyRate: hourlyRate ? parseFloat(hourlyRate) : null,
-        defaultHours: defaultHours ? parseFloat(defaultHours) : null,
+        serviceHours: serviceHours ? parseFloat(serviceHours) : null,
+        salesVendorId: salesVendorId ? parseInt(salesVendorId) : null,
+        categoryId: categoryId ? parseInt(categoryId) : null,
+      },
+      include: {
+        category: true,
+        salesVendor: true,
       },
     })
 

@@ -23,11 +23,17 @@ export default function ProjectDetailPage() {
     currency: 'KRW',
     exchangeRate: '1',
     partsCost: '',
+    partsCostKRW: '',
     laborCost: '',
+    laborCostKRW: '',
     customsCost: '',
+    customsCostKRW: '',
     shippingCost: '',
+    shippingCostKRW: '',
     otherCost: '',
+    otherCostKRW: '',
     salesPrice: '',
+    salesPriceKRW: '',
     memo: '',
   })
   
@@ -42,6 +48,14 @@ export default function ProjectDetailPage() {
   }, [])
   
   useEffect(() => {
+    if (formData.currency) {
+      fetchExchangeRate()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.currency])
+  
+  useEffect(() => {
+    calculateKRWValues()
     calculateValues()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -51,6 +65,7 @@ export default function ProjectDetailPage() {
     formData.shippingCost,
     formData.otherCost,
     formData.salesPrice,
+    formData.exchangeRate,
   ])
 
   const fetchProject = async () => {
@@ -61,21 +76,37 @@ export default function ProjectDetailPage() {
       }
       const data = await res.json()
       
+      // Convert date to YYYY-MM format
+      const startDate = new Date(data.startDate)
+      const startYearMonth = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}`
+      
+      let endYearMonth = ''
+      if (data.endDate) {
+        const endDate = new Date(data.endDate)
+        endYearMonth = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}`
+      }
+      
       setFormData({
-        code: data.code,
+        code: data.code || '',
         name: data.name,
         customer: data.customer || '',
-        startDate: new Date(data.startDate).toISOString().split('T')[0],
-        endDate: data.endDate ? new Date(data.endDate).toISOString().split('T')[0] : '',
+        startDate: startYearMonth,
+        endDate: endYearMonth,
         status: data.status,
         currency: data.currency,
         exchangeRate: data.exchangeRate.toString(),
         partsCost: data.partsCost?.toString() || '',
+        partsCostKRW: '',
         laborCost: data.laborCost?.toString() || '',
+        laborCostKRW: '',
         customsCost: data.customsCost?.toString() || '',
+        customsCostKRW: '',
         shippingCost: data.shippingCost?.toString() || '',
+        shippingCostKRW: '',
         otherCost: data.otherCost?.toString() || '',
+        otherCostKRW: '',
         salesPrice: data.salesPrice.toString(),
+        salesPriceKRW: '',
         memo: data.memo || '',
       })
       setLoading(false)
@@ -86,13 +117,47 @@ export default function ProjectDetailPage() {
     }
   }
   
+  const fetchExchangeRate = async () => {
+    if (formData.currency === 'KRW') {
+      setFormData(prev => ({ ...prev, exchangeRate: '1' }))
+      return
+    }
+    
+    try {
+      const res = await fetch(`/api/exchange-rates?currency=${formData.currency}`)
+      if (res.ok) {
+        const rates = await res.json()
+        if (rates.length > 0) {
+          setFormData(prev => ({ ...prev, exchangeRate: rates[0].rate.toString() }))
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching exchange rate:', error)
+    }
+  }
+  
+  const calculateKRWValues = () => {
+    const rate = parseFloat(formData.exchangeRate) || 1
+    
+    setFormData(prev => ({
+      ...prev,
+      partsCostKRW: (parseFloat(formData.partsCost) * rate || 0).toFixed(0),
+      laborCostKRW: (parseFloat(formData.laborCost) * rate || 0).toFixed(0),
+      customsCostKRW: (parseFloat(formData.customsCost) * rate || 0).toFixed(0),
+      shippingCostKRW: (parseFloat(formData.shippingCost) * rate || 0).toFixed(0),
+      otherCostKRW: (parseFloat(formData.otherCost) * rate || 0).toFixed(0),
+      salesPriceKRW: (parseFloat(formData.salesPrice) * rate || 0).toFixed(0),
+    }))
+  }
+  
   const calculateValues = () => {
-    const partsCost = parseFloat(formData.partsCost) || 0
-    const laborCost = parseFloat(formData.laborCost) || 0
-    const customsCost = parseFloat(formData.customsCost) || 0
-    const shippingCost = parseFloat(formData.shippingCost) || 0
-    const otherCost = parseFloat(formData.otherCost) || 0
-    const salesPrice = parseFloat(formData.salesPrice) || 0
+    const rate = parseFloat(formData.exchangeRate) || 1
+    const partsCost = (parseFloat(formData.partsCost) || 0) * rate
+    const laborCost = (parseFloat(formData.laborCost) || 0) * rate
+    const customsCost = (parseFloat(formData.customsCost) || 0) * rate
+    const shippingCost = (parseFloat(formData.shippingCost) || 0) * rate
+    const otherCost = (parseFloat(formData.otherCost) || 0) * rate
+    const salesPrice = (parseFloat(formData.salesPrice) || 0) * rate
     
     const totalCost = partsCost + laborCost + customsCost + shippingCost + otherCost
     const margin = salesPrice - totalCost
@@ -164,14 +229,13 @@ export default function ProjectDetailPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                프로젝트 코드 <span className="text-red-500">*</span>
+                프로젝트 코드
               </label>
               <input
                 type="text"
                 name="code"
                 value={formData.code}
                 onChange={handleChange}
-                required
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
               />
             </div>
@@ -223,10 +287,10 @@ export default function ProjectDetailPage() {
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                시작일 <span className="text-red-500">*</span>
+                시작월 <span className="text-red-500">*</span>
               </label>
               <input
-                type="date"
+                type="month"
                 name="startDate"
                 value={formData.startDate}
                 onChange={handleChange}
@@ -237,10 +301,10 @@ export default function ProjectDetailPage() {
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                종료일 (예정)
+                종료월 (예정)
               </label>
               <input
-                type="date"
+                type="month"
                 name="endDate"
                 value={formData.endDate}
                 onChange={handleChange}
@@ -290,7 +354,7 @@ export default function ProjectDetailPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                부품비 (₩)
+                부품비 ({formData.currency})
               </label>
               <input
                 type="number"
@@ -300,11 +364,14 @@ export default function ProjectDetailPage() {
                 step="0.01"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
               />
+              {formData.currency !== 'KRW' && formData.partsCostKRW && (
+                <p className="text-sm text-gray-500 mt-1">≈ {formatCurrency(parseFloat(formData.partsCostKRW))}</p>
+              )}
             </div>
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                인건비 (₩)
+                인건비 ({formData.currency})
               </label>
               <input
                 type="number"
@@ -314,11 +381,14 @@ export default function ProjectDetailPage() {
                 step="0.01"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
               />
+              {formData.currency !== 'KRW' && formData.laborCostKRW && (
+                <p className="text-sm text-gray-500 mt-1">≈ {formatCurrency(parseFloat(formData.laborCostKRW))}</p>
+              )}
             </div>
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                관세 (₩)
+                관세 ({formData.currency})
               </label>
               <input
                 type="number"
@@ -328,11 +398,14 @@ export default function ProjectDetailPage() {
                 step="0.01"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
               />
+              {formData.currency !== 'KRW' && formData.customsCostKRW && (
+                <p className="text-sm text-gray-500 mt-1">≈ {formatCurrency(parseFloat(formData.customsCostKRW))}</p>
+              )}
             </div>
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                운송비 (₩)
+                운송비 ({formData.currency})
               </label>
               <input
                 type="number"
@@ -342,11 +415,14 @@ export default function ProjectDetailPage() {
                 step="0.01"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
               />
+              {formData.currency !== 'KRW' && formData.shippingCostKRW && (
+                <p className="text-sm text-gray-500 mt-1">≈ {formatCurrency(parseFloat(formData.shippingCostKRW))}</p>
+              )}
             </div>
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                기타비용 (₩)
+                기타비용 ({formData.currency})
               </label>
               <input
                 type="number"
@@ -356,6 +432,9 @@ export default function ProjectDetailPage() {
                 step="0.01"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
               />
+              {formData.currency !== 'KRW' && formData.otherCostKRW && (
+                <p className="text-sm text-gray-500 mt-1">≈ {formatCurrency(parseFloat(formData.otherCostKRW))}</p>
+              )}
             </div>
           </div>
           
@@ -372,7 +451,7 @@ export default function ProjectDetailPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                매출가 (₩) <span className="text-red-500">*</span>
+                매출가 ({formData.currency}) <span className="text-red-500">*</span>
               </label>
               <input
                 type="number"
@@ -383,6 +462,9 @@ export default function ProjectDetailPage() {
                 step="0.01"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
               />
+              {formData.currency !== 'KRW' && formData.salesPriceKRW && (
+                <p className="text-sm text-gray-500 mt-1">≈ {formatCurrency(parseFloat(formData.salesPriceKRW))}</p>
+              )}
             </div>
           </div>
           

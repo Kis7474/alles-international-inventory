@@ -26,9 +26,10 @@ interface Part {
   category: Category | null
   description: string | null
   defaultPurchasePrice: number | null
-  defaultSalesPrice: number | null
   purchaseVendorId: number
   purchaseVendor: Vendor
+  salesVendorId: number | null
+  salesVendor: Vendor | null
 }
 
 export default function MasterPartsPage() {
@@ -51,8 +52,8 @@ export default function MasterPartsPage() {
     categoryId: '',
     description: '',
     defaultPurchasePrice: '',
-    defaultSalesPrice: '',
     purchaseVendorId: '',
+    salesVendorId: '',
   })
 
   useEffect(() => {
@@ -209,8 +210,8 @@ export default function MasterPartsPage() {
       categoryId: part.categoryId?.toString() || '',
       description: part.description || '',
       defaultPurchasePrice: part.defaultPurchasePrice?.toString() || '',
-      defaultSalesPrice: part.defaultSalesPrice?.toString() || '',
       purchaseVendorId: part.purchaseVendorId.toString(),
+      salesVendorId: part.salesVendorId?.toString() || '',
     })
     setShowModal(true)
   }
@@ -225,8 +226,8 @@ export default function MasterPartsPage() {
       categoryId: '',
       description: '',
       defaultPurchasePrice: '',
-      defaultSalesPrice: '',
       purchaseVendorId: '',
+      salesVendorId: '',
     })
   }
 
@@ -338,13 +339,13 @@ export default function MasterPartsPage() {
                   매입처
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                  매출처
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                   카테고리
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  기본 매입가
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  기본 매출가
+                  매입가
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">
                   관리
@@ -375,13 +376,13 @@ export default function MasterPartsPage() {
                     {part.purchaseVendor?.name || '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {part.salesVendor?.name || '-'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {part.category?.nameKo || '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
                     {part.defaultPurchasePrice ? formatCurrency(part.defaultPurchasePrice) : '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                    {part.defaultSalesPrice ? formatCurrency(part.defaultSalesPrice) : '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
                     <button
@@ -401,7 +402,7 @@ export default function MasterPartsPage() {
               ))}
               {parts.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={8} className="px-6 py-4 text-center text-gray-500">
                     등록된 부품이 없습니다.
                   </td>
                 </tr>
@@ -442,6 +443,28 @@ export default function MasterPartsPage() {
                 </div>
 
                 <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    매출 거래처
+                  </label>
+                  <select
+                    value={formData.salesVendorId}
+                    onChange={(e) => setFormData({ ...formData, salesVendorId: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                  >
+                    <option value="">선택하세요</option>
+                    {vendors
+                      .filter(v => v.type === 'DOMESTIC_SALES' || v.type === 'INTERNATIONAL_SALES')
+                      .map((vendor) => (
+                        <option key={vendor.id} value={vendor.id}>
+                          [{vendor.code}] {vendor.name}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">부품명 *</label>
                   <input
                     type="text"
@@ -451,9 +474,7 @@ export default function MasterPartsPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                   />
                 </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     부품코드 (선택)
@@ -465,6 +486,9 @@ export default function MasterPartsPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
                   />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     단위 *
@@ -498,31 +522,17 @@ export default function MasterPartsPage() {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    기본 매입가 (₩)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.defaultPurchasePrice}
-                    onChange={(e) => setFormData({ ...formData, defaultPurchasePrice: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    기본 매출가 (₩)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.defaultSalesPrice}
-                    onChange={(e) => setFormData({ ...formData, defaultSalesPrice: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                  />
-                </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  매입가 (₩)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={formData.defaultPurchasePrice}
+                  onChange={(e) => setFormData({ ...formData, defaultPurchasePrice: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                />
               </div>
 
               <div className="mb-4">

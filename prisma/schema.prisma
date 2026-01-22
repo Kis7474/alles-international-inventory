@@ -97,8 +97,15 @@ model Vendor {
   inventoryLots   InventoryLot[]
   
   // 재료/부품 매입처
-  materials       Material[]  @relation("MaterialPurchaseVendor")
-  parts           Part[]      @relation("PartPurchaseVendor")
+  materials           Material[]  @relation("MaterialPurchaseVendor")
+  parts               Part[]      @relation("PartPurchaseVendor")
+  
+  // 재료/부품 매출처
+  materialsSales      Material[]  @relation("MaterialSalesVendor")
+  partsSales          Part[]      @relation("PartSalesVendor")
+  
+  // 서비스 매출처
+  services            Service[]   @relation("ServiceSalesVendor")
   
   createdAt       DateTime              @default(now())
   updatedAt       DateTime              @updatedAt
@@ -152,6 +159,7 @@ model Category {
   importExports   ImportExport[]
   materials       Material[]
   parts           Part[]
+  services        Service[]   @relation("ServiceCategory")
   
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
@@ -440,8 +448,10 @@ model Material {
   purchaseVendorId      Int
   purchaseVendor        Vendor    @relation("MaterialPurchaseVendor", fields: [purchaseVendorId], references: [id])
   
+  salesVendorId         Int?
+  salesVendor           Vendor?   @relation("MaterialSalesVendor", fields: [salesVendorId], references: [id])
+  
   defaultPurchasePrice  Float?
-  defaultSalesPrice     Float?
   
   projectItems          ProjectItem[]
   
@@ -462,8 +472,10 @@ model Part {
   purchaseVendorId      Int
   purchaseVendor        Vendor    @relation("PartPurchaseVendor", fields: [purchaseVendorId], references: [id])
   
+  salesVendorId         Int?
+  salesVendor           Vendor?   @relation("PartSalesVendor", fields: [salesVendorId], references: [id])
+  
   defaultPurchasePrice  Float?
-  defaultSalesPrice     Float?
   
   projectItems          ProjectItem[]
   
@@ -478,9 +490,16 @@ model Service {
   name              String    // 서비스명
   description       String?
   
-  // 기본 단가 정보
-  hourlyRate        Float?    // 시간당 단가
-  defaultHours      Float?    // 기본 작업시간
+  // 서비스 시간 (optional)
+  serviceHours      Float?    // 서비스 시간
+  
+  // 매출처
+  salesVendorId     Int?
+  salesVendor       Vendor?   @relation("ServiceSalesVendor", fields: [salesVendorId], references: [id])
+  
+  // 카테고리
+  categoryId        Int?
+  category          Category? @relation("ServiceCategory", fields: [categoryId], references: [id])
   
   projectItems      ProjectItem[]
   
