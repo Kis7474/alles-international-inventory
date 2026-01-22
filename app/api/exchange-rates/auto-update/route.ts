@@ -47,7 +47,7 @@ function fetchWithSSLBypass(url: string, maxRedirects = 5): Promise<KoreaEximRat
       }
       
       // 에러 상태 코드 처리
-      if (!res.statusCode || res.statusCode < 200 || res.statusCode >= 300) {
+      if (!res.statusCode || res.statusCode < 200 || res.statusCode >= 400) {
         reject(new Error(`API 응답 오류: ${res.statusCode}`))
         return
       }
