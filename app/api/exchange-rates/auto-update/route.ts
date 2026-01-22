@@ -34,7 +34,15 @@ function fetchWithSSLBypass(url: string): Promise<KoreaEximRate[]> {
     const req = https.request(options, (res) => {
       let data = ''
       
-      res.on('data', (chunk) => {
+      // HTTP 상태 코드 검증
+      if (!res.statusCode || res.statusCode < 200 || res.statusCode >= 300) {
+        reject(new Error(`API 응답 오류: ${res.statusCode}`))
+        return
+      }
+      
+      res.setEncoding('utf8')
+      
+      res.on('data', (chunk: string) => {
         data += chunk
       })
       
