@@ -19,9 +19,14 @@ interface KoreaEximRate {
   kftc_bkpr: string
 }
 
-// HTTPS 요청을 Promise로 래핑하는 헬퍼 함수
-function fetchWithSSLBypass(url: string): Promise<KoreaEximRate[]> {
+// 리다이렉트를 처리하는 HTTPS 요청 함수
+function fetchWithSSLBypass(url: string, maxRedirects = 5): Promise<KoreaEximRate[]> {
   return new Promise((resolve, reject) => {
+    if (maxRedirects <= 0) {
+      reject(new Error('너무 많은 리다이렉트'))
+      return
+    }
+    
     const urlObj = new URL(url)
     
     const options = {
@@ -32,14 +37,22 @@ function fetchWithSSLBypass(url: string): Promise<KoreaEximRate[]> {
     }
     
     const req = https.request(options, (res) => {
-      let data = ''
+      // 리다이렉트 처리 (301, 302, 303, 307, 308)
+      if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        const redirectUrl = new URL(res.headers.location, url).toString()
+        fetchWithSSLBypass(redirectUrl, maxRedirects - 1)
+          .then(resolve)
+          .catch(reject)
+        return
+      }
       
-      // HTTP 상태 코드 검증
+      // 에러 상태 코드 처리
       if (!res.statusCode || res.statusCode < 200 || res.statusCode >= 300) {
         reject(new Error(`API 응답 오류: ${res.statusCode}`))
         return
       }
       
+      let data = ''
       res.setEncoding('utf8')
       
       res.on('data', (chunk: string) => {
