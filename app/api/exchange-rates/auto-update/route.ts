@@ -19,6 +19,43 @@ interface KoreaEximRate {
   kftc_bkpr: string
 }
 
+// HTTPS 요청을 Promise로 래핑하는 헬퍼 함수
+function fetchWithSSLBypass(url: string): Promise<KoreaEximRate[]> {
+  return new Promise((resolve, reject) => {
+    const urlObj = new URL(url)
+    
+    const options = {
+      hostname: urlObj.hostname,
+      path: urlObj.pathname + urlObj.search,
+      method: 'GET',
+      rejectUnauthorized: false, // SSL 검증 우회
+    }
+    
+    const req = https.request(options, (res) => {
+      let data = ''
+      
+      res.on('data', (chunk) => {
+        data += chunk
+      })
+      
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(data)
+          resolve(parsed)
+        } catch {
+          reject(new Error('JSON 파싱 실패'))
+        }
+      })
+    })
+    
+    req.on('error', (e) => {
+      reject(e)
+    })
+    
+    req.end()
+  })
+}
+
 // POST /api/exchange-rates/auto-update - 환율 자동 업데이트
 export async function POST() {
   try {
@@ -48,29 +85,10 @@ export async function POST() {
     const today = new Date()
     const searchDate = today.toISOString().slice(0, 10).replace(/-/g, '')
     
-    // SSL 검증 우회를 위한 agent 생성
-    const httpsAgent = new https.Agent({
-      rejectUnauthorized: false
-    })
-    
     // 한국수출입은행 API 호출
-    const response = await fetch(
-      `${KOREAEXIM_API_URL}?authkey=${apiKey}&searchdate=${searchDate}&data=AP01`,
-      {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        // @ts-expect-error - Node.js fetch accepts agent option
-        agent: httpsAgent,
-      }
+    let data: KoreaEximRate[] = await fetchWithSSLBypass(
+      `${KOREAEXIM_API_URL}?authkey=${apiKey}&searchdate=${searchDate}&data=AP01`
     )
-    
-    if (!response.ok) {
-      throw new Error(`API 응답 오류: ${response.status}`)
-    }
-    
-    let data: KoreaEximRate[] = await response.json()
     
     // API 결과 확인 (결과가 없으면 전날 데이터 조회)
     if (!data || !Array.isArray(data) || data.length === 0 || (data[0]?.result === 4)) {
@@ -80,14 +98,9 @@ export async function POST() {
         pastDate.setDate(pastDate.getDate() - daysAgo)
         const pastDateStr = pastDate.toISOString().slice(0, 10).replace(/-/g, '')
         
-        const retryResponse = await fetch(
-          `${KOREAEXIM_API_URL}?authkey=${apiKey}&searchdate=${pastDateStr}&data=AP01`,
-          {
-            // @ts-expect-error - Node.js fetch accepts agent option
-            agent: httpsAgent,
-          }
+        const retryData = await fetchWithSSLBypass(
+          `${KOREAEXIM_API_URL}?authkey=${apiKey}&searchdate=${pastDateStr}&data=AP01`
         )
-        const retryData = await retryResponse.json()
         
         if (retryData && Array.isArray(retryData) && retryData.length > 0 && retryData[0]?.result !== 4) {
           data = retryData
