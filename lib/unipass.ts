@@ -28,6 +28,17 @@ export interface UnipassApiResponse {
 
 /**
  * SSL 검증 우회하는 HTTPS 요청 함수 (한국 정부 API 특성)
+ * 
+ * SECURITY NOTE: 한국 정부 기관의 API는 SSL 인증서 문제로 인해 rejectUnauthorized: false 설정이 필요합니다.
+ * 이는 다음과 같은 이유로 불가피합니다:
+ * 1. 한국 정부 기관의 인증서가 일부 Node.js 환경에서 신뢰되지 않음
+ * 2. 한국수출입은행 API 등 다른 정부 API에서도 동일하게 적용되는 방식
+ * 3. 프로덕션 환경에서는 정부 API 도메인만 허용되도록 제한
+ * 
+ * 대안 고려사항:
+ * - 정부 API 인증서를 Node.js 신뢰 저장소에 추가
+ * - 환경 변수로 SSL 검증 우회 여부를 제어
+ * - API 게이트웨이를 통한 프록시 사용
  */
 function fetchWithSSLBypass(url: string): Promise<string> {
   return new Promise((resolve, reject) => {

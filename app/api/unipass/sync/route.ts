@@ -56,6 +56,7 @@ export async function POST(request: NextRequest) {
     }
     
     // 수입내역 생성
+    // TODO: 실제 운영 시에는 통화와 환율을 설정에서 가져오거나 환율 API에서 조회 필요
     const importRecord = await prisma.importExport.create({
       data: {
         date: clearance.clearanceDate || clearance.arrivalDate || new Date(),
