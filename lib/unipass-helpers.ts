@@ -27,6 +27,7 @@ export async function getUnipassSettings(): Promise<UnipassSettings | null> {
 
 /**
  * 등록 방식에 따라 올바른 API 키 반환
+ * Note: DECLARATION 타입은 더 이상 사용되지 않지만 하위 호환성을 위해 유지
  */
 export function getApiKeyForRegistrationType(
   settings: UnipassSettings,
@@ -34,9 +35,8 @@ export function getApiKeyForRegistrationType(
 ): string | null {
   if (registrationType === 'BL') {
     return settings.apiKeyCargoProgress || null
-  } else if (registrationType === 'DECLARATION') {
-    return settings.apiKeyImportDeclaration || null
   }
+  // DECLARATION은 더 이상 지원하지 않음
   return null
 }
 

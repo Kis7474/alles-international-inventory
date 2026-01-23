@@ -40,12 +40,10 @@ export default function CustomsTrackingPage() {
   const [statusFilter, setStatusFilter] = useState('')
   
   const [showForm, setShowForm] = useState(false)
-  const [registrationType, setRegistrationType] = useState<'BL' | 'DECLARATION'>('BL')
   const [formData, setFormData] = useState({
     blType: 'MBL' as 'MBL' | 'HBL',
     blNumber: '',
     blYear: new Date().getFullYear().toString(),
-    declarationNumber: '',
   })
 
   // 상세보기 모달 상태
@@ -65,7 +63,7 @@ export default function CustomsTrackingPage() {
       setTrackings(data)
     } catch (error) {
       console.error('Failed to fetch trackings:', error)
-      alert('통관 추적 정보 조회 중 오류가 발생했습니다.')
+      alert('통관 내역 조회 중 오류가 발생했습니다.')
     } finally {
       setLoading(false)
     }
@@ -78,16 +76,9 @@ export default function CustomsTrackingPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (registrationType === 'BL') {
-      if (!formData.blNumber || !formData.blYear) {
-        alert('BL번호와 입항년도를 입력해주세요.')
-        return
-      }
-    } else {
-      if (!formData.declarationNumber) {
-        alert('수입신고번호를 입력해주세요.')
-        return
-      }
+    if (!formData.blNumber || !formData.blYear) {
+      alert('BL번호와 입항년도를 입력해주세요.')
+      return
     }
 
     try {
@@ -96,7 +87,7 @@ export default function CustomsTrackingPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          registrationType,
+          registrationType: 'BL',
           ...formData,
         }),
       })
@@ -114,7 +105,6 @@ export default function CustomsTrackingPage() {
         blType: 'MBL',
         blNumber: '',
         blYear: new Date().getFullYear().toString(),
-        declarationNumber: '',
       })
       await fetchTrackings()
     } catch (error) {
@@ -270,10 +260,12 @@ export default function CustomsTrackingPage() {
     
     const statusMap: { [key: string]: { bg: string; text: string } } = {
       입항: { bg: 'bg-blue-100', text: 'text-blue-800' },
-      검사중: { bg: 'bg-yellow-100', text: 'text-yellow-800' },
+      반입: { bg: 'bg-yellow-100', text: 'text-yellow-800' },
+      검사중: { bg: 'bg-orange-100', text: 'text-orange-800' },
       심사중: { bg: 'bg-orange-100', text: 'text-orange-800' },
-      통관완료: { bg: 'bg-green-100', text: 'text-green-800' },
+      반출완료: { bg: 'bg-green-100', text: 'text-green-800' },
       수입신고수리: { bg: 'bg-green-100', text: 'text-green-800' },
+      통관완료: { bg: 'bg-green-100', text: 'text-green-800' },
     }
 
     const style = statusMap[status] || { bg: 'bg-gray-100', text: 'text-gray-800' }
@@ -287,8 +279,8 @@ export default function CustomsTrackingPage() {
   // 통계 계산
   const stats = {
     total: trackings.length,
-    inProgress: trackings.filter((t) => t.status && t.status !== '통관완료' && t.status !== '수입신고수리').length,
-    completed: trackings.filter((t) => t.status === '통관완료' || t.status === '수입신고수리').length,
+    inProgress: trackings.filter((t) => !isCustomsCleared(t.status)).length,
+    completed: trackings.filter((t) => isCustomsCleared(t.status)).length,
     linked: trackings.filter((t) => t.importId).length,
     totalTax: trackings.reduce((sum, t) => sum + (t.totalTax || 0), 0),
   }
@@ -296,52 +288,22 @@ export default function CustomsTrackingPage() {
   return (
     <div className="max-w-7xl">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">통관 추적</h1>
-        <p className="text-gray-600 mt-2">유니패스 API를 통한 통관 정보 추적 및 관리</p>
+        <h1 className="text-3xl font-bold text-gray-900">통관 내역</h1>
+        <p className="text-gray-600 mt-2">유니패스 API를 통한 BL번호 기반 통관 정보 조회 및 관리</p>
       </div>
 
       {/* 등록 폼 */}
       {showForm && (
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-lg font-semibold mb-4">통관 추적 등록</h2>
+          <h2 className="text-lg font-semibold mb-4">통관 내역 등록</h2>
           <form onSubmit={handleSubmit}>
-            {/* 등록 방식 선택 */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                등록 방식
-              </label>
-              <div className="flex gap-4">
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    value="BL"
-                    checked={registrationType === 'BL'}
-                    onChange={(e) => setRegistrationType(e.target.value as 'BL')}
-                    className="mr-2"
-                  />
-                  BL번호
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    value="DECLARATION"
-                    checked={registrationType === 'DECLARATION'}
-                    onChange={(e) => setRegistrationType(e.target.value as 'DECLARATION')}
-                    className="mr-2"
-                  />
-                  수입신고번호
-                </label>
-              </div>
-            </div>
-
             {/* BL번호 입력 */}
-            {registrationType === 'BL' && (
-              <>
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    BL 유형
-                  </label>
-                  <div className="flex gap-4">
+            <>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  BL 유형
+                </label>
+                <div className="flex gap-4">
                     <label className="flex items-center">
                       <input
                         type="radio"
@@ -397,24 +359,6 @@ export default function CustomsTrackingPage() {
                   </div>
                 </div>
               </>
-            )}
-
-            {/* 수입신고번호 입력 */}
-            {registrationType === 'DECLARATION' && (
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  수입신고번호
-                </label>
-                <input
-                  type="text"
-                  value={formData.declarationNumber}
-                  onChange={(e) => setFormData({ ...formData, declarationNumber: e.target.value })}
-                  placeholder="예: 12345-26-1234567"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                />
-              </div>
-            )}
 
             <div className="flex gap-2">
               <button

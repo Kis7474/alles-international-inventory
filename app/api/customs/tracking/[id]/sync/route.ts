@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getCargoProgress, verifyImportDeclaration, parseUnipassDate } from '@/lib/unipass'
+import { getCargoProgress, parseUnipassDate } from '@/lib/unipass'
 import { getUnipassSettings, getApiKeyForRegistrationType } from '@/lib/unipass-helpers'
+import { isCustomsCleared } from '@/lib/utils'
 
 interface UpdateDataInput {
   lastSyncAt: Date
@@ -9,6 +10,8 @@ interface UpdateDataInput {
   status?: string
   productName?: string | null
   weight?: number | null
+  packageCount?: number | null
+  packageUnit?: string | null
   arrivalDate?: Date | null
   declarationDate?: Date | null
   clearanceDate?: Date | null
@@ -45,52 +48,33 @@ export async function POST(
     }
     
     // 등록 방식에 따라 다른 API 키 사용
-    const apiKey = getApiKeyForRegistrationType(settings, tracking.registrationType)
+    const apiKey = getApiKeyForRegistrationType(settings, 'BL')
     if (!apiKey) {
-      const keyName = tracking.registrationType === 'BL' 
-        ? '화물통관진행정보조회' 
-        : '수입신고필증검증'
       return NextResponse.json(
-        { error: `${keyName} API 키가 설정되지 않았습니다.` },
+        { error: '화물통관진행정보조회 API 키가 설정되지 않았습니다.' },
+        { status: 400 }
+      )
+    }
+    
+    // BL 정보 확인
+    if (!tracking.blType || !tracking.blNumber || !tracking.blYear) {
+      return NextResponse.json(
+        { error: 'BL 정보가 올바르지 않습니다.' },
         { status: 400 }
       )
     }
     
     // 등록 방식에 따라 API 호출
-    let apiResult
     let updateData: UpdateDataInput = {
       lastSyncAt: new Date(),
       syncCount: tracking.syncCount + 1,
     }
     
-    if (tracking.registrationType === 'BL') {
-      if (!tracking.blType || !tracking.blNumber || !tracking.blYear) {
-        return NextResponse.json(
-          { error: 'BL 정보가 올바르지 않습니다.' },
-          { status: 400 }
-        )
-      }
-      
-      apiResult = await getCargoProgress(apiKey, {
-        blType: tracking.blType as 'MBL' | 'HBL',
-        blNumber: tracking.blNumber,
-        blYear: tracking.blYear,
-      })
-    } else if (tracking.registrationType === 'DECLARATION') {
-      if (!tracking.declarationNumber) {
-        return NextResponse.json(
-          { error: '수입신고번호가 올바르지 않습니다.' },
-          { status: 400 }
-        )
-      }
-      
-      apiResult = await verifyImportDeclaration(apiKey, tracking.declarationNumber)
-    } else {
-      return NextResponse.json(
-        { error: '올바른 등록 방식이 아닙니다.' },
-        { status: 400 }
-      )
-    }
+    const apiResult = await getCargoProgress(apiKey, {
+      blType: tracking.blType as 'MBL' | 'HBL',
+      blNumber: tracking.blNumber,
+      blYear: tracking.blYear,
+    })
     
     if (!apiResult.success) {
       return NextResponse.json(
@@ -114,6 +98,8 @@ export async function POST(
       status: data.prgsStts,
       productName: data.prnm,
       weight: data.ttwg ? parseFloat(data.ttwg) : null,
+      packageCount: data.pckGcnt ? parseInt(data.pckGcnt) : null,
+      packageUnit: data.pckUt || null,
       arrivalDate: data.etprDt ? parseUnipassDate(data.etprDt) : null,
       declarationDate: data.dclrDt ? parseUnipassDate(data.dclrDt) : null,
       clearanceDate: data.tkofDt ? parseUnipassDate(data.tkofDt) : null,
@@ -129,7 +115,7 @@ export async function POST(
     })
     
     // 통관완료 상태이고 아직 연동되지 않았으면 자동 연동
-    if ((updateData.status === '통관완료' || updateData.status === '수입신고수리') && !tracking.importId) {
+    if (isCustomsCleared(updateData.status) && !tracking.importId) {
       await autoLinkToImport(params.id)
     }
     
@@ -166,11 +152,7 @@ async function autoLinkToImport(trackingId: string) {
     }
     
     // 통관완료 상태 체크
-    const isCleared = tracking.status === '통관완료' || 
-                      tracking.status === '수입신고수리' ||
-                      tracking.status === '반출완료'
-    
-    if (!isCleared) {
+    if (!isCustomsCleared(tracking.status)) {
       console.log('Not cleared yet:', tracking.status)
       return
     }
@@ -192,20 +174,51 @@ async function autoLinkToImport(trackingId: string) {
       return
     }
     
-    // 수입내역 생성
+    // rawData에서 추가 정보 파싱
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let parsedData: Record<string, any> | null = null
+    try {
+      if (tracking.rawData) {
+        parsedData = JSON.parse(tracking.rawData)
+      }
+    } catch (e) {
+      console.error('Failed to parse rawData:', e)
+    }
+    
+    // 메모에 상세 정보 기록
+    const blType = tracking.blType === 'MBL' ? 'Master B/L' : 'House B/L'
+    const loadingPortName = parsedData?.ldprNm || '-'
+    const loadingCountryCode = parsedData?.lodCntyCd || '-'
+    const weightUnit = parsedData?.wghtUt || 'KG'
+    
+    const memo = `[유니패스 연동 정보]
+━━━━━━━━━━━━━━━━━━━━
+BL번호: ${tracking.blNumber || '-'} (${blType})
+화물관리번호: ${tracking.cargoNumber || '-'}
+품명: ${tracking.productName || '-'}
+중량: ${tracking.weight || '-'}${weightUnit}
+포장: ${tracking.packageCount || '-'}${tracking.packageUnit || ''}
+입항일: ${tracking.arrivalDate ? new Date(tracking.arrivalDate).toISOString().split('T')[0] : '-'}
+반출일: ${tracking.clearanceDate ? new Date(tracking.clearanceDate).toISOString().split('T')[0] : '-'}
+통관상태: ${tracking.status || '-'}
+세액: ${tracking.totalTax ? `${tracking.totalTax.toLocaleString('ko-KR')}원` : '-'}
+━━━━━━━━━━━━━━━━━━━━
+적재항(출발지): ${loadingPortName}
+적출국가: ${loadingCountryCode}
+━━━━━━━━━━━━━━━━━━━━
+* 위 정보를 참고하여 상세 내역을 입력해주세요.`
+    
+    // 수입내역 생성 - 최소 정보만 채움
     const importRecord = await prisma.importExport.create({
       data: {
         type: 'IMPORT',
         date: tracking.clearanceDate || tracking.arrivalDate || new Date(),
         vendorId: vendor.id,
         currency: 'USD',
-        exchangeRate: 1300, // TODO: 실제 환율 적용
-        foreignAmount: 0,
-        krwAmount: tracking.totalTax || 0,
-        dutyAmount: tracking.customsDuty || 0,
-        vatAmount: tracking.vat || 0,
-        totalAmount: tracking.totalTax || 0,
-        memo: `[유니패스 자동연동] ${tracking.productName || ''} / BL: ${tracking.blNumber || ''} / 신고번호: ${tracking.declarationNumber || ''}`,
+        exchangeRate: 1300, // 기본값 - 사용자가 수정 필요
+        foreignAmount: 0, // 사용자가 직접 입력
+        krwAmount: 0, // 사용자가 직접 입력
+        memo,
       },
     })
     
