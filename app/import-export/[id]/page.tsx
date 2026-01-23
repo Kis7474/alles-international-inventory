@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { formatCurrency } from '@/lib/utils'
 import ProductRegistrationModal from '@/components/ProductRegistrationModal'
@@ -88,6 +88,15 @@ export default function ImportExportEditPage() {
   const router = useRouter()
   const params = useParams()
   const id = params.id as string
+  
+  // Validate ID parameter
+  useEffect(() => {
+    if (!id || isNaN(parseInt(id))) {
+      alert('잘못된 접근입니다.')
+      router.push('/import-export')
+    }
+  }, [id, router])
+  
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   
@@ -147,6 +156,14 @@ export default function ImportExportEditPage() {
     vatAmount: 0,
     totalAmount: 0,
   })
+  
+  // Memoize the total foreign amount calculation
+  const totalForeignAmount = useMemo(() => {
+    return items.reduce((sum, item) => {
+      const amount = (parseFloat(item.quantity) || 0) * (parseFloat(item.unitPrice) || 0)
+      return sum + amount
+    }, 0)
+  }, [items])
 
   useEffect(() => {
     fetchMasterData()
@@ -261,6 +278,12 @@ export default function ImportExportEditPage() {
     
     try {
       const res = await fetch(`/api/exchange-rates?currency=${currency}&date=${date}`)
+      
+      if (!res.ok) {
+        console.warn(`환율 조회 실패: ${res.status}`)
+        return
+      }
+      
       const rates = await res.json()
       
       if (rates && rates.length > 0) {
@@ -698,16 +721,18 @@ export default function ImportExportEditPage() {
                   {items.map((item, index) => {
                     const product = products.find(p => p.id === parseInt(item.productId))
                     const amount = (parseFloat(item.quantity) || 0) * (parseFloat(item.unitPrice) || 0)
+                    const qty = parseFloat(item.quantity) || 0
+                    const price = parseFloat(item.unitPrice) || 0
                     return (
                       <tr key={index} className="border-b">
                         <td className="px-4 py-2 text-sm text-gray-900">
                           {product ? `[${product.code}] ${product.name}` : '-'}
                         </td>
                         <td className="px-4 py-2 text-sm text-gray-900 text-right">
-                          {parseFloat(item.quantity).toLocaleString()}
+                          {qty.toLocaleString()}
                         </td>
                         <td className="px-4 py-2 text-sm text-gray-900 text-right">
-                          {parseFloat(item.unitPrice).toLocaleString()}
+                          {price.toLocaleString()}
                         </td>
                         <td className="px-4 py-2 text-sm text-gray-900 text-right font-semibold">
                           {amount.toLocaleString()}
@@ -729,10 +754,7 @@ export default function ImportExportEditPage() {
                       총 외화 금액:
                     </td>
                     <td className="px-4 py-2 text-sm text-gray-900 text-right">
-                      {items.reduce((sum, item) => {
-                        const amount = (parseFloat(item.quantity) || 0) * (parseFloat(item.unitPrice) || 0)
-                        return sum + amount
-                      }, 0).toLocaleString()} {formData.currency}
+                      {totalForeignAmount.toLocaleString()} {formData.currency}
                     </td>
                     <td></td>
                   </tr>
@@ -848,10 +870,7 @@ export default function ImportExportEditPage() {
               <input
                 type="number"
                 name="foreignAmount"
-                value={items.length > 0 ? items.reduce((sum, item) => {
-                  const amount = (parseFloat(item.quantity) || 0) * (parseFloat(item.unitPrice) || 0)
-                  return sum + amount
-                }, 0) : formData.foreignAmount}
+                value={items.length > 0 ? totalForeignAmount : formData.foreignAmount}
                 onChange={handleChange}
                 required={items.length === 0}
                 step="0.01"
