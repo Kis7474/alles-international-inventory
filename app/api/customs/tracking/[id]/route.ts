@@ -50,3 +50,31 @@ export async function DELETE(
     )
   }
 }
+
+// PATCH /api/customs/tracking/[id] - 메모 업데이트
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const body = await request.json()
+    const { memo } = body
+    
+    const tracking = await prisma.customsTracking.update({
+      where: { id: params.id },
+      data: { memo },
+    })
+    
+    return NextResponse.json({
+      success: true,
+      message: '메모가 저장되었습니다.',
+      tracking,
+    })
+  } catch (error) {
+    console.error('Error updating customs tracking:', error)
+    return NextResponse.json(
+      { error: '메모 저장 중 오류가 발생했습니다.' },
+      { status: 500 }
+    )
+  }
+}

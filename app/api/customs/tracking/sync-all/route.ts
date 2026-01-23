@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
         })
         
         // 통관완료 상태이고 아직 연동되지 않았으면 자동 연동
-        if ((data.prgsStts === '통관완료' || data.prgsStts === '수입신고수리') && !tracking.importId) {
+        if ((data.prgsStts === '통관완료' || data.prgsStts === '수입신고수리' || data.prgsStts === '반출완료') && !tracking.importId) {
           await autoLinkToImport(tracking.id)
         }
         
@@ -126,7 +126,24 @@ async function autoLinkToImport(trackingId: string) {
       where: { id: trackingId },
     })
     
-    if (!tracking || tracking.importId) {
+    if (!tracking) {
+      console.error('Tracking not found:', trackingId)
+      return
+    }
+    
+    // 이미 연동되었으면 스킵
+    if (tracking.importId) {
+      console.log('Already linked:', trackingId)
+      return
+    }
+    
+    // 통관완료 상태 체크
+    const isCleared = tracking.status === '통관완료' || 
+                      tracking.status === '수입신고수리' ||
+                      tracking.status === '반출완료'
+    
+    if (!isCleared) {
+      console.log('Not cleared yet:', tracking.status)
       return
     }
     
@@ -136,7 +153,6 @@ async function autoLinkToImport(trackingId: string) {
       orderBy: { id: 'asc' },
     })
     
-    // 없으면 아무 거래처나 사용
     if (!vendor) {
       vendor = await prisma.vendor.findFirst({
         orderBy: { id: 'asc' },
@@ -161,9 +177,11 @@ async function autoLinkToImport(trackingId: string) {
         dutyAmount: tracking.customsDuty || 0,
         vatAmount: tracking.vat || 0,
         totalAmount: tracking.totalTax || 0,
-        memo: `[유니패스 자동연동] ${tracking.productName || ''}`,
+        memo: `[유니패스 자동연동] ${tracking.productName || ''} / BL: ${tracking.blNumber || ''} / 신고번호: ${tracking.declarationNumber || ''}`,
       },
     })
+    
+    console.log('Import record created:', importRecord.id)
     
     // 추적 데이터에 연동 ID 저장
     await prisma.customsTracking.update({
@@ -173,6 +191,8 @@ async function autoLinkToImport(trackingId: string) {
         linkedAt: new Date(),
       },
     })
+    
+    console.log('Tracking linked to import:', trackingId, '->', importRecord.id)
   } catch (error) {
     console.error('Error auto-linking to import:', error)
   }
