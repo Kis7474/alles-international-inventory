@@ -192,6 +192,10 @@ async function autoLinkToImport(trackingId: string) {
         foreignAmount: 0, // 사용자가 직접 입력
         krwAmount: 0, // 사용자가 직접 입력
         memo,
+        // PDF 정보 연동
+        pdfFileName: tracking.pdfFileName,
+        pdfFilePath: tracking.pdfFilePath,
+        pdfUploadedAt: tracking.pdfUploadedAt,
       },
     })
     
