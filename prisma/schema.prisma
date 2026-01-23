@@ -645,6 +645,9 @@ model CustomsTracking {
   lastSyncAt      DateTime? // 마지막 동기화 시간
   syncCount       Int      @default(0) // 동기화 횟수
   
+  // 메모
+  memo            String?  // 사용자 메모
+  
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   

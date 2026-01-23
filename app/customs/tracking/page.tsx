@@ -16,6 +16,8 @@ interface CustomsTracking {
   productName: string | null
   quantity: number | null
   weight: number | null
+  packageCount: number | null
+  packageUnit: string | null
   arrivalDate: string | null
   declarationDate: string | null
   clearanceDate: string | null
@@ -26,6 +28,7 @@ interface CustomsTracking {
   linkedAt: string | null
   lastSyncAt: string | null
   syncCount: number
+  memo: string | null
   createdAt: string
   updatedAt: string
 }
@@ -44,6 +47,12 @@ export default function CustomsTrackingPage() {
     blYear: new Date().getFullYear().toString(),
     declarationNumber: '',
   })
+
+  // 상세보기 모달 상태
+  const [selectedTracking, setSelectedTracking] = useState<CustomsTracking | null>(null)
+  const [showDetailModal, setShowDetailModal] = useState(false)
+  const [memo, setMemo] = useState('')
+  const [savingMemo, setSavingMemo] = useState(false)
 
   const fetchTrackings = useCallback(async () => {
     try {
@@ -185,6 +194,43 @@ export default function CustomsTrackingPage() {
     } catch (error) {
       console.error('Delete failed:', error)
       alert('삭제 중 오류가 발생했습니다.')
+    }
+  }
+
+  // 상세보기 열기
+  const handleViewDetail = (tracking: CustomsTracking) => {
+    setSelectedTracking(tracking)
+    setMemo(tracking.memo || '')
+    setShowDetailModal(true)
+  }
+
+  // 메모 저장
+  const handleSaveMemo = async () => {
+    if (!selectedTracking) return
+    
+    try {
+      setSavingMemo(true)
+      const res = await fetch(`/api/customs/tracking/${selectedTracking.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ memo }),
+      })
+      
+      if (!res.ok) {
+        alert('메모 저장에 실패했습니다.')
+        return
+      }
+      
+      alert('메모가 저장되었습니다.')
+      await fetchTrackings()
+      
+      // 모달 내 데이터 업데이트
+      setSelectedTracking({ ...selectedTracking, memo })
+    } catch (error) {
+      console.error('Failed to save memo:', error)
+      alert('메모 저장 중 오류가 발생했습니다.')
+    } finally {
+      setSavingMemo(false)
     }
   }
 
@@ -555,6 +601,13 @@ export default function CustomsTrackingPage() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <div className="flex gap-2">
                         <button
+                          onClick={() => handleViewDetail(tracking)}
+                          className="text-gray-600 hover:text-gray-800"
+                          title="상세보기"
+                        >
+                          👁️
+                        </button>
+                        <button
                           onClick={() => handleSync(tracking.id)}
                           className="text-blue-600 hover:text-blue-800"
                           title="동기화"
@@ -588,6 +641,164 @@ export default function CustomsTrackingPage() {
           </div>
         )}
       </div>
+
+      {/* 상세보기 모달 */}
+      {showDetailModal && selectedTracking && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold">통관 상세 정보</h2>
+                <button
+                  onClick={() => setShowDetailModal(false)}
+                  className="text-gray-500 hover:text-gray-700 text-2xl"
+                >
+                  ×
+                </button>
+              </div>
+              
+              {/* 기본 정보 */}
+              <div className="mb-6">
+                <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
+                  <span className="mr-2">■</span> 기본 정보
+                </h3>
+                <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <span className="text-gray-600">등록방식</span>
+                    <span className="font-medium">{selectedTracking.registrationType === 'BL' ? 'BL번호' : '수입신고번호'}</span>
+                  </div>
+                  {selectedTracking.registrationType === 'BL' ? (
+                    <>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <span className="text-gray-600">BL번호</span>
+                        <span className="font-medium">{selectedTracking.blNumber} ({selectedTracking.blType})</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <span className="text-gray-600">입항년도</span>
+                        <span className="font-medium">{selectedTracking.blYear}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <span className="text-gray-600">수입신고번호</span>
+                      <span className="font-medium">{selectedTracking.declarationNumber}</span>
+                    </div>
+                  )}
+                  {selectedTracking.cargoNumber && (
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <span className="text-gray-600">화물관리번호</span>
+                      <span className="font-medium">{selectedTracking.cargoNumber}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* 화물 정보 */}
+              <div className="mb-6">
+                <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
+                  <span className="mr-2">■</span> 화물 정보
+                </h3>
+                <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <span className="text-gray-600">품명</span>
+                    <span className="font-medium">{selectedTracking.productName || '-'}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <span className="text-gray-600">중량</span>
+                    <span className="font-medium">{selectedTracking.weight ? `${selectedTracking.weight.toLocaleString()} kg` : '-'}</span>
+                  </div>
+                  {selectedTracking.packageCount && (
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <span className="text-gray-600">포장</span>
+                      <span className="font-medium">{selectedTracking.packageCount} {selectedTracking.packageUnit || ''}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* 통관 정보 */}
+              <div className="mb-6">
+                <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
+                  <span className="mr-2">■</span> 통관 정보
+                </h3>
+                <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <span className="text-gray-600">진행상태</span>
+                    <span className="font-medium">{selectedTracking.status || '-'}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <span className="text-gray-600">입항일</span>
+                    <span className="font-medium">
+                      {selectedTracking.arrivalDate 
+                        ? new Date(selectedTracking.arrivalDate).toLocaleDateString('ko-KR') 
+                        : '-'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <span className="text-gray-600">통관일</span>
+                    <span className="font-medium">
+                      {selectedTracking.clearanceDate 
+                        ? new Date(selectedTracking.clearanceDate).toLocaleDateString('ko-KR') 
+                        : '-'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <span className="text-gray-600">관세</span>
+                    <span className="font-medium">
+                      {selectedTracking.customsDuty ? `₩${selectedTracking.customsDuty.toLocaleString()}` : '-'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <span className="text-gray-600">총 세금</span>
+                    <span className="font-medium">
+                      {selectedTracking.totalTax ? `₩${selectedTracking.totalTax.toLocaleString()}` : '-'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <span className="text-gray-600">수입연동</span>
+                    <span className="font-medium">
+                      {selectedTracking.importId 
+                        ? <span className="text-green-600">✅ 연동됨 (#{selectedTracking.importId})</span>
+                        : <span className="text-gray-400">미연동</span>}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* 메모 */}
+              <div className="mb-6">
+                <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
+                  <span className="mr-2">■</span> 메모
+                </h3>
+                <textarea
+                  value={memo}
+                  onChange={(e) => setMemo(e.target.value)}
+                  placeholder="메모를 입력하세요..."
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  rows={4}
+                />
+              </div>
+              
+              {/* 버튼 */}
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={handleSaveMemo}
+                  disabled={savingMemo}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed transition-colors"
+                >
+                  {savingMemo ? '저장 중...' : '메모 저장'}
+                </button>
+                <button
+                  onClick={() => setShowDetailModal(false)}
+                  className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                >
+                  닫기
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

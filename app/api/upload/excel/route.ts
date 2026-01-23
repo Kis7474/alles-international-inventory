@@ -115,12 +115,12 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
         // Branch based on category
         if (categoryName === 'Service' || categoryName === '서비스') {
           // Create/update Service entry
-          await handleServiceEntry(row, summary, options)
+          await handleServiceEntry(row as unknown as ExcelRow, summary, options)
           summary.successRows++
           continue
         } else if (categoryName === 'Project' || categoryName === '프로젝트') {
           // Create/update Project entry
-          await handleProjectEntry(row, summary, options)
+          await handleProjectEntry(row as unknown as ExcelRow, summary, options)
           summary.successRows++
           continue
         }
@@ -489,7 +489,7 @@ async function handlePriceMatrixUpload(file: File, options: UploadOptions) {
 /**
  * Handle Service category entry
  */
-async function handleServiceEntry(row: ExcelRow, summary: UploadSummary) {
+async function handleServiceEntry(row: ExcelRow, summary: UploadSummary, options: UploadOptions) {
   // Find or create sales vendor
   let salesVendor = null
   if (row.salesVendorName) {
@@ -505,7 +505,9 @@ async function handleServiceEntry(row: ExcelRow, summary: UploadSummary) {
   let category = null
   if (row.category) {
     category = await findOrCreateCategory(row.category, options.createCategories || false)
-    if (category?.isNew) summary.categoriesCreated++
+    if (category?.isNew) {
+      summary.categoriesCreated = (summary.categoriesCreated || 0) + 1
+    }
   }
   
   // Find or create service
@@ -518,7 +520,7 @@ async function handleServiceEntry(row: ExcelRow, summary: UploadSummary) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updateData: any = {}
     
-    if (row.serviceHours && row.serviceHours > 0) {
+    if (row.serviceHours && typeof row.serviceHours === 'number' && row.serviceHours > 0) {
       updateData.serviceHours = row.serviceHours
     }
     if (salesVendor) {
@@ -543,9 +545,9 @@ async function handleServiceEntry(row: ExcelRow, summary: UploadSummary) {
     await prisma.service.create({
       data: {
         code,
-        name: row.productName,
+        name: row.productName || 'Unknown Service',
         description: row.description || null,
-        serviceHours: row.serviceHours && row.serviceHours > 0 ? row.serviceHours : null,
+        serviceHours: row.serviceHours && typeof row.serviceHours === 'number' && row.serviceHours > 0 ? row.serviceHours : null,
         salesVendorId: salesVendor?.data.id || null,
         categoryId: category?.data.id || null,
       }
@@ -557,7 +559,8 @@ async function handleServiceEntry(row: ExcelRow, summary: UploadSummary) {
 /**
  * Handle Project category entry
  */
-async function handleProjectEntry(row: ExcelRow, summary: UploadSummary) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function handleProjectEntry(row: ExcelRow, summary: UploadSummary, options: UploadOptions) {
   // Find or create project
   const existingProject = await prisma.project.findFirst({
     where: { name: row.productName }
@@ -570,8 +573,8 @@ async function handleProjectEntry(row: ExcelRow, summary: UploadSummary) {
     if (row.salesVendorName) {
       updateData.customer = row.salesVendorName
     }
-    if (row.unitPrice && row.unitPrice > 0) {
-      updateData.salesPrice = row.unitPrice * (row.quantity || 1)
+    if (row.unitPrice && typeof row.unitPrice === 'number' && row.unitPrice > 0) {
+      updateData.salesPrice = row.unitPrice * ((typeof row.quantity === 'number' ? row.quantity : 0) || 1)
     }
     if (row.description) {
       updateData.memo = row.description
@@ -586,13 +589,15 @@ async function handleProjectEntry(row: ExcelRow, summary: UploadSummary) {
   } else {
     // Create new project
     const code = `PRJ-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`
-    const startDate = row.date ? new Date(row.date) : new Date()
-    const salesPrice = (row.unitPrice || 0) * (row.quantity || 1)
+    const startDate = row.date && typeof row.date === 'string' ? new Date(row.date) : new Date()
+    const unitPrice = typeof row.unitPrice === 'number' ? row.unitPrice : 0
+    const quantity = typeof row.quantity === 'number' ? row.quantity : 1
+    const salesPrice = unitPrice * quantity
     
     await prisma.project.create({
       data: {
         code,
-        name: row.productName,
+        name: row.productName || 'Unknown Project',
         customer: row.salesVendorName || null,
         startDate: startDate,
         status: 'IN_PROGRESS',

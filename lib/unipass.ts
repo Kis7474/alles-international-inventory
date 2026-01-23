@@ -41,6 +41,15 @@ export interface UnipassApiResponse {
   isMultiple?: boolean  // 다건 응답 플래그
 }
 
+// Type for API response structure
+interface UnipassRawResponse {
+  ntceInfo?: {
+    ntceCn?: string
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [key: string]: any
+}
+
 /**
  * 유니패스 날짜 형식 (YYYYMMDD) 파싱
  * @param dateStr - 날짜 문자열 (예: "20260123")
@@ -170,7 +179,7 @@ export async function getCargoProgress(
     const parsed = await parseXml(xmlData)
     
     // XML 구조 파싱
-    const response = parsed?.cargCsclPrgsInfoQryRtnVo
+    const response = parsed?.cargCsclPrgsInfoQryRtnVo as UnipassRawResponse
     
     if (!response) {
       return {
@@ -263,7 +272,7 @@ export async function getImportDeclaration(
     const parsed = await parseXml(xmlData)
     
     // XML 구조 파싱
-    const response = parsed?.cargCsclPrgsInfoQryRtnVo
+    const response = parsed?.cargCsclPrgsInfoQryRtnVo as UnipassRawResponse
     
     if (!response) {
       return {
@@ -325,7 +334,7 @@ export async function testConnection(apiKey: string): Promise<UnipassApiResponse
     const xmlData = await fetchWithSSLBypass(url)
     const parsed = await parseXml(xmlData)
     
-    const response = parsed?.cargCsclPrgsInfoQryRtnVo
+    const response = parsed?.cargCsclPrgsInfoQryRtnVo as UnipassRawResponse
     
     if (!response) {
       return {
@@ -377,7 +386,7 @@ export async function verifyImportDeclaration(
     const parsed = await parseXml(xmlData)
     
     // XML 구조 파싱
-    const response = parsed?.impCdslPaprVrfcQryRtnVo
+    const response = parsed?.impCdslPaprVrfcQryRtnVo as UnipassRawResponse
     
     if (!response) {
       return {
