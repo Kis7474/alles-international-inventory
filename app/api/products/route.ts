@@ -10,9 +10,11 @@ export async function GET(request: Request) {
     const searchName = searchParams.get('searchName')
     const salesVendorId = searchParams.get('salesVendorId')
     const includeCostInfo = searchParams.get('includeCostInfo') === 'true'
+    const type = searchParams.get('type') // 품목 타입 필터 추가
     
     interface WhereClause {
       categoryId?: number
+      type?: string | { in: string[] }
       OR?: Array<{
         name?: { contains: string }
         code?: { contains: string }
@@ -41,6 +43,15 @@ export async function GET(request: Request) {
         some: {
           vendorId: parseInt(salesVendorId),
         },
+      }
+    }
+    if (type) {
+      // 콤마로 구분된 타입들을 배열로 처리
+      const types = type.split(',').map(t => t.trim())
+      if (types.length === 1) {
+        where.type = types[0]
+      } else {
+        where.type = { in: types }
       }
     }
     
@@ -91,6 +102,7 @@ export async function POST(request: Request) {
       code,
       name,
       unit,
+      type,
       categoryId,
       description,
       defaultPurchasePrice,
@@ -104,13 +116,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '품목명은 필수입니다.' }, { status: 400 })
     }
     
-    if (!purchaseVendorId) {
-      return NextResponse.json({ error: '매입 거래처는 필수입니다.' }, { status: 400 })
-    }
-    
-    const parsedPurchaseVendorId = parseInt(purchaseVendorId)
-    if (isNaN(parsedPurchaseVendorId)) {
-      return NextResponse.json({ error: '유효하지 않은 매입 거래처입니다.' }, { status: 400 })
+    // purchaseVendorId는 이제 선택적
+    let parsedPurchaseVendorId: number | null = null
+    if (purchaseVendorId) {
+      parsedPurchaseVendorId = parseInt(purchaseVendorId)
+      if (isNaN(parsedPurchaseVendorId)) {
+        return NextResponse.json({ error: '유효하지 않은 매입 거래처입니다.' }, { status: 400 })
+      }
     }
     
     // Validate salesVendorIds if provided
@@ -127,6 +139,7 @@ export async function POST(request: Request) {
         code: code || null,
         name,
         unit: unit || 'EA',
+        type: type || 'PRODUCT', // 기본값 PRODUCT
         categoryId: categoryId ? parseInt(categoryId) : null,
         description,
         defaultPurchasePrice: defaultPurchasePrice ? parseFloat(defaultPurchasePrice) : null,
@@ -165,6 +178,7 @@ export async function PUT(request: Request) {
       code,
       name,
       unit,
+      type,
       categoryId,
       description,
       defaultPurchasePrice,
@@ -182,19 +196,19 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: '품목명은 필수입니다.' }, { status: 400 })
     }
     
-    if (!purchaseVendorId) {
-      return NextResponse.json({ error: '매입 거래처는 필수입니다.' }, { status: 400 })
-    }
-    
     const parsedId = parseInt(id)
-    const parsedPurchaseVendorId = parseInt(purchaseVendorId)
     
     if (isNaN(parsedId)) {
       return NextResponse.json({ error: '유효하지 않은 품목 ID입니다.' }, { status: 400 })
     }
     
-    if (isNaN(parsedPurchaseVendorId)) {
-      return NextResponse.json({ error: '유효하지 않은 매입 거래처입니다.' }, { status: 400 })
+    // purchaseVendorId는 이제 선택적
+    let parsedPurchaseVendorId: number | null = null
+    if (purchaseVendorId) {
+      parsedPurchaseVendorId = parseInt(purchaseVendorId)
+      if (isNaN(parsedPurchaseVendorId)) {
+        return NextResponse.json({ error: '유효하지 않은 매입 거래처입니다.' }, { status: 400 })
+      }
     }
     
     // Validate salesVendorIds if provided
@@ -217,6 +231,7 @@ export async function PUT(request: Request) {
         code: code || null,
         name,
         unit: unit || 'EA',
+        type: type || 'PRODUCT',
         categoryId: categoryId ? parseInt(categoryId) : null,
         description,
         defaultPurchasePrice: defaultPurchasePrice ? parseFloat(defaultPurchasePrice) : null,

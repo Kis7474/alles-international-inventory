@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-// GET /api/parts - 부품 목록 조회
+// GET /api/parts - 부품 목록 조회 (Product 테이블 사용, type=PART)
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
@@ -9,6 +9,7 @@ export async function GET(request: Request) {
     const searchName = searchParams.get('searchName')
     
     interface WhereClause {
+      type: string
       categoryId?: number
       OR?: Array<{
         name?: { contains: string }
@@ -16,7 +17,9 @@ export async function GET(request: Request) {
       }>
     }
     
-    const where: WhereClause = {}
+    const where: WhereClause = {
+      type: 'PART'
+    }
     
     if (categoryId) {
       where.categoryId = parseInt(categoryId)
@@ -28,24 +31,35 @@ export async function GET(request: Request) {
       ]
     }
     
-    const parts = await prisma.part.findMany({
+    const parts = await prisma.product.findMany({
       where,
       include: {
         category: true,
         purchaseVendor: true,
-        salesVendor: true,
+        salesVendors: {
+          include: {
+            vendor: true,
+          },
+        },
       },
       orderBy: { id: 'asc' },
     })
     
-    return NextResponse.json(parts)
+    // Transform to match Part interface for backward compatibility
+    const transformedParts = parts.map(product => ({
+      ...product,
+      salesVendor: product.salesVendors.length > 0 ? product.salesVendors[0].vendor : null,
+      salesVendorId: product.salesVendors.length > 0 ? product.salesVendors[0].vendorId : null,
+    }))
+    
+    return NextResponse.json(transformedParts)
   } catch (error) {
     console.error('Error fetching parts:', error)
     return NextResponse.json({ error: 'Failed to fetch parts' }, { status: 500 })
   }
 }
 
-// POST /api/parts - 부품 생성
+// POST /api/parts - 부품 생성 (Product 테이블 사용, type=PART)
 export async function POST(request: Request) {
   try {
     const body = await request.json()
@@ -64,36 +78,49 @@ export async function POST(request: Request) {
     if (!name) {
       return NextResponse.json({ error: '부품명을 입력해주세요.' }, { status: 400 })
     }
-    if (!purchaseVendorId) {
-      return NextResponse.json({ error: '매입처를 선택해주세요.' }, { status: 400 })
-    }
 
-    const part = await prisma.part.create({
+    const part = await prisma.product.create({
       data: {
         code,
         name,
         unit: unit || 'EA',
+        type: 'PART',
         categoryId: categoryId ? parseInt(categoryId) : null,
         description,
         defaultPurchasePrice: defaultPurchasePrice ? parseFloat(defaultPurchasePrice) : null,
-        purchaseVendorId: parseInt(purchaseVendorId),
-        salesVendorId: salesVendorId ? parseInt(salesVendorId) : null,
+        purchaseVendorId: purchaseVendorId ? parseInt(purchaseVendorId) : null,
+        salesVendors: salesVendorId ? {
+          create: {
+            vendorId: parseInt(salesVendorId),
+          },
+        } : undefined,
       },
       include: {
         category: true,
         purchaseVendor: true,
-        salesVendor: true,
+        salesVendors: {
+          include: {
+            vendor: true,
+          },
+        },
       },
     })
 
-    return NextResponse.json(part, { status: 201 })
+    // Transform response for backward compatibility
+    const response = {
+      ...part,
+      salesVendor: part.salesVendors.length > 0 ? part.salesVendors[0].vendor : null,
+      salesVendorId: part.salesVendors.length > 0 ? part.salesVendors[0].vendorId : null,
+    }
+
+    return NextResponse.json(response, { status: 201 })
   } catch (error) {
     console.error('Error creating part:', error)
     return NextResponse.json({ error: 'Failed to create part' }, { status: 500 })
   }
 }
 
-// PUT /api/parts - 부품 수정
+// PUT /api/parts - 부품 수정 (Product 테이블 사용)
 export async function PUT(request: Request) {
   try {
     const body = await request.json()
@@ -113,44 +140,103 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'ID가 필요합니다.' }, { status: 400 })
     }
 
-    const part = await prisma.part.update({
+    // Delete existing sales vendor relationships
+    await prisma.productSalesVendor.deleteMany({
+      where: { productId: parseInt(id) },
+    })
+
+    const part = await prisma.product.update({
       where: { id: parseInt(id) },
       data: {
         code,
         name,
         unit,
+        type: 'PART',
         categoryId: categoryId ? parseInt(categoryId) : null,
         description,
         defaultPurchasePrice: defaultPurchasePrice ? parseFloat(defaultPurchasePrice) : null,
-        purchaseVendorId: parseInt(purchaseVendorId),
-        salesVendorId: salesVendorId ? parseInt(salesVendorId) : null,
+        purchaseVendorId: purchaseVendorId ? parseInt(purchaseVendorId) : null,
+        salesVendors: salesVendorId ? {
+          create: {
+            vendorId: parseInt(salesVendorId),
+          },
+        } : undefined,
       },
       include: {
         category: true,
         purchaseVendor: true,
-        salesVendor: true,
+        salesVendors: {
+          include: {
+            vendor: true,
+          },
+        },
       },
     })
 
-    return NextResponse.json(part)
+    // Transform response for backward compatibility
+    const response = {
+      ...part,
+      salesVendor: part.salesVendors.length > 0 ? part.salesVendors[0].vendor : null,
+      salesVendorId: part.salesVendors.length > 0 ? part.salesVendors[0].vendorId : null,
+    }
+
+    return NextResponse.json(response)
   } catch (error) {
     console.error('Error updating part:', error)
     return NextResponse.json({ error: 'Failed to update part' }, { status: 500 })
   }
 }
 
-// DELETE /api/parts - 부품 삭제
+// DELETE /api/parts - 부품 삭제 (Product 테이블 사용)
 export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
+    const body = await request.json().catch(() => null)
 
+    // Bulk delete
+    if (body && body.ids && Array.isArray(body.ids)) {
+      // Validate all IDs are valid numbers
+      const validIds = body.ids
+        .map((id: string | number) => parseInt(id.toString()))
+        .filter((id: number) => !isNaN(id))
+      
+      if (validIds.length !== body.ids.length) {
+        return NextResponse.json({ error: '유효하지 않은 ID가 포함되어 있습니다.' }, { status: 400 })
+      }
+
+      await prisma.product.deleteMany({
+        where: {
+          id: { in: validIds },
+          type: 'PART',
+        }
+      })
+      return NextResponse.json({ success: true, count: validIds.length })
+    }
+
+    // Single delete
     if (!id) {
       return NextResponse.json({ error: 'ID가 필요합니다.' }, { status: 400 })
     }
 
-    await prisma.part.delete({
+    // Verify the product is a PART type before deletion
+    const product = await prisma.product.findUnique({
       where: { id: parseInt(id) },
+      select: { type: true }
+    })
+
+    if (!product) {
+      return NextResponse.json({ error: '품목을 찾을 수 없습니다.' }, { status: 404 })
+    }
+
+    if (product.type !== 'PART') {
+      return NextResponse.json({ error: '부품 타입 품목만 삭제할 수 있습니다.' }, { status: 400 })
+    }
+
+    await prisma.product.delete({
+      where: { 
+        id: parseInt(id),
+      },
     })
 
     return NextResponse.json({ success: true })

@@ -22,12 +22,13 @@ interface Material {
   code: string | null
   name: string
   unit: string
+  type: string
   categoryId: number | null
   category: Category | null
   description: string | null
   defaultPurchasePrice: number | null
-  purchaseVendorId: number
-  purchaseVendor: Vendor
+  purchaseVendorId: number | null
+  purchaseVendor: Vendor | null
   salesVendorId: number | null
   salesVendor: Vendor | null
 }
@@ -49,6 +50,7 @@ export default function MasterMaterialsPage() {
     code: '',
     name: '',
     unit: 'KG',
+    type: 'MATERIAL',
     categoryId: '',
     description: '',
     defaultPurchasePrice: '',
@@ -102,11 +104,6 @@ export default function MasterMaterialsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    if (!formData.purchaseVendorId) {
-      alert('매입 거래처를 선택해주세요.')
-      return
-    }
     
     try {
       const url = '/api/materials'
@@ -207,10 +204,11 @@ export default function MasterMaterialsPage() {
       code: material.code || '',
       name: material.name,
       unit: material.unit,
+      type: 'MATERIAL',
       categoryId: material.categoryId?.toString() || '',
       description: material.description || '',
       defaultPurchasePrice: material.defaultPurchasePrice?.toString() || '',
-      purchaseVendorId: material.purchaseVendorId.toString(),
+      purchaseVendorId: material.purchaseVendorId?.toString() || '',
       salesVendorId: material.salesVendorId?.toString() || '',
     })
     setShowModal(true)
@@ -223,6 +221,7 @@ export default function MasterMaterialsPage() {
       code: '',
       name: '',
       unit: 'KG',
+      type: 'MATERIAL',
       categoryId: '',
       description: '',
       defaultPurchasePrice: '',
@@ -423,10 +422,25 @@ export default function MasterMaterialsPage() {
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    매입 거래처 *
+                    품목 유형 *
                   </label>
                   <select
                     required
+                    value={formData.type}
+                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                  >
+                    <option value="MATERIAL">재료</option>
+                    <option value="PART">부품</option>
+                    <option value="PRODUCT">일반 품목</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    매입 거래처
+                  </label>
+                  <select
                     value={formData.purchaseVendorId}
                     onChange={(e) => setFormData({ ...formData, purchaseVendorId: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
@@ -441,7 +455,9 @@ export default function MasterMaterialsPage() {
                       ))}
                   </select>
                 </div>
+              </div>
 
+              <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     매출 거래처
