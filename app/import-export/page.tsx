@@ -128,6 +128,35 @@ export default function ImportExportPage() {
     }
   }
 
+  const handleWarehouseTransfer = async (id: number, storageLocation: 'WAREHOUSE' | 'OFFICE') => {
+    try {
+      const res = await fetch(`/api/import-export/${id}/warehouse`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storageLocation })
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        alert(data.error || '창고 입고 중 오류가 발생했습니다.')
+        return
+      }
+
+      if (data.alreadyStored) {
+        if (confirm('이미 창고에 입고되었습니다. 입고 관리 페이지로 이동하시겠습니까?')) {
+          window.location.href = '/warehouse/lots'
+        }
+      } else {
+        alert(data.message)
+        fetchRecords()
+      }
+    } catch (error) {
+      console.error('Error transferring to warehouse:', error)
+      alert('창고 입고 중 오류가 발생했습니다.')
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -297,18 +326,40 @@ export default function ImportExportPage() {
                     {record.storageType === 'WAREHOUSE' ? '창고' : record.storageType === 'OFFICE' ? '사무실' : '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
-                    <Link
-                      href={`/import-export/${record.id}`}
-                      className="text-blue-600 hover:text-blue-900 mr-3"
-                    >
-                      수정
-                    </Link>
-                    <button
-                      onClick={() => handleDelete(record.id)}
-                      className="text-red-600 hover:text-red-900"
-                    >
-                      삭제
-                    </button>
+                    <div className="flex gap-2 justify-center">
+                      <Link
+                        href={`/import-export/${record.id}`}
+                        className="text-blue-600 hover:text-blue-900"
+                        title="수정"
+                      >
+                        수정
+                      </Link>
+                      {record.type === 'IMPORT' && !record.storageType && record.product && (
+                        <>
+                          <button
+                            onClick={() => handleWarehouseTransfer(record.id, 'WAREHOUSE')}
+                            className="text-green-600 hover:text-green-900"
+                            title="창고 입고"
+                          >
+                            📦창고
+                          </button>
+                          <button
+                            onClick={() => handleWarehouseTransfer(record.id, 'OFFICE')}
+                            className="text-purple-600 hover:text-purple-900"
+                            title="사무실 보관"
+                          >
+                            🏢사무실
+                          </button>
+                        </>
+                      )}
+                      <button
+                        onClick={() => handleDelete(record.id)}
+                        className="text-red-600 hover:text-red-900"
+                        title="삭제"
+                      >
+                        삭제
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
