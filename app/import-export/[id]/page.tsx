@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { formatCurrency } from '@/lib/utils'
 import ProductRegistrationModal from '@/components/ProductRegistrationModal'
+import PdfPreviewModal from '@/components/PdfPreviewModal'
 
 interface Product {
   id: number
@@ -75,6 +76,9 @@ interface ImportExportData {
   totalAmount: number | null
   memo: string | null
   items: ImportExportItem[]
+  pdfFileName: string | null
+  pdfFilePath: string | null
+  pdfUploadedAt: string | null
 }
 
 // Multi-item support
@@ -122,6 +126,13 @@ export default function ImportExportEditPage() {
   
   // Product registration modal state
   const [showProductModal, setShowProductModal] = useState(false)
+  
+  // PDF state
+  const [pdfFile, setPdfFile] = useState<File | null>(null)
+  const [uploadingPdf, setUploadingPdf] = useState(false)
+  const [showPdfModal, setShowPdfModal] = useState(false)
+  const [currentPdfUrl, setCurrentPdfUrl] = useState('')
+  const [currentPdfName, setCurrentPdfName] = useState('')
   
   // Store record data for displaying existing items
   const [recordData, setRecordData] = useState<ImportExportData | null>(null)
@@ -463,6 +474,70 @@ export default function ImportExportEditPage() {
       ...prev,
       [name]: type === 'checkbox' ? checked : value,
     }))
+  }
+  
+  // PDF upload handler
+  const handlePdfUpload = async () => {
+    if (!pdfFile) {
+      alert('PDF 파일을 선택해주세요.')
+      return
+    }
+    
+    try {
+      setUploadingPdf(true)
+      
+      const formDataUpload = new FormData()
+      formDataUpload.append('file', pdfFile)
+      formDataUpload.append('type', 'import-export')
+      
+      const uploadRes = await fetch('/api/upload', {
+        method: 'POST',
+        body: formDataUpload,
+      })
+      
+      if (!uploadRes.ok) {
+        const error = await uploadRes.json()
+        throw new Error(error.error || 'PDF 업로드에 실패했습니다.')
+      }
+      
+      const uploadData = await uploadRes.json()
+      
+      // Update the record with PDF info
+      const updateRes = await fetch('/api/import-export', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: parseInt(id),
+          pdfFileName: uploadData.fileName,
+          pdfFilePath: uploadData.filePath,
+          pdfUploadedAt: uploadData.uploadedAt,
+        }),
+      })
+      
+      if (!updateRes.ok) {
+        throw new Error('PDF 정보 저장에 실패했습니다.')
+      }
+      
+      alert('PDF가 업로드되었습니다.')
+      setPdfFile(null)
+      
+      // Refresh the record data
+      await fetchRecord()
+    } catch (error) {
+      console.error('PDF upload error:', error)
+      alert(error instanceof Error ? error.message : 'PDF 업로드 중 오류가 발생했습니다.')
+    } finally {
+      setUploadingPdf(false)
+    }
+  }
+  
+  // PDF preview handler
+  const handlePdfPreview = () => {
+    if (recordData?.pdfFilePath) {
+      setCurrentPdfUrl(recordData.pdfFilePath)
+      setCurrentPdfName(recordData.pdfFileName || 'document.pdf')
+      setShowPdfModal(true)
+    }
   }
 
   if (loading) {
@@ -1059,6 +1134,62 @@ export default function ImportExportEditPage() {
           />
         </div>
 
+        {/* PDF 첨부 */}
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">PDF 첨부</h2>
+          
+          {/* 기존 PDF가 있는 경우 */}
+          {recordData?.pdfFilePath && (
+            <div className="mb-4 p-4 bg-blue-50 rounded-md border border-blue-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  </svg>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      {recordData.pdfFileName || 'document.pdf'}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      업로드됨: {recordData.pdfUploadedAt ? new Date(recordData.pdfUploadedAt).toLocaleString('ko-KR') : '-'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handlePdfPreview}
+                  className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
+                >
+                  미리보기
+                </button>
+              </div>
+            </div>
+          )}
+          
+          {/* PDF 업로드 */}
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <input
+                type="file"
+                accept="application/pdf"
+                onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handlePdfUpload}
+              disabled={!pdfFile || uploadingPdf}
+              className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400"
+            >
+              {uploadingPdf ? '업로드 중...' : 'PDF 업로드'}
+            </button>
+          </div>
+          <p className="text-xs text-gray-500 mt-2">
+            * PDF 파일을 선택한 후 &quot;PDF 업로드&quot; 버튼을 클릭하세요.
+          </p>
+        </div>
+
         {/* 버튼 */}
         <div className="flex justify-end gap-4">
           <button
@@ -1084,6 +1215,14 @@ export default function ImportExportEditPage() {
         onClose={() => setShowProductModal(false)}
         onSuccess={handleProductRegistrationSuccess}
         vendors={vendors}
+      />
+      
+      {/* PDF Preview Modal */}
+      <PdfPreviewModal
+        isOpen={showPdfModal}
+        onClose={() => setShowPdfModal(false)}
+        pdfUrl={currentPdfUrl}
+        fileName={currentPdfName}
       />
     </div>
   )
