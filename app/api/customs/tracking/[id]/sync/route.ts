@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCargoProgress, parseUnipassDate } from '@/lib/unipass'
-import { getUnipassSettings, getApiKeyForRegistrationType } from '@/lib/unipass-helpers'
+import { getUnipassSettings, getApiKeyForRegistrationType, generateImportLinkMemo } from '@/lib/unipass-helpers'
 import { isCustomsCleared } from '@/lib/utils'
 
 interface UpdateDataInput {
@@ -174,39 +174,8 @@ async function autoLinkToImport(trackingId: string) {
       return
     }
     
-    // rawData에서 추가 정보 파싱
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let parsedData: Record<string, any> | null = null
-    try {
-      if (tracking.rawData) {
-        parsedData = JSON.parse(tracking.rawData)
-      }
-    } catch (e) {
-      console.error('Failed to parse rawData:', e)
-    }
-    
-    // 메모에 상세 정보 기록
-    const blType = tracking.blType === 'MBL' ? 'Master B/L' : 'House B/L'
-    const loadingPortName = parsedData?.ldprNm || '-'
-    const loadingCountryCode = parsedData?.lodCntyCd || '-'
-    const weightUnit = parsedData?.wghtUt || 'KG'
-    
-    const memo = `[유니패스 연동 정보]
-━━━━━━━━━━━━━━━━━━━━
-BL번호: ${tracking.blNumber || '-'} (${blType})
-화물관리번호: ${tracking.cargoNumber || '-'}
-품명: ${tracking.productName || '-'}
-중량: ${tracking.weight || '-'}${weightUnit}
-포장: ${tracking.packageCount || '-'}${tracking.packageUnit || ''}
-입항일: ${tracking.arrivalDate ? new Date(tracking.arrivalDate).toISOString().split('T')[0] : '-'}
-반출일: ${tracking.clearanceDate ? new Date(tracking.clearanceDate).toISOString().split('T')[0] : '-'}
-통관상태: ${tracking.status || '-'}
-세액: ${tracking.totalTax ? `${tracking.totalTax.toLocaleString('ko-KR')}원` : '-'}
-━━━━━━━━━━━━━━━━━━━━
-적재항(출발지): ${loadingPortName}
-적출국가: ${loadingCountryCode}
-━━━━━━━━━━━━━━━━━━━━
-* 위 정보를 참고하여 상세 내역을 입력해주세요.`
+    // 메모 생성
+    const memo = generateImportLinkMemo(tracking)
     
     // 수입내역 생성 - 최소 정보만 채움
     const importRecord = await prisma.importExport.create({
