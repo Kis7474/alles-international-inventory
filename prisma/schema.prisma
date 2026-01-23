@@ -189,7 +189,7 @@ model ImportExport {
   items           ImportExportItem[]
   
   // 통관 정보 (역참조)
-  customsClearances CustomsClearance[]
+  customsTracking CustomsTracking[]
   
   // 수량 및 금액 (단일 품목용, 하위 호환성)
   quantity        Float?
@@ -590,39 +590,64 @@ model ProjectItem {
 // 통관 관리 (UNI-PASS 연동)
 // ============================================
 
-// 통관 진행 상황
-model CustomsClearance {
+// 통관 추적 시스템 (BL번호 또는 수입신고번호로 등록)
+model CustomsTracking {
   id              String   @id @default(cuid())
-  blNumber        String   // BL번호 (House B/L 또는 Master B/L)
-  blYear          String   // BL년도
-  cargoNumber     String?  // 화물관리번호
-  status          String   // 통관상태 (입항, 검사중, 심사중, 통관완료 등)
-  declareNumber   String?  // 수입신고번호
+  
+  // 등록 방식
+  registrationType String  // 'BL' | 'DECLARATION'
+  
+  // BL번호 등록 시
+  blType          String?  // 'MBL' | 'HBL'
+  blNumber        String?  // BL번호
+  blYear          String?  // 입항년도 (blYy)
+  
+  // 수입신고번호 등록 시
+  declarationNumber String? // 수입신고번호
+  
+  // 조회 결과 저장
+  cargoNumber     String?  // 화물관리번호 (API 조회 결과)
+  status          String?  // 진행상태 (입항, 검사중, 심사중, 통관완료 등)
+  statusCode      String?  // 진행상태코드
   
   // 화물 정보
   productName     String?  // 품명
   quantity        Float?   // 수량
   weight          Float?   // 중량(kg)
+  packageCount    Int?     // 포장개수
+  packageUnit     String?  // 포장단위
+  
+  // 선박/항공 정보
+  shipName        String?  // 선박명/편명
+  carrier         String?  // 선사/항공사
+  loadingPort     String?  // 적재항
+  dischargePort   String?  // 양륙항
   
   // 일자 정보
   arrivalDate     DateTime? // 입항일
-  declareDate     DateTime? // 신고일
-  clearanceDate   DateTime? // 통관완료일
+  declarationDate DateTime? // 신고일
+  clearanceDate   DateTime? // 통관완료일(수리일)
   
   // 비용 정보
   customsDuty     Float?   // 관세
   vat             Float?   // 부가세
   totalTax        Float?   // 총 세금
-  shippingCost    Float?   // 운송비
   
-  // 연동 정보
-  importId        Int?     // 수입내역 연동 ID
+  // 수입내역 연동
+  importId        Int?     // 수입내역 ID (자동 연동 시 저장)
   import          ImportExport?  @relation(fields: [importId], references: [id])
-  syncedAt        DateTime? // 마지막 동기화 시간
-  rawData         String?  // 원본 API 응답 데이터 (JSON 문자열)
+  linkedAt        DateTime? // 연동 일시
+  
+  // 원본 데이터
+  rawData         String?  // 원본 API 응답 (JSON 문자열)
+  
+  // 메타 정보
+  lastSyncAt      DateTime? // 마지막 동기화 시간
+  syncCount       Int      @default(0) // 동기화 횟수
   
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   
-  @@unique([blNumber, blYear])
+  @@unique([blNumber, blYear], name: "bl_unique")
+  @@index([declarationNumber], name: "declaration_idx")
 }

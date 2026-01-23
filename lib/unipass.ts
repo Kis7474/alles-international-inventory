@@ -40,8 +40,13 @@ export interface UnipassApiResponse {
  * - 환경 변수로 SSL 검증 우회 여부를 제어
  * - API 게이트웨이를 통한 프록시 사용
  */
-function fetchWithSSLBypass(url: string): Promise<string> {
+function fetchWithSSLBypass(url: string, maxRedirects = 5): Promise<string> {
   return new Promise((resolve, reject) => {
+    if (maxRedirects <= 0) {
+      reject(new Error(`Too many redirects (max ${5}). Possible redirect loop.`))
+      return
+    }
+    
     const urlObj = new URL(url)
     
     const options = {
@@ -53,6 +58,15 @@ function fetchWithSSLBypass(url: string): Promise<string> {
     }
     
     const req = https.request(options, (res) => {
+      // 리다이렉트 처리
+      if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        const redirectUrl = new URL(res.headers.location, url).toString()
+        fetchWithSSLBypass(redirectUrl, maxRedirects - 1)
+          .then(resolve)
+          .catch(reject)
+        return
+      }
+      
       if (!res.statusCode || res.statusCode < 200 || res.statusCode >= 400) {
         reject(new Error(`API 응답 오류: ${res.statusCode}`))
         return
@@ -94,18 +108,23 @@ function parseXml(xml: string): Promise<Record<string, unknown>> {
 }
 
 /**
- * 화물통관진행정보 조회
+ * 화물통관진행정보 조회 (API001)
  * @param apiKey - UNI-PASS API 인증키
- * @param blNumber - B/L 번호
- * @param blYear - B/L 연도 (YYYY)
+ * @param params - 조회 파라미터
  */
 export async function getCargoProgress(
   apiKey: string,
-  blNumber: string,
-  blYear: string
+  params: {
+    blType: 'MBL' | 'HBL'
+    blNumber: string
+    blYear: string
+  }
 ): Promise<UnipassApiResponse> {
   try {
-    const url = `https://${UNIPASS_API_BASE}:${UNIPASS_API_PORT}/ext/rest/cargCsclPrgsInfoQry/retrieveCargCsclPrgsInfo?crkyCn=${encodeURIComponent(apiKey)}&mblNo=${encodeURIComponent(blNumber)}&blYy=${encodeURIComponent(blYear)}`
+    const { blType, blNumber, blYear } = params
+    const blParam = blType === 'MBL' ? 'mblNo' : 'hblNo'
+    
+    const url = `https://${UNIPASS_API_BASE}:${UNIPASS_API_PORT}/ext/rest/cargCsclPrgsInfoQry/retrieveCargCsclPrgsInfo?crkyCn=${encodeURIComponent(apiKey)}&${blParam}=${encodeURIComponent(blNumber)}&blYy=${encodeURIComponent(blYear)}`
     
     const xmlData = await fetchWithSSLBypass(url)
     const parsed = await parseXml(xmlData)
@@ -271,6 +290,72 @@ export async function testConnection(apiKey: string): Promise<UnipassApiResponse
     return {
       success: false,
       message: error instanceof Error ? error.message : '연결 테스트 중 오류가 발생했습니다.'
+    }
+  }
+}
+
+/**
+ * 수입신고필증검증 (API022)
+ * @param apiKey - UNI-PASS API 인증키
+ * @param declarationNumber - 수입신고번호 (예: 12345-26-1234567)
+ */
+export async function verifyImportDeclaration(
+  apiKey: string,
+  declarationNumber: string
+): Promise<UnipassApiResponse> {
+  try {
+    const url = `https://${UNIPASS_API_BASE}:${UNIPASS_API_PORT}/ext/rest/impCdslPaprVrfcSrvc/retrieveImpCdslPaprVrfc?crkyCn=${encodeURIComponent(apiKey)}&dclrNo=${encodeURIComponent(declarationNumber)}`
+    
+    const xmlData = await fetchWithSSLBypass(url)
+    const parsed = await parseXml(xmlData)
+    
+    // XML 구조 파싱
+    const response = parsed?.impCdslPaprVrfcQryRtnVo
+    
+    if (!response) {
+      return {
+        success: false,
+        message: 'API 응답 형식이 올바르지 않습니다.',
+        rawXml: xmlData
+      }
+    }
+    
+    // 에러 체크
+    const notice = response.ntceInfo?.ntceCn
+    if (notice && notice !== '정상처리되었습니다.') {
+      return {
+        success: false,
+        message: notice,
+        rawXml: xmlData
+      }
+    }
+    
+    // 데이터 추출
+    let dataList = response.impCdslPaprVrfcQryVo
+    if (!dataList) {
+      return {
+        success: true,
+        message: '조회 결과가 없습니다.',
+        data: [],
+        rawXml: xmlData
+      }
+    }
+    
+    // 단일 결과를 배열로 변환
+    if (!Array.isArray(dataList)) {
+      dataList = [dataList]
+    }
+    
+    return {
+      success: true,
+      data: dataList as UnipassCargoProgress[],
+      rawXml: xmlData
+    }
+  } catch (error) {
+    console.error('UNI-PASS Import Declaration API Error:', error)
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.'
     }
   }
 }

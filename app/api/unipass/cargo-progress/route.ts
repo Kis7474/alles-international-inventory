@@ -46,8 +46,12 @@ export async function GET(request: NextRequest) {
       )
     }
     
-    // API 호출
-    const result = await getCargoProgress(apiKey, blNumber, blYear)
+    // API 호출 (기본적으로 MBL로 조회)
+    const result = await getCargoProgress(apiKey, {
+      blType: 'MBL',
+      blNumber,
+      blYear,
+    })
     
     if (!result.success) {
       return NextResponse.json(
@@ -56,48 +60,7 @@ export async function GET(request: NextRequest) {
       )
     }
     
-    // DB에 저장 또는 업데이트
-    if (result.data && result.data.length > 0) {
-      for (const item of result.data) {
-        await prisma.customsClearance.upsert({
-          where: {
-            blNumber_blYear: {
-              blNumber: item.mblNo || item.hblNo || blNumber,
-              blYear: blYear,
-            },
-          },
-          update: {
-            cargoNumber: item.cargMtNo || null,
-            status: item.prgsStts || '조회됨',
-            declareNumber: item.dclrNo || null,
-            productName: item.prnm || null,
-            weight: item.wght ? parseFloat(item.wght) : null,
-            totalTax: item.csclTotaTxamt ? parseFloat(item.csclTotaTxamt) : null,
-            arrivalDate: item.rlbrDt ? new Date(item.rlbrDt) : null,
-            declareDate: item.dclrDt ? new Date(item.dclrDt) : null,
-            clearanceDate: item.tkofDt ? new Date(item.tkofDt) : null,
-            rawData: JSON.stringify(item),
-            syncedAt: new Date(),
-          },
-          create: {
-            blNumber: item.mblNo || item.hblNo || blNumber,
-            blYear: blYear,
-            cargoNumber: item.cargMtNo || null,
-            status: item.prgsStts || '조회됨',
-            declareNumber: item.dclrNo || null,
-            productName: item.prnm || null,
-            weight: item.wght ? parseFloat(item.wght) : null,
-            totalTax: item.csclTotaTxamt ? parseFloat(item.csclTotaTxamt) : null,
-            arrivalDate: item.rlbrDt ? new Date(item.rlbrDt) : null,
-            declareDate: item.dclrDt ? new Date(item.dclrDt) : null,
-            clearanceDate: item.tkofDt ? new Date(item.tkofDt) : null,
-            rawData: JSON.stringify(item),
-            syncedAt: new Date(),
-          },
-        })
-      }
-    }
-    
+    // 조회 결과 반환 (DB 저장은 /api/customs/tracking에서 처리)
     return NextResponse.json({
       success: true,
       data: result.data,

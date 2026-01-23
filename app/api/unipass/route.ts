@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
 
-// GET /api/unipass - 통관 정보 조회
+// GET /api/unipass - 통관 정보 조회 (기존 CustomsClearance - 하위 호환성)
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
@@ -16,13 +15,9 @@ export async function GET(request: NextRequest) {
       where.status = status
     }
     
-    const clearances = await prisma.customsClearance.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        import: true,
-      },
-    })
+    // CustomsClearance 모델이 제거되었으므로 빈 배열 반환
+    // 새 시스템은 /api/customs/tracking 사용
+    const clearances: never[] = []
     
     return NextResponse.json(clearances)
   } catch (error) {
@@ -34,7 +29,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// DELETE /api/unipass - 통관 정보 삭제
+// DELETE /api/unipass - 통관 정보 삭제 (기존 CustomsClearance - 하위 호환성)
 export async function DELETE(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
@@ -47,9 +42,8 @@ export async function DELETE(request: NextRequest) {
       )
     }
     
-    await prisma.customsClearance.delete({
-      where: { id },
-    })
+    // CustomsClearance 모델이 제거되었으므로 무시
+    // 새 시스템은 /api/customs/tracking 사용
     
     return NextResponse.json({ success: true })
   } catch (error) {
