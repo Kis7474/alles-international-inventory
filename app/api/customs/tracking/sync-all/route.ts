@@ -1,24 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getCargoProgress, verifyImportDeclaration } from '@/lib/unipass'
+import { getCargoProgress, verifyImportDeclaration, parseUnipassDate } from '@/lib/unipass'
+import { getUnipassSettings, getApiKeyForRegistrationType } from '@/lib/unipass-helpers'
 
 // POST /api/customs/tracking/sync-all - 전체 동기화
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function POST(request: NextRequest) {
   try {
-    // 유니패스 API 키 가져오기
-    const apiKeySetting = await prisma.systemSetting.findUnique({
-      where: { key: 'unipass_api_key' },
-    })
+    // 유니패스 설정 가져오기
+    const settings = await getUnipassSettings()
     
-    if (!apiKeySetting || !apiKeySetting.value) {
+    if (!settings) {
       return NextResponse.json(
-        { error: '유니패스 API 키가 설정되지 않았습니다.' },
+        { error: '유니패스 API 설정이 필요합니다.' },
         { status: 400 }
       )
     }
-    
-    const apiKey = apiKeySetting.value
     
     // 모든 추적 정보 가져오기
     const trackings = await prisma.customsTracking.findMany()
@@ -29,6 +26,17 @@ export async function POST(request: NextRequest) {
     
     for (const tracking of trackings) {
       try {
+        // 등록 방식에 따라 다른 API 키 사용
+        const apiKey = getApiKeyForRegistrationType(settings, tracking.registrationType)
+        if (!apiKey) {
+          failCount++
+          const keyName = tracking.registrationType === 'BL' 
+            ? '화물통관진행정보조회' 
+            : '수입신고필증검증'
+          errors.push(`${tracking.id}: ${keyName} API 키가 설정되지 않았습니다.`)
+          continue
+        }
+        
         let apiResult
         
         if (tracking.registrationType === 'BL') {
@@ -71,10 +79,10 @@ export async function POST(request: NextRequest) {
           data: {
             status: data.prgsStts,
             productName: data.prnm,
-            weight: data.wght ? parseFloat(data.wght) : null,
-            arrivalDate: data.rlbrDt ? new Date(data.rlbrDt) : null,
-            declarationDate: data.dclrDt ? new Date(data.dclrDt) : null,
-            clearanceDate: data.tkofDt ? new Date(data.tkofDt) : null,
+            weight: data.ttwg ? parseFloat(data.ttwg) : null,
+            arrivalDate: data.etprDt ? parseUnipassDate(data.etprDt) : null,
+            declarationDate: data.dclrDt ? parseUnipassDate(data.dclrDt) : null,
+            clearanceDate: data.tkofDt ? parseUnipassDate(data.tkofDt) : null,
             customsDuty: data.csclTotaTxamt ? parseFloat(data.csclTotaTxamt) : null,
             totalTax: data.csclTotaTxamt ? parseFloat(data.csclTotaTxamt) : null,
             rawData: JSON.stringify(data),
