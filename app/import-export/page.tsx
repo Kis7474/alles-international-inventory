@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { formatCurrency } from '@/lib/utils'
 import Link from 'next/link'
+import PdfPreviewModal from '@/components/PdfPreviewModal'
 
 interface ImportExport {
   id: number
@@ -21,6 +22,9 @@ interface ImportExport {
   unitCost: number | null
   storageType: string | null
   memo: string | null
+  pdfFileName: string | null
+  pdfFilePath: string | null
+  pdfUploadedAt: string | null
 }
 
 export default function ImportExportPage() {
@@ -33,6 +37,11 @@ export default function ImportExportPage() {
   })
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [selectAll, setSelectAll] = useState(false)
+  
+  // PDF modal state
+  const [showPdfModal, setShowPdfModal] = useState(false)
+  const [currentPdfUrl, setCurrentPdfUrl] = useState('')
+  const [currentPdfName, setCurrentPdfName] = useState('')
 
   useEffect(() => {
     fetchRecords()
@@ -154,6 +163,14 @@ export default function ImportExportPage() {
     } catch (error) {
       console.error('Error transferring to warehouse:', error)
       alert('창고 입고 중 오류가 발생했습니다.')
+    }
+  }
+  
+  const handlePdfPreview = (record: ImportExport) => {
+    if (record.pdfFilePath) {
+      setCurrentPdfUrl(record.pdfFilePath)
+      setCurrentPdfName(record.pdfFileName || 'document.pdf')
+      setShowPdfModal(true)
     }
   }
 
@@ -278,6 +295,9 @@ export default function ImportExportPage() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                   보관
                 </th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider w-20">
+                  PDF
+                </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">
                   관리
                 </th>
@@ -325,6 +345,19 @@ export default function ImportExportPage() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {record.storageType === 'WAREHOUSE' ? '창고' : record.storageType === 'OFFICE' ? '사무실' : '-'}
                   </td>
+                  <td className="px-4 py-4 whitespace-nowrap text-center">
+                    {record.pdfFilePath ? (
+                      <button
+                        onClick={() => handlePdfPreview(record)}
+                        className="text-blue-600 hover:text-blue-800 text-lg"
+                        title={record.pdfFileName || 'PDF 보기'}
+                      >
+                        📄
+                      </button>
+                    ) : (
+                      <span className="text-gray-300">-</span>
+                    )}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
                     <div className="flex gap-2 justify-center">
                       <Link
@@ -365,7 +398,7 @@ export default function ImportExportPage() {
               ))}
               {records.length === 0 && (
                 <tr>
-                  <td colSpan={11} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={12} className="px-6 py-4 text-center text-gray-500">
                     등록된 내역이 없습니다.
                   </td>
                 </tr>
@@ -374,6 +407,14 @@ export default function ImportExportPage() {
           </table>
         </div>
       </div>
+      
+      {/* PDF Preview Modal */}
+      <PdfPreviewModal
+        isOpen={showPdfModal}
+        onClose={() => setShowPdfModal(false)}
+        pdfUrl={currentPdfUrl}
+        fileName={currentPdfName}
+      />
     </div>
   )
 }
