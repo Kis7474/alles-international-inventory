@@ -43,3 +43,7 @@ prisma/*.db
 prisma/*.db-journal
 *.db
 *.db-journal
+
+# uploads
+/public/uploads/**/*.pdf
+!/public/uploads/.gitkeep
