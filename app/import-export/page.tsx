@@ -8,11 +8,11 @@ interface ImportExport {
   id: number
   date: string
   type: string
-  product: { code: string; name: string }
-  vendor: { name: string }
+  product: { code: string; name: string } | null
+  vendor: { name: string } | null
   salesperson: { name: string } | null
   category: { nameKo: string } | null
-  quantity: number
+  quantity: number | null
   currency: string
   exchangeRate: number
   foreignAmount: number
@@ -276,13 +276,13 @@ export default function ImportExportPage() {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {record.product.name}
+                    {record.product?.name || '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {record.vendor.name}
+                    {record.vendor?.name || '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                    {record.quantity.toLocaleString('ko-KR')}
+                    {record.quantity?.toLocaleString('ko-KR') || '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
                     {formatCurrency(record.foreignAmount, record.currency)}
