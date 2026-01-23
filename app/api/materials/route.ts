@@ -196,18 +196,41 @@ export async function DELETE(request: Request) {
 
     // Bulk delete
     if (body && body.ids && Array.isArray(body.ids)) {
+      // Validate all IDs are valid numbers
+      const validIds = body.ids
+        .map((id: string | number) => parseInt(id.toString()))
+        .filter((id: number) => !isNaN(id))
+      
+      if (validIds.length !== body.ids.length) {
+        return NextResponse.json({ error: '유효하지 않은 ID가 포함되어 있습니다.' }, { status: 400 })
+      }
+
       await prisma.product.deleteMany({
         where: {
-          id: { in: body.ids.map((id: string | number) => parseInt(id.toString())) },
+          id: { in: validIds },
           type: 'MATERIAL',
         }
       })
-      return NextResponse.json({ success: true, count: body.ids.length })
+      return NextResponse.json({ success: true, count: validIds.length })
     }
 
     // Single delete
     if (!id) {
       return NextResponse.json({ error: 'ID가 필요합니다.' }, { status: 400 })
+    }
+
+    // Verify the product is a MATERIAL type before deletion
+    const product = await prisma.product.findUnique({
+      where: { id: parseInt(id) },
+      select: { type: true }
+    })
+
+    if (!product) {
+      return NextResponse.json({ error: '품목을 찾을 수 없습니다.' }, { status: 404 })
+    }
+
+    if (product.type !== 'MATERIAL') {
+      return NextResponse.json({ error: '재료 타입 품목만 삭제할 수 있습니다.' }, { status: 400 })
     }
 
     await prisma.product.delete({
