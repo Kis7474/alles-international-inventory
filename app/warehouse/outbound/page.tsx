@@ -271,20 +271,20 @@ export default function OutboundPage() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">출고 관리</h1>
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-4 md:mb-6 gap-3">
+        <h1 className="text-2xl md:text-3xl font-bold">출고 관리</h1>
         <div className="flex gap-2">
           {selectedIds.length > 0 && (
             <button
               onClick={handleBulkDelete}
-              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
+              className="bg-red-600 text-white px-4 py-3 md:py-2 rounded-lg hover:bg-red-700 text-sm md:text-base min-h-[44px]"
             >
               선택 삭제 ({selectedIds.length}개)
             </button>
           )}
           <button
             onClick={() => setShowForm(true)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+            className="bg-blue-600 text-white px-4 py-3 md:py-2 rounded-lg hover:bg-blue-700 text-sm md:text-base min-h-[44px]"
           >
             + 출고 등록
           </button>
@@ -292,16 +292,16 @@ export default function OutboundPage() {
       </div>
 
       {/* 필터 */}
-      <div className="bg-white p-6 rounded-lg shadow mb-6">
-        <h2 className="text-lg font-bold mb-4 text-gray-900">필터</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="bg-white p-4 md:p-6 rounded-lg shadow mb-4 md:mb-6">
+        <h2 className="text-base md:text-lg font-bold mb-3 md:mb-4 text-gray-900">필터</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700">시작일</label>
             <input
               type="date"
               value={filterStartDate}
               onChange={(e) => setFilterStartDate(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg text-gray-900"
+              className="w-full px-3 py-3 md:py-2 border rounded-lg text-gray-900"
             />
           </div>
           
@@ -311,7 +311,7 @@ export default function OutboundPage() {
               type="date"
               value={filterEndDate}
               onChange={(e) => setFilterEndDate(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg text-gray-900"
+              className="w-full px-3 py-3 md:py-2 border rounded-lg text-gray-900"
             />
           </div>
           
@@ -320,7 +320,7 @@ export default function OutboundPage() {
             <select
               value={filterItemId}
               onChange={(e) => setFilterItemId(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg text-gray-900"
+              className="w-full px-3 py-3 md:py-2 border rounded-lg text-gray-900"
             >
               <option value="">전체</option>
               {items.map((item) => (
@@ -332,10 +332,10 @@ export default function OutboundPage() {
           </div>
         </div>
         
-        <div className="mt-4">
+        <div className="mt-4 flex flex-col sm:flex-row gap-2">
           <button
             onClick={handleFilter}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+            className="bg-blue-600 text-white px-6 py-3 md:py-2 rounded-lg hover:bg-blue-700 min-h-[44px]"
           >
             필터 적용
           </button>
@@ -346,7 +346,7 @@ export default function OutboundPage() {
               setFilterItemId('')
               fetchData()
             }}
-            className="ml-2 bg-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-400"
+            className="bg-gray-300 text-gray-700 px-6 py-3 md:py-2 rounded-lg hover:bg-gray-400 min-h-[44px]"
           >
             초기화
           </button>
@@ -355,8 +355,8 @@ export default function OutboundPage() {
 
       {/* 출고 등록 폼 */}
       {showForm && (
-        <div className="bg-white p-6 rounded-lg shadow mb-6">
-          <h2 className="text-xl font-bold mb-4">출고 등록</h2>
+        <div className="bg-white p-4 md:p-6 rounded-lg shadow mb-4 md:mb-6">
+          <h2 className="text-lg md:text-xl font-bold mb-3 md:mb-4">출고 등록</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* 보관 위치 선택 */}
             <div className="mb-4 p-4 bg-gray-50 rounded-lg">
@@ -393,7 +393,7 @@ export default function OutboundPage() {
               </div>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">
                   품목 * <span className="text-xs text-blue-600">
@@ -404,7 +404,7 @@ export default function OutboundPage() {
                   required
                   value={formData.productId}
                   onChange={(e) => handleProductSelect(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg"
+                  className="w-full px-3 py-3 md:py-2 border rounded-lg"
                 >
                   <option value="">품목을 선택하세요</option>
                   {inventoryProducts.map((item) => (
@@ -427,7 +427,7 @@ export default function OutboundPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, quantity: e.target.value })
                   }
-                  className="w-full px-3 py-2 border rounded-lg"
+                  className="w-full px-3 py-3 md:py-2 border rounded-lg"
                 />
                 {selectedProductInfo && (
                   <div className="mt-2 p-3 bg-blue-50 rounded-lg text-sm">
@@ -451,7 +451,7 @@ export default function OutboundPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, outboundDate: e.target.value })
                   }
-                  className="w-full px-3 py-2 border rounded-lg"
+                  className="w-full px-3 py-3 md:py-2 border rounded-lg"
                 />
               </div>
             </div>
@@ -462,17 +462,17 @@ export default function OutboundPage() {
               </div>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <button
                 type="submit"
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+                className="bg-blue-600 text-white px-6 py-3 md:py-2 rounded-lg hover:bg-blue-700 min-h-[44px]"
               >
                 출고 처리
               </button>
               <button
                 type="button"
                 onClick={() => setShowForm(false)}
-                className="bg-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-400"
+                className="bg-gray-300 text-gray-700 px-6 py-3 md:py-2 rounded-lg hover:bg-gray-400 min-h-[44px]"
               >
                 취소
               </button>
@@ -551,95 +551,165 @@ export default function OutboundPage() {
       )}
 
       {/* 출고 이력 */}
-      <div className="bg-white rounded-lg shadow overflow-x-auto">
-        <div className="px-6 py-4 border-b">
-          <h2 className="text-xl font-bold">출고 이력</h2>
+      <div className="bg-white rounded-lg shadow">
+        <div className="px-4 md:px-6 py-3 md:py-4 border-b">
+          <h2 className="text-lg md:text-xl font-bold">출고 이력</h2>
         </div>
-        <table className="min-w-full">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-4 py-3 w-12">
-                <input
-                  type="checkbox"
-                  checked={selectAll}
-                  onChange={handleSelectAll}
-                  className="w-4 h-4 rounded"
-                />
-              </th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                출고일
-              </th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                품목
-              </th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                LOT 코드
-              </th>
-              <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">
-                수량
-              </th>
-              <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">
-                단가
-              </th>
-              <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">
-                총액
-              </th>
-              <th className="px-4 py-3 text-center text-sm font-medium text-gray-700">
-                관리
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {history.map((record) => (
-              <tr key={record.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3">
+        
+        {/* Desktop Table */}
+        <div className="hidden md:block overflow-x-auto">
+          <table className="min-w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 w-12">
                   <input
                     type="checkbox"
-                    checked={selectedIds.includes(record.id)}
-                    onChange={() => handleSelect(record.id)}
+                    checked={selectAll}
+                    onChange={handleSelectAll}
                     className="w-4 h-4 rounded"
                   />
-                </td>
-                <td className="px-4 py-4">
-                  {new Date(record.movementDate).toLocaleDateString('ko-KR')}
-                </td>
-                <td className="px-4 py-4">
-                  [{record.item.code}] {record.item.name}
-                </td>
-                <td className="px-4 py-4">
-                  {record.lot?.lotCode || '-'}
-                </td>
-                <td className="px-4 py-4 text-right">
-                  {formatNumber(record.quantity, 0)}
-                </td>
-                <td className="px-4 py-4 text-right">
-                  ₩{formatNumber(record.unitCost, 2)}
-                </td>
-                <td className="px-4 py-4 text-right">
-                  ₩{formatNumber(record.totalCost, 0)}
-                </td>
-                <td className="px-4 py-4 text-center">
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                  출고일
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                  품목
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                  LOT 코드
+                </th>
+                <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">
+                  수량
+                </th>
+                <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">
+                  단가
+                </th>
+                <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">
+                  총액
+                </th>
+                <th className="px-4 py-3 text-center text-sm font-medium text-gray-700">
+                  관리
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {history.map((record) => (
+                <tr key={record.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(record.id)}
+                      onChange={() => handleSelect(record.id)}
+                      className="w-4 h-4 rounded"
+                    />
+                  </td>
+                  <td className="px-4 py-4">
+                    {new Date(record.movementDate).toLocaleDateString('ko-KR')}
+                  </td>
+                  <td className="px-4 py-4">
+                    [{record.item.code}] {record.item.name}
+                  </td>
+                  <td className="px-4 py-4">
+                    {record.lot?.lotCode || '-'}
+                  </td>
+                  <td className="px-4 py-4 text-right">
+                    {formatNumber(record.quantity, 0)}
+                  </td>
+                  <td className="px-4 py-4 text-right">
+                    ₩{formatNumber(record.unitCost, 2)}
+                  </td>
+                  <td className="px-4 py-4 text-right">
+                    ₩{formatNumber(record.totalCost, 0)}
+                  </td>
+                  <td className="px-4 py-4 text-center">
+                    <button
+                      onClick={() => handleDelete(record.id)}
+                      className="text-red-600 hover:text-red-900 text-sm"
+                    >
+                      삭제
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {history.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={8}
+                    className="px-6 py-8 text-center text-gray-500"
+                  >
+                    출고 내역이 없습니다.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Mobile Card View */}
+        <div className="md:hidden">
+          <div className="p-4 border-b bg-gray-50">
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={selectAll}
+                onChange={handleSelectAll}
+                className="w-4 h-4 rounded mr-2"
+              />
+              <span className="text-sm text-gray-700">전체 선택</span>
+            </label>
+          </div>
+          <div className="divide-y divide-gray-200">
+            {history.map((record) => (
+              <div key={record.id} className="p-4">
+                <div className="flex items-start justify-between mb-3">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(record.id)}
+                      onChange={() => handleSelect(record.id)}
+                      className="w-4 h-4 rounded mr-2"
+                    />
+                    <span className="text-xs text-gray-600">
+                      {new Date(record.movementDate).toLocaleDateString('ko-KR')}
+                    </span>
+                  </label>
                   <button
                     onClick={() => handleDelete(record.id)}
-                    className="text-red-600 hover:text-red-900 text-sm"
+                    className="text-red-600 hover:text-red-900 text-sm px-3 py-1 min-h-[32px]"
                   >
                     삭제
                   </button>
-                </td>
-              </tr>
+                </div>
+                <div className="font-bold text-gray-900 mb-2">
+                  [{record.item.code}] {record.item.name}
+                </div>
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">LOT:</span>
+                    <span className="text-gray-900">{record.lot?.lotCode || '-'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">수량:</span>
+                    <span className="text-gray-900">{formatNumber(record.quantity, 0)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">단가:</span>
+                    <span className="text-gray-900">₩{formatNumber(record.unitCost, 2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-2 border-t">
+                    <span className="text-gray-600 font-medium">총액:</span>
+                    <span className="font-bold text-gray-900">₩{formatNumber(record.totalCost, 0)}</span>
+                  </div>
+                </div>
+              </div>
             ))}
             {history.length === 0 && (
-              <tr>
-                <td
-                  colSpan={8}
-                  className="px-6 py-8 text-center text-gray-500"
-                >
-                  출고 내역이 없습니다.
-                </td>
-              </tr>
+              <div className="px-6 py-8 text-center text-gray-500">
+                출고 내역이 없습니다.
+              </div>
             )}
-          </tbody>
-        </table>
+          </div>
+        </div>
       </div>
 
       {/* 삭제 확인 모달 */}
