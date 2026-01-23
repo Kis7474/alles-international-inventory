@@ -648,6 +648,6 @@ model CustomsTracking {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   
-  @@unique([blNumber, blYear])
-  @@unique([declarationNumber])
+  @@unique([blNumber, blYear], name: "bl_unique")
+  @@index([declarationNumber], name: "declaration_idx")
 }

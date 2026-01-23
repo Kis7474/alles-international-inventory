@@ -43,7 +43,7 @@ export interface UnipassApiResponse {
 function fetchWithSSLBypass(url: string, maxRedirects = 5): Promise<string> {
   return new Promise((resolve, reject) => {
     if (maxRedirects <= 0) {
-      reject(new Error('너무 많은 리다이렉트'))
+      reject(new Error(`Too many redirects (max ${5}). Possible redirect loop.`))
       return
     }
     

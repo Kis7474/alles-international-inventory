@@ -2,6 +2,26 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCargoProgress, verifyImportDeclaration } from '@/lib/unipass'
 
+interface TrackingDataInput {
+  registrationType: string
+  syncCount: number
+  lastSyncAt: Date
+  blType?: string
+  blNumber?: string
+  blYear?: string
+  declarationNumber?: string
+  cargoNumber?: string | null
+  status?: string
+  productName?: string | null
+  weight?: number | null
+  arrivalDate?: Date | null
+  declarationDate?: Date | null
+  clearanceDate?: Date | null
+  customsDuty?: number | null
+  totalTax?: number | null
+  rawData?: string
+}
+
 // GET /api/customs/tracking - 목록 조회
 export async function GET(request: NextRequest) {
   try {
@@ -57,8 +77,7 @@ export async function POST(request: NextRequest) {
     
     // 등록 방식에 따라 API 호출
     let apiResult
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let trackingData: any = {
+    let trackingData: TrackingDataInput = {
       registrationType,
       syncCount: 1,
       lastSyncAt: new Date(),
@@ -201,12 +220,30 @@ async function autoLinkToImport(trackingId: string) {
       return
     }
     
+    // 기본 거래처 찾기 (해외 매입 거래처 우선)
+    let vendor = await prisma.vendor.findFirst({
+      where: { type: 'INTERNATIONAL_PURCHASE' },
+      orderBy: { id: 'asc' },
+    })
+    
+    // 없으면 아무 거래처나 사용
+    if (!vendor) {
+      vendor = await prisma.vendor.findFirst({
+        orderBy: { id: 'asc' },
+      })
+    }
+    
+    if (!vendor) {
+      console.error('No vendor found for auto-linking')
+      return
+    }
+    
     // 수입내역 생성
     const importRecord = await prisma.importExport.create({
       data: {
         type: 'IMPORT',
         date: tracking.clearanceDate || tracking.arrivalDate || new Date(),
-        vendorId: 1, // TODO: 기본 거래처 ID (실제로는 설정에서 가져와야 함)
+        vendorId: vendor.id,
         currency: 'USD',
         exchangeRate: 1300, // TODO: 실제 환율 적용
         foreignAmount: 0,

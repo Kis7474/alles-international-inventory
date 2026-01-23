@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { formatCurrency } from '@/lib/utils'
 import Link from 'next/link'
 
@@ -45,12 +45,7 @@ export default function CustomsTrackingPage() {
     declarationNumber: '',
   })
 
-  useEffect(() => {
-    fetchTrackings()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter])
-
-  const fetchTrackings = async () => {
+  const fetchTrackings = useCallback(async () => {
     try {
       setLoading(true)
       const params = new URLSearchParams()
@@ -65,7 +60,11 @@ export default function CustomsTrackingPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [statusFilter])
+
+  useEffect(() => {
+    fetchTrackings()
+  }, [fetchTrackings])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

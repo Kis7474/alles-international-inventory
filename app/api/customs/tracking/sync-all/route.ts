@@ -122,12 +122,30 @@ async function autoLinkToImport(trackingId: string) {
       return
     }
     
+    // 기본 거래처 찾기 (해외 매입 거래처 우선)
+    let vendor = await prisma.vendor.findFirst({
+      where: { type: 'INTERNATIONAL_PURCHASE' },
+      orderBy: { id: 'asc' },
+    })
+    
+    // 없으면 아무 거래처나 사용
+    if (!vendor) {
+      vendor = await prisma.vendor.findFirst({
+        orderBy: { id: 'asc' },
+      })
+    }
+    
+    if (!vendor) {
+      console.error('No vendor found for auto-linking')
+      return
+    }
+    
     // 수입내역 생성
     const importRecord = await prisma.importExport.create({
       data: {
         type: 'IMPORT',
         date: tracking.clearanceDate || tracking.arrivalDate || new Date(),
-        vendorId: 1, // TODO: 기본 거래처 ID
+        vendorId: vendor.id,
         currency: 'USD',
         exchangeRate: 1300, // TODO: 실제 환율 적용
         foreignAmount: 0,
