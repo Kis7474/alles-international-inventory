@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { testConnection, getCargoProgress, verifyImportDeclaration } from '@/lib/unipass'
+import { isAuthenticationError } from '@/lib/unipass-helpers'
 
 // POST /api/unipass/test-connection - API 연결 테스트
 export async function POST(request: NextRequest) {
@@ -25,7 +26,7 @@ export async function POST(request: NextRequest) {
       })
       
       // 인증 오류가 아니면 연결 성공으로 간주
-      if (result.success || (result.message && !result.message.includes('인증') && !result.message.includes('키') && !result.message.includes('권한'))) {
+      if (result.success || !isAuthenticationError(result.message)) {
         return NextResponse.json({
           success: true,
           message: '화물통관진행정보조회 API 연결 성공',
@@ -36,7 +37,7 @@ export async function POST(request: NextRequest) {
       result = await verifyImportDeclaration(apiKey, '00000-00-0000000')
       
       // 인증 오류가 아니면 연결 성공으로 간주
-      if (result.success || (result.message && !result.message.includes('인증') && !result.message.includes('키') && !result.message.includes('권한'))) {
+      if (result.success || !isAuthenticationError(result.message)) {
         return NextResponse.json({
           success: true,
           message: '수입신고필증검증 API 연결 성공',

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCargoProgress, verifyImportDeclaration, parseUnipassDate } from '@/lib/unipass'
+import { getUnipassSettings, getApiKeyForRegistrationType } from '@/lib/unipass-helpers'
 
 interface TrackingDataInput {
   registrationType: string
@@ -62,18 +63,14 @@ export async function POST(request: NextRequest) {
     const { registrationType, blType, blNumber, blYear, declarationNumber } = body
     
     // 유니패스 설정 가져오기
-    const settings = await prisma.systemSetting.findUnique({
-      where: { key: 'unipass_settings' },
-    })
+    const settings = await getUnipassSettings()
     
-    if (!settings?.value) {
+    if (!settings) {
       return NextResponse.json(
         { error: '유니패스 API 설정이 필요합니다. 설정 페이지에서 API 키를 등록해주세요.' },
         { status: 400 }
       )
     }
-    
-    const parsed = typeof settings.value === 'string' ? JSON.parse(settings.value) : settings.value
     
     // 등록 방식에 따라 API 호출
     let apiResult
@@ -92,7 +89,7 @@ export async function POST(request: NextRequest) {
       }
       
       // 화물통관진행정보조회 API 키 확인
-      const apiKey = parsed.apiKeyCargoProgress
+      const apiKey = getApiKeyForRegistrationType(settings, 'BL')
       if (!apiKey) {
         return NextResponse.json(
           { error: '화물통관진행정보조회 API 키가 설정되지 않았습니다.' },
@@ -148,7 +145,7 @@ export async function POST(request: NextRequest) {
       }
       
       // 수입신고필증검증 API 키 확인
-      const apiKey = parsed.apiKeyImportDeclaration
+      const apiKey = getApiKeyForRegistrationType(settings, 'DECLARATION')
       if (!apiKey) {
         return NextResponse.json(
           { error: '수입신고필증검증 API 키가 설정되지 않았습니다.' },

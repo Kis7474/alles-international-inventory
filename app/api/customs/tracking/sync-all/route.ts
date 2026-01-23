@@ -1,24 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCargoProgress, verifyImportDeclaration, parseUnipassDate } from '@/lib/unipass'
+import { getUnipassSettings, getApiKeyForRegistrationType } from '@/lib/unipass-helpers'
 
 // POST /api/customs/tracking/sync-all - 전체 동기화
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function POST(request: NextRequest) {
   try {
     // 유니패스 설정 가져오기
-    const settings = await prisma.systemSetting.findUnique({
-      where: { key: 'unipass_settings' },
-    })
+    const settings = await getUnipassSettings()
     
-    if (!settings?.value) {
+    if (!settings) {
       return NextResponse.json(
         { error: '유니패스 API 설정이 필요합니다.' },
         { status: 400 }
       )
     }
-    
-    const parsed = typeof settings.value === 'string' ? JSON.parse(settings.value) : settings.value
     
     // 모든 추적 정보 가져오기
     const trackings = await prisma.customsTracking.findMany()
@@ -29,20 +26,23 @@ export async function POST(request: NextRequest) {
     
     for (const tracking of trackings) {
       try {
+        // 등록 방식에 따라 다른 API 키 사용
+        const apiKey = getApiKeyForRegistrationType(settings, tracking.registrationType)
+        if (!apiKey) {
+          failCount++
+          const keyName = tracking.registrationType === 'BL' 
+            ? '화물통관진행정보조회' 
+            : '수입신고필증검증'
+          errors.push(`${tracking.id}: ${keyName} API 키가 설정되지 않았습니다.`)
+          continue
+        }
+        
         let apiResult
-        let apiKey: string
         
         if (tracking.registrationType === 'BL') {
           if (!tracking.blType || !tracking.blNumber || !tracking.blYear) {
             failCount++
             errors.push(`${tracking.id}: BL 정보가 올바르지 않습니다.`)
-            continue
-          }
-          
-          apiKey = parsed.apiKeyCargoProgress
-          if (!apiKey) {
-            failCount++
-            errors.push(`${tracking.id}: 화물통관진행정보조회 API 키가 설정되지 않았습니다.`)
             continue
           }
           
@@ -55,13 +55,6 @@ export async function POST(request: NextRequest) {
           if (!tracking.declarationNumber) {
             failCount++
             errors.push(`${tracking.id}: 수입신고번호가 올바르지 않습니다.`)
-            continue
-          }
-          
-          apiKey = parsed.apiKeyImportDeclaration
-          if (!apiKey) {
-            failCount++
-            errors.push(`${tracking.id}: 수입신고필증검증 API 키가 설정되지 않았습니다.`)
             continue
           }
           

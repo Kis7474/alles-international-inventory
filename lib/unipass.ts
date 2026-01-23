@@ -3,6 +3,7 @@ import { parseString } from 'xml2js'
 
 const UNIPASS_API_BASE = 'unipass.customs.go.kr'
 const UNIPASS_API_PORT = 38010
+const MULTIPLE_RESULTS_PREFIX = '[N00]' // 다건 응답 메시지 prefix
 
 // UNI-PASS API 응답 인터페이스
 export interface UnipassCargoProgress {
@@ -47,10 +48,22 @@ export interface UnipassApiResponse {
  */
 export function parseUnipassDate(dateStr: string | undefined): Date | null {
   if (!dateStr || dateStr.length < 8) return null
-  const year = dateStr.substring(0, 4)
-  const month = dateStr.substring(4, 6)
-  const day = dateStr.substring(6, 8)
-  return new Date(`${year}-${month}-${day}`)
+  const year = parseInt(dateStr.substring(0, 4), 10)
+  const month = parseInt(dateStr.substring(4, 6), 10)
+  const day = parseInt(dateStr.substring(6, 8), 10)
+  
+  // Validate date components
+  if (year < 1900 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31) {
+    return null
+  }
+  
+  const date = new Date(`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`)
+  // Check if the date is valid (e.g., not Feb 30)
+  if (isNaN(date.getTime())) {
+    return null
+  }
+  
+  return date
 }
 
 /**
@@ -171,7 +184,7 @@ export async function getCargoProgress(
     const notice = response.ntceInfo?.ntceCn
     if (notice && notice !== '정상처리되었습니다.') {
       // 다건 응답 체크
-      if (notice && notice.startsWith('[N00]')) {
+      if (notice && notice.startsWith(MULTIPLE_RESULTS_PREFIX)) {
         // 다건 응답 - 목록 반환
         let dataList = response.cargCsclPrgsInfoQryVo
         if (!dataList) {
