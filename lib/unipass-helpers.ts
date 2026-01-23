@@ -27,6 +27,7 @@ export async function getUnipassSettings(): Promise<UnipassSettings | null> {
 
 /**
  * 등록 방식에 따라 올바른 API 키 반환
+ * Note: DECLARATION 타입은 더 이상 사용되지 않지만 하위 호환성을 위해 유지
  */
 export function getApiKeyForRegistrationType(
   settings: UnipassSettings,
@@ -34,10 +35,61 @@ export function getApiKeyForRegistrationType(
 ): string | null {
   if (registrationType === 'BL') {
     return settings.apiKeyCargoProgress || null
-  } else if (registrationType === 'DECLARATION') {
-    return settings.apiKeyImportDeclaration || null
   }
+  // DECLARATION은 더 이상 지원하지 않음
   return null
+}
+
+/**
+ * 통관 추적 정보로부터 수입내역 연동용 메모 생성
+ */
+export function generateImportLinkMemo(tracking: {
+  blType?: string | null
+  blNumber?: string | null
+  cargoNumber?: string | null
+  productName?: string | null
+  weight?: number | null
+  packageCount?: number | null
+  packageUnit?: string | null
+  arrivalDate?: Date | null
+  clearanceDate?: Date | null
+  status?: string | null
+  totalTax?: number | null
+  rawData?: string | null
+}): string {
+  // rawData에서 추가 정보 파싱
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let parsedData: Record<string, any> | null = null
+  try {
+    if (tracking.rawData) {
+      parsedData = JSON.parse(tracking.rawData)
+    }
+  } catch (e) {
+    console.error('Failed to parse rawData:', e)
+  }
+
+  // 메모에 상세 정보 기록
+  const blType = tracking.blType === 'MBL' ? 'Master B/L' : 'House B/L'
+  const loadingPortName = parsedData?.ldprNm || '-'
+  const loadingCountryCode = parsedData?.lodCntyCd || '-'
+  const weightUnit = parsedData?.wghtUt || 'KG'
+
+  return `[유니패스 연동 정보]
+━━━━━━━━━━━━━━━━━━━━
+BL번호: ${tracking.blNumber || '-'} (${blType})
+화물관리번호: ${tracking.cargoNumber || '-'}
+품명: ${tracking.productName || '-'}
+중량: ${tracking.weight || '-'}${weightUnit}
+포장: ${tracking.packageCount || '-'}${tracking.packageUnit || ''}
+입항일: ${tracking.arrivalDate ? new Date(tracking.arrivalDate).toISOString().split('T')[0] : '-'}
+반출일: ${tracking.clearanceDate ? new Date(tracking.clearanceDate).toISOString().split('T')[0] : '-'}
+통관상태: ${tracking.status || '-'}
+세액: ${tracking.totalTax ? `${tracking.totalTax.toLocaleString('ko-KR')}원` : '-'}
+━━━━━━━━━━━━━━━━━━━━
+적재항(출발지): ${loadingPortName}
+적출국가: ${loadingCountryCode}
+━━━━━━━━━━━━━━━━━━━━
+* 위 정보를 참고하여 상세 내역을 입력해주세요.`
 }
 
 /**

@@ -25,6 +25,7 @@ export interface UnipassCargoProgress {
   dclrDt?: string         // 신고일자
   ldprCd?: string         // 적재항코드
   ldprNm?: string         // 적재항명
+  lodCntyCd?: string      // 적출국가코드
   dsprCd?: string         // 양륙항코드
   dsprNm?: string         // 양륙항명
   shcoFlco?: string       // 선사항공사

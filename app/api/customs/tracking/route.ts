@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getCargoProgress, verifyImportDeclaration, parseUnipassDate } from '@/lib/unipass'
-import { getUnipassSettings, getApiKeyForRegistrationType } from '@/lib/unipass-helpers'
+import { getCargoProgress, parseUnipassDate } from '@/lib/unipass'
+import { getUnipassSettings, getApiKeyForRegistrationType, generateImportLinkMemo } from '@/lib/unipass-helpers'
 import { isCustomsCleared } from '@/lib/utils'
 
 interface TrackingDataInput {
@@ -16,6 +16,8 @@ interface TrackingDataInput {
   status?: string
   productName?: string | null
   weight?: number | null
+  packageCount?: number | null
+  packageUnit?: string | null
   arrivalDate?: Date | null
   declarationDate?: Date | null
   clearanceDate?: Date | null
@@ -61,7 +63,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { registrationType, blType, blNumber, blYear, declarationNumber } = body
+    const { blType, blNumber, blYear } = body
     
     // 유니패스 설정 가져오기
     const settings = await getUnipassSettings()
@@ -73,121 +75,64 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    // 등록 방식에 따라 API 호출
-    let apiResult
-    let trackingData: TrackingDataInput = {
-      registrationType,
-      syncCount: 1,
-      lastSyncAt: new Date(),
-    }
-    
-    if (registrationType === 'BL') {
-      if (!blType || !blNumber || !blYear) {
-        return NextResponse.json(
-          { error: 'BL 유형, BL번호, 입항년도를 모두 입력해주세요.' },
-          { status: 400 }
-        )
-      }
-      
-      // 화물통관진행정보조회 API 키 확인
-      const apiKey = getApiKeyForRegistrationType(settings, 'BL')
-      if (!apiKey) {
-        return NextResponse.json(
-          { error: '화물통관진행정보조회 API 키가 설정되지 않았습니다.' },
-          { status: 400 }
-        )
-      }
-      
-      // BL번호로 조회
-      apiResult = await getCargoProgress(apiKey, {
-        blType,
-        blNumber,
-        blYear,
-      })
-      
-      if (!apiResult.success) {
-        return NextResponse.json(
-          { error: apiResult.message || '유니패스 API 조회에 실패했습니다.' },
-          { status: 400 }
-        )
-      }
-      
-      if (!apiResult.data || apiResult.data.length === 0) {
-        return NextResponse.json(
-          { error: '조회된 통관 정보가 없습니다.' },
-          { status: 404 }
-        )
-      }
-      
-      const cargoData = apiResult.data[0]
-      
-      trackingData = {
-        ...trackingData,
-        blType,
-        blNumber,
-        blYear,
-        cargoNumber: cargoData.cargMtNo,
-        status: cargoData.prgsStts,
-        productName: cargoData.prnm,
-        weight: cargoData.ttwg ? parseFloat(cargoData.ttwg) : null,
-        arrivalDate: cargoData.etprDt ? parseUnipassDate(cargoData.etprDt) : null,
-        declarationDate: cargoData.dclrDt ? parseUnipassDate(cargoData.dclrDt) : null,
-        clearanceDate: cargoData.tkofDt ? parseUnipassDate(cargoData.tkofDt) : null,
-        customsDuty: cargoData.csclTotaTxamt ? parseFloat(cargoData.csclTotaTxamt) : null,
-        totalTax: cargoData.csclTotaTxamt ? parseFloat(cargoData.csclTotaTxamt) : null,
-        rawData: JSON.stringify(cargoData),
-      }
-    } else if (registrationType === 'DECLARATION') {
-      if (!declarationNumber) {
-        return NextResponse.json(
-          { error: '수입신고번호를 입력해주세요.' },
-          { status: 400 }
-        )
-      }
-      
-      // 수입신고필증검증 API 키 확인
-      const apiKey = getApiKeyForRegistrationType(settings, 'DECLARATION')
-      if (!apiKey) {
-        return NextResponse.json(
-          { error: '수입신고필증검증 API 키가 설정되지 않았습니다.' },
-          { status: 400 }
-        )
-      }
-      
-      // 수입신고번호로 조회
-      apiResult = await verifyImportDeclaration(apiKey, declarationNumber)
-      
-      if (!apiResult.success) {
-        return NextResponse.json(
-          { error: apiResult.message || '유니패스 API 조회에 실패했습니다.' },
-          { status: 400 }
-        )
-      }
-      
-      if (!apiResult.data || apiResult.data.length === 0) {
-        return NextResponse.json(
-          { error: '조회된 통관 정보가 없습니다.' },
-          { status: 404 }
-        )
-      }
-      
-      const declarationData = apiResult.data[0]
-      
-      trackingData = {
-        ...trackingData,
-        declarationNumber,
-        status: declarationData.prgsStts || '수입신고수리',
-        productName: declarationData.prnm,
-        weight: declarationData.ttwg ? parseFloat(declarationData.ttwg) : null,
-        customsDuty: declarationData.csclTotaTxamt ? parseFloat(declarationData.csclTotaTxamt) : null,
-        totalTax: declarationData.csclTotaTxamt ? parseFloat(declarationData.csclTotaTxamt) : null,
-        rawData: JSON.stringify(declarationData),
-      }
-    } else {
+    if (!blType || !blNumber || !blYear) {
       return NextResponse.json(
-        { error: '올바른 등록 방식을 선택해주세요.' },
+        { error: 'BL 유형, BL번호, 입항년도를 모두 입력해주세요.' },
         { status: 400 }
       )
+    }
+    
+    // 화물통관진행정보조회 API 키 확인
+    const apiKey = getApiKeyForRegistrationType(settings, 'BL')
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: '화물통관진행정보조회 API 키가 설정되지 않았습니다.' },
+        { status: 400 }
+      )
+    }
+    
+    // BL번호로 조회
+    const apiResult = await getCargoProgress(apiKey, {
+      blType,
+      blNumber,
+      blYear,
+    })
+    
+    if (!apiResult.success) {
+      return NextResponse.json(
+        { error: apiResult.message || '유니패스 API 조회에 실패했습니다.' },
+        { status: 400 }
+      )
+    }
+    
+    if (!apiResult.data || apiResult.data.length === 0) {
+      return NextResponse.json(
+        { error: '조회된 통관 정보가 없습니다.' },
+        { status: 404 }
+      )
+    }
+    
+    const cargoData = apiResult.data[0]
+    
+    const trackingData: TrackingDataInput = {
+      registrationType: 'BL',
+      blType,
+      blNumber,
+      blYear,
+      cargoNumber: cargoData.cargMtNo,
+      status: cargoData.prgsStts,
+      productName: cargoData.prnm,
+      weight: cargoData.ttwg ? parseFloat(cargoData.ttwg) : null,
+      arrivalDate: cargoData.etprDt ? parseUnipassDate(cargoData.etprDt) : null,
+      declarationDate: cargoData.dclrDt ? parseUnipassDate(cargoData.dclrDt) : null,
+      clearanceDate: cargoData.tkofDt ? parseUnipassDate(cargoData.tkofDt) : null,
+      customsDuty: cargoData.csclTotaTxamt ? parseFloat(cargoData.csclTotaTxamt) : null,
+      totalTax: cargoData.csclTotaTxamt ? parseFloat(cargoData.csclTotaTxamt) : null,
+      packageCount: cargoData.pckGcnt ? parseInt(cargoData.pckGcnt) : null,
+      packageUnit: cargoData.pckUt || null,
+      rawData: JSON.stringify(cargoData),
+      syncCount: 1,
+      lastSyncAt: new Date(),
     }
     
     // DB에 저장
@@ -212,7 +157,7 @@ export async function POST(request: NextRequest) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if ((error as any).code === 'P2002') {
       return NextResponse.json(
-        { error: '이미 등록된 BL번호 또는 수입신고번호입니다.' },
+        { error: '이미 등록된 BL번호입니다.' },
         { status: 400 }
       )
     }
@@ -265,20 +210,20 @@ async function autoLinkToImport(trackingId: string) {
       return
     }
     
-    // 수입내역 생성
+    // 메모 생성
+    const memo = generateImportLinkMemo(tracking)
+    
+    // 수입내역 생성 - 최소 정보만 채움
     const importRecord = await prisma.importExport.create({
       data: {
         type: 'IMPORT',
         date: tracking.clearanceDate || tracking.arrivalDate || new Date(),
         vendorId: vendor.id,
         currency: 'USD',
-        exchangeRate: 1300, // TODO: 실제 환율 적용
-        foreignAmount: 0,
-        krwAmount: tracking.totalTax || 0,
-        dutyAmount: tracking.customsDuty || 0,
-        vatAmount: tracking.vat || 0,
-        totalAmount: tracking.totalTax || 0,
-        memo: `[유니패스 자동연동] ${tracking.productName || ''} / BL: ${tracking.blNumber || ''} / 신고번호: ${tracking.declarationNumber || ''}`,
+        exchangeRate: 1300, // 기본값 - 사용자가 수정 필요
+        foreignAmount: 0, // 사용자가 직접 입력
+        krwAmount: 0, // 사용자가 직접 입력
+        memo,
       },
     })
     
