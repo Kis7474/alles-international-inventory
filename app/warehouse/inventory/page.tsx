@@ -82,22 +82,22 @@ export default function InventoryPage() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-6 text-gray-900">재고 조회</h1>
+      <h1 className="text-2xl md:text-3xl font-bold mb-4 md:mb-6 text-gray-900">재고 조회</h1>
 
       {/* 창고료 정보 요약 */}
       {inventory.length > 0 && inventory[0].totalStorageExpense !== undefined && (
-        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-6">
-          <h3 className="text-lg font-bold text-orange-900 mb-2">💰 창고료 정보</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-4 md:mb-6">
+          <h3 className="text-base md:text-lg font-bold text-orange-900 mb-2">💰 창고료 정보</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
             <div>
-              <p className="text-sm text-orange-700">이번 달 총 창고료</p>
-              <p className="text-2xl font-bold text-orange-900">
+              <p className="text-xs md:text-sm text-orange-700">이번 달 총 창고료</p>
+              <p className="text-xl md:text-2xl font-bold text-orange-900">
                 ₩{formatNumber(inventory[0].totalStorageExpense || 0, 0)}
               </p>
             </div>
             <div>
-              <p className="text-sm text-orange-700">단위당 배분 창고료</p>
-              <p className="text-2xl font-bold text-orange-900">
+              <p className="text-xs md:text-sm text-orange-700">단위당 배분 창고료</p>
+              <p className="text-xl md:text-2xl font-bold text-orange-900">
                 ₩{formatNumber(inventory[0].storageExpensePerUnit || 0, 2)}
               </p>
             </div>
@@ -109,10 +109,10 @@ export default function InventoryPage() {
       )}
 
       {/* 탭 UI */}
-      <div className="flex border-b mb-6">
+      <div className="flex border-b mb-4 md:mb-6 overflow-x-auto">
         <button
           onClick={() => setActiveTab('ALL')}
-          className={`px-6 py-3 font-medium transition-colors ${
+          className={`px-4 md:px-6 py-3 font-medium transition-colors whitespace-nowrap min-h-[44px] ${
             activeTab === 'ALL'
               ? 'border-b-2 border-blue-600 text-blue-600'
               : 'text-gray-500 hover:text-gray-700'
@@ -122,7 +122,7 @@ export default function InventoryPage() {
         </button>
         <button
           onClick={() => setActiveTab('WAREHOUSE')}
-          className={`px-6 py-3 font-medium transition-colors ${
+          className={`px-4 md:px-6 py-3 font-medium transition-colors whitespace-nowrap min-h-[44px] ${
             activeTab === 'WAREHOUSE'
               ? 'border-b-2 border-blue-600 text-blue-600'
               : 'text-gray-500 hover:text-gray-700'
@@ -132,7 +132,7 @@ export default function InventoryPage() {
         </button>
         <button
           onClick={() => setActiveTab('OFFICE')}
-          className={`px-6 py-3 font-medium transition-colors ${
+          className={`px-4 md:px-6 py-3 font-medium transition-colors whitespace-nowrap min-h-[44px] ${
             activeTab === 'OFFICE'
               ? 'border-b-2 border-blue-600 text-blue-600'
               : 'text-gray-500 hover:text-gray-700'
@@ -142,13 +142,15 @@ export default function InventoryPage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         {/* 품목별 재고 현황 */}
         <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b">
-            <h2 className="text-xl font-bold">품목별 재고 현황</h2>
+          <div className="px-4 md:px-6 py-3 md:py-4 border-b">
+            <h2 className="text-lg md:text-xl font-bold">품목별 재고 현황</h2>
           </div>
-          <div className="overflow-x-auto">
+          
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="min-w-full">
               <thead className="bg-gray-50">
                 <tr>
@@ -227,91 +229,179 @@ export default function InventoryPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Mobile Card View */}
+          <div className="md:hidden divide-y divide-gray-200">
+            {inventory.map((item) => (
+              <div
+                key={item.productId}
+                onClick={() => handleItemClick(item.productId)}
+                className={`p-4 cursor-pointer active:bg-blue-50 ${
+                  selectedItem?.productId === item.productId ? 'bg-blue-50' : ''
+                }`}
+              >
+                <div className="font-bold text-gray-900 mb-2 text-base">
+                  {item.productName}
+                  {item.productCode && <span className="text-sm text-gray-600 ml-2">[{item.productCode}]</span>}
+                </div>
+                <div className="space-y-1.5 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">매입처:</span>
+                    <span className="text-gray-900">{item.purchaseVendor || '-'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">카테고리:</span>
+                    <span className="text-gray-900">{item.category || '-'}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">재고:</span>
+                    <span className="font-bold text-gray-900">{formatNumber(item.totalQuantity, 0)} {item.unit}</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-2 border-t">
+                    <span className="text-gray-600">평균단가:</span>
+                    <span className="font-bold text-blue-700">₩{formatNumber(item.avgUnitCost, 2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 text-xs">창고료 미포함:</span>
+                    <span className="text-gray-500 text-xs">₩{formatNumber(item.avgUnitCostWithoutStorage, 2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 text-xs">배분 창고료:</span>
+                    <span className="text-orange-600 text-xs">₩{formatNumber(item.allocatedStorageExpense, 2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-2 border-t">
+                    <span className="text-gray-600 font-medium">재고가치:</span>
+                    <span className="font-bold text-gray-900">₩{formatNumber(item.totalValueWithStorage, 0)}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {inventory.length === 0 && (
+              <div className="px-6 py-8 text-center text-gray-500">
+                재고가 없습니다.
+              </div>
+            )}
+          </div>
         </div>
 
         {/* LOT별 상세 정보 */}
         <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b">
-            <h2 className="text-xl font-bold">LOT별 상세 정보</h2>
+          <div className="px-4 md:px-6 py-3 md:py-4 border-b">
+            <h2 className="text-lg md:text-xl font-bold">LOT별 상세 정보</h2>
             {selectedItem && (
-              <div className="text-sm text-gray-600 mt-1">
+              <div className="text-xs md:text-sm text-gray-600 mt-1">
                 총 재고: {formatNumber(selectedItem.totalQuantity, 0)} (
                 {selectedItem.lots.length}개 LOT)
               </div>
             )}
           </div>
-          <div className="overflow-x-auto">
-            {selectedItem ? (
-              <table className="min-w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                      LOT 코드
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                      입고일
-                    </th>
-                    <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">
-                      입고수량
-                    </th>
-                    <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">
-                      잔량
-                    </th>
-                    <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">
-                      단가
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {selectedItem.lots.map((lot) => (
-                    <tr key={lot.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3">
-                        {lot.lotCode || `#${lot.id}`}
-                      </td>
-                      <td className="px-4 py-3">
-                        {new Date(lot.receivedDate).toLocaleDateString('ko-KR')}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        {formatNumber(lot.quantityReceived, 0)}
-                      </td>
-                      <td className="px-4 py-3 text-right font-medium">
-                        {formatNumber(lot.quantityRemaining, 0)}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        ₩{formatNumber(lot.unitCost, 2)}
-                      </td>
+          
+          {selectedItem ? (
+            <>
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="min-w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                        LOT 코드
+                      </th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                        입고일
+                      </th>
+                      <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">
+                        입고수량
+                      </th>
+                      <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">
+                        잔량
+                      </th>
+                      <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">
+                        단가
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <div className="px-6 py-8 text-center text-gray-500">
-                품목을 선택하면 LOT별 상세 정보를 확인할 수 있습니다.
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {selectedItem.lots.map((lot) => (
+                      <tr key={lot.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3">
+                          {lot.lotCode || `#${lot.id}`}
+                        </td>
+                        <td className="px-4 py-3">
+                          {new Date(lot.receivedDate).toLocaleDateString('ko-KR')}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          {formatNumber(lot.quantityReceived, 0)}
+                        </td>
+                        <td className="px-4 py-3 text-right font-medium">
+                          {formatNumber(lot.quantityRemaining, 0)}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          ₩{formatNumber(lot.unitCost, 2)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            )}
-          </div>
+
+              {/* Mobile Card View */}
+              <div className="md:hidden divide-y divide-gray-200">
+                {selectedItem.lots.map((lot) => (
+                  <div key={lot.id} className="p-4">
+                    <div className="font-bold text-gray-900 mb-2">
+                      {lot.lotCode || `#${lot.id}`}
+                    </div>
+                    <div className="space-y-1.5 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">입고일:</span>
+                        <span className="text-gray-900">
+                          {new Date(lot.receivedDate).toLocaleDateString('ko-KR')}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">입고수량:</span>
+                        <span className="text-gray-900">{formatNumber(lot.quantityReceived, 0)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">잔량:</span>
+                        <span className="font-bold text-gray-900">{formatNumber(lot.quantityRemaining, 0)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">단가:</span>
+                        <span className="text-gray-900">₩{formatNumber(lot.unitCost, 2)}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="px-4 md:px-6 py-8 text-center text-gray-500 text-sm md:text-base">
+              품목을 선택하면 LOT별 상세 정보를 확인할 수 있습니다.
+            </div>
+          )}
         </div>
       </div>
 
       {/* 재고 요약 */}
-      <div className="mt-6 bg-white p-6 rounded-lg shadow">
-        <h2 className="text-xl font-bold mb-4">재고 요약</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="mt-4 md:mt-6 bg-white p-4 md:p-6 rounded-lg shadow">
+        <h2 className="text-lg md:text-xl font-bold mb-3 md:mb-4">재고 요약</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
           <div>
-            <div className="text-sm text-gray-600 mb-1">총 품목 수</div>
-            <div className="text-3xl font-bold text-blue-600">
+            <div className="text-xs md:text-sm text-gray-600 mb-1">총 품목 수</div>
+            <div className="text-2xl md:text-3xl font-bold text-blue-600">
               {inventory.length}개
             </div>
           </div>
           <div>
-            <div className="text-sm text-gray-600 mb-1">총 LOT 수</div>
-            <div className="text-3xl font-bold text-green-600">
+            <div className="text-xs md:text-sm text-gray-600 mb-1">총 LOT 수</div>
+            <div className="text-2xl md:text-3xl font-bold text-green-600">
               {inventory.reduce((sum, item) => sum + item.lotCount, 0)}개
             </div>
           </div>
           <div>
-            <div className="text-sm text-gray-600 mb-1">총 재고 가치</div>
-            <div className="text-3xl font-bold text-purple-600">
+            <div className="text-xs md:text-sm text-gray-600 mb-1">총 재고 가치</div>
+            <div className="text-2xl md:text-3xl font-bold text-purple-600">
               ₩
               {formatNumber(
                 inventory.reduce((sum, item) => sum + item.totalValue, 0),
