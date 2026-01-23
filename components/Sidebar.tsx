@@ -34,7 +34,7 @@ const menuItems: MenuItem[] = [
     submenu: [
       { href: '/import-export', label: '수입/수출 내역', icon: '📋' },
       { href: '/import-export/new', label: '수입/수출 등록', icon: '➕' },
-      { href: '/customs/tracking', label: '통관 추적', icon: '📦' },
+      { href: '/customs/tracking', label: '통관 내역', icon: '📦' },
       { href: '/exchange-rates', label: '환율 관리', icon: '💱' },
     ],
   },

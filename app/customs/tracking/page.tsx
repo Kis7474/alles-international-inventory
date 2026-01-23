@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, isCustomsCleared } from '@/lib/utils'
 import Link from 'next/link'
 
 interface CustomsTracking {
@@ -194,6 +194,37 @@ export default function CustomsTrackingPage() {
     } catch (error) {
       console.error('Delete failed:', error)
       alert('삭제 중 오류가 발생했습니다.')
+    }
+  }
+
+  // 수입/수출로 이동
+  const handleTransferToImportExport = async (id: string) => {
+    try {
+      const res = await fetch(`/api/customs/tracking/${id}/transfer`, {
+        method: 'POST',
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        alert(data.error || '수입/수출로 이동 중 오류가 발생했습니다.')
+        return
+      }
+
+      if (data.alreadyLinked) {
+        if (confirm('이미 수입/수출로 이동되었습니다. 해당 페이지로 이동하시겠습니까?')) {
+          window.location.href = `/import-export/${data.importExportId}`
+        }
+      } else {
+        if (confirm(data.message + ' 수정 페이지로 이동하시겠습니까?')) {
+          window.location.href = `/import-export/${data.importExportId}`
+        } else {
+          await fetchTrackings()
+        }
+      }
+    } catch (error) {
+      console.error('Transfer failed:', error)
+      alert('수입/수출로 이동 중 오류가 발생했습니다.')
     }
   }
 
@@ -616,14 +647,22 @@ export default function CustomsTrackingPage() {
                         </button>
                         {tracking.importId ? (
                           <Link
-                            href={`/import-export`}
+                            href={`/import-export/${tracking.importId}`}
                             className="text-green-600 hover:text-green-800"
-                            title="수입내역 연동됨"
+                            title="수입내역 보기"
                           >
                             📋
                           </Link>
                         ) : (
-                          <span className="text-gray-400" title="수입내역 미연동">📋</span>
+                          isCustomsCleared(tracking.status) && (
+                            <button
+                              onClick={() => handleTransferToImportExport(tracking.id)}
+                              className="text-purple-600 hover:text-purple-800"
+                              title="수입/수출 이동"
+                            >
+                              ➡️
+                            </button>
+                          )
                         )}
                         <button
                           onClick={() => handleDelete(tracking.id)}
