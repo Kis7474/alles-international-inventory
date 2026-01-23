@@ -17,6 +17,8 @@ interface UpdateDataInput {
   clearanceDate?: Date | null
   customsDuty?: number | null
   totalTax?: number | null
+  forwarderCode?: string | null
+  forwarderName?: string | null
   rawData?: string
 }
 
@@ -105,6 +107,8 @@ export async function POST(
       clearanceDate: data.tkofDt ? parseUnipassDate(data.tkofDt) : null,
       customsDuty: data.csclTotaTxamt ? parseFloat(data.csclTotaTxamt) : null,
       totalTax: data.csclTotaTxamt ? parseFloat(data.csclTotaTxamt) : null,
+      forwarderCode: data.frwrSgn || null,
+      forwarderName: data.frwrEntsConm || null,
       rawData: JSON.stringify(data),
     }
     

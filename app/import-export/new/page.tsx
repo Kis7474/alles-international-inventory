@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatCurrency } from '@/lib/utils'
+import ProductRegistrationModal from '@/components/ProductRegistrationModal'
 
 interface Product {
   id: number
@@ -66,6 +67,9 @@ export default function ImportExportNewPage() {
     quantity: '',
     unitPrice: ''
   })
+  
+  // Product registration modal state
+  const [showProductModal, setShowProductModal] = useState(false)
   
   // Form data
   const [formData, setFormData] = useState({
@@ -256,6 +260,23 @@ export default function ImportExportNewPage() {
     setFormData(prev => ({ ...prev, currency }))
     fetchExchangeRate(currency, formData.date)
   }
+  
+  // 품목 등록 성공 핸들러
+  const handleProductRegistrationSuccess = async (productId: number) => {
+    // Refresh products list
+    const res = await fetch('/api/products')
+    const updatedProducts = await res.json()
+    setProducts(updatedProducts)
+    
+    // If a vendor is selected, update available products
+    if (formData.vendorId) {
+      const filtered = updatedProducts.filter((p: Product) => p.purchaseVendorId === parseInt(formData.vendorId))
+      setAvailableProducts(filtered)
+    }
+    
+    // Auto-select the newly registered product
+    setFormData({ ...formData, productId: productId.toString() })
+  }
 
   // 날짜 변경 핸들러
   const handleDateChange = (date: string) => {
@@ -411,29 +432,39 @@ export default function ImportExportNewPage() {
               </select>
             </div>
             
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                품목 <span className="text-red-500">*</span> <span className="text-xs text-blue-600">(선택한 거래처의 품목)</span>
-              </label>
-              <select
-                name="productId"
-                value={formData.productId}
-                onChange={handleChange}
-                required
-                disabled={!formData.vendorId}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+            <div className="flex gap-2 items-end">
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  품목 <span className="text-red-500">*</span> <span className="text-xs text-blue-600">(선택한 거래처의 품목)</span>
+                </label>
+                <select
+                  name="productId"
+                  value={formData.productId}
+                  onChange={handleChange}
+                  required
+                  disabled={!formData.vendorId}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                >
+                  <option value="">{formData.vendorId ? '품목을 선택하세요' : '거래처를 먼저 선택하세요'}</option>
+                  {availableProducts
+                    .filter(p => 
+                      p.name.toLowerCase().includes(productSearch.toLowerCase())
+                    )
+                    .map((product) => (
+                      <option key={product.id} value={product.id}>
+                        [{product.code}] {product.name} ({product.unit})
+                      </option>
+                    ))}
+                </select>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowProductModal(true)}
+                className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-bold text-lg"
+                title="새 품목 등록"
               >
-                <option value="">{formData.vendorId ? '품목을 선택하세요' : '거래처를 먼저 선택하세요'}</option>
-                {availableProducts
-                  .filter(p => 
-                    p.name.toLowerCase().includes(productSearch.toLowerCase())
-                  )
-                  .map((product) => (
-                    <option key={product.id} value={product.id}>
-                      [{product.code}] {product.name} ({product.unit})
-                    </option>
-                  ))}
-              </select>
+                +
+              </button>
             </div>
             
             <div>
@@ -887,6 +918,14 @@ export default function ImportExportNewPage() {
           </button>
         </div>
       </form>
+      
+      {/* Product Registration Modal */}
+      <ProductRegistrationModal
+        isOpen={showProductModal}
+        onClose={() => setShowProductModal(false)}
+        onSuccess={handleProductRegistrationSuccess}
+        vendors={vendors}
+      />
     </div>
   )
 }

@@ -220,6 +220,11 @@ model ImportExport {
   
   memo            String?
   
+  // PDF 첨부 파일 (통관 내역에서 연동 또는 직접 첨부)
+  pdfFileName     String?
+  pdfFilePath     String?
+  pdfUploadedAt   DateTime?
+  
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 }
@@ -647,6 +652,15 @@ model CustomsTracking {
   
   // 메모
   memo            String?  // 사용자 메모
+  
+  // PDF 첨부 파일
+  pdfFileName     String?   // 원본 파일명
+  pdfFilePath     String?   // 저장 경로
+  pdfUploadedAt   DateTime? // 업로드 일시
+  
+  // 포워더/특송업체 정보
+  forwarderCode   String?   // 포워더부호 (frwrSgn)
+  forwarderName   String?   // 포워더명 (frwrEntsConm)
   
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

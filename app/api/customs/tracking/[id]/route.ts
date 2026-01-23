@@ -51,29 +51,52 @@ export async function DELETE(
   }
 }
 
-// PATCH /api/customs/tracking/[id] - 메모 업데이트
+// PATCH /api/customs/tracking/[id] - 메모 및 PDF 업데이트
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     const body = await request.json()
-    const { memo } = body
+    
+    // Build update data dynamically
+    const updateData: {
+      memo?: string
+      pdfFileName?: string | null
+      pdfFilePath?: string | null
+      pdfUploadedAt?: Date | string | null
+    } = {}
+    
+    if ('memo' in body) {
+      updateData.memo = body.memo
+    }
+    
+    if ('pdfFileName' in body) {
+      updateData.pdfFileName = body.pdfFileName
+    }
+    
+    if ('pdfFilePath' in body) {
+      updateData.pdfFilePath = body.pdfFilePath
+    }
+    
+    if ('pdfUploadedAt' in body) {
+      updateData.pdfUploadedAt = body.pdfUploadedAt
+    }
     
     const tracking = await prisma.customsTracking.update({
       where: { id: params.id },
-      data: { memo },
+      data: updateData,
     })
     
     return NextResponse.json({
       success: true,
-      message: '메모가 저장되었습니다.',
+      message: '정보가 업데이트되었습니다.',
       tracking,
     })
   } catch (error) {
     console.error('Error updating customs tracking:', error)
     return NextResponse.json(
-      { error: '메모 저장 중 오류가 발생했습니다.' },
+      { error: '정보 업데이트 중 오류가 발생했습니다.' },
       { status: 500 }
     )
   }

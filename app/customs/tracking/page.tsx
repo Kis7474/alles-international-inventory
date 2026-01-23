@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { formatCurrency, isCustomsCleared } from '@/lib/utils'
 import Link from 'next/link'
+import PdfPreviewModal from '@/components/PdfPreviewModal'
 
 interface CustomsTracking {
   id: string
@@ -29,6 +30,11 @@ interface CustomsTracking {
   lastSyncAt: string | null
   syncCount: number
   memo: string | null
+  pdfFileName: string | null
+  pdfFilePath: string | null
+  pdfUploadedAt: string | null
+  forwarderCode: string | null
+  forwarderName: string | null
   createdAt: string
   updatedAt: string
 }
@@ -38,6 +44,10 @@ export default function CustomsTrackingPage() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [statusFilter, setStatusFilter] = useState('')
+  
+  // Date filter state
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
   
   const [showForm, setShowForm] = useState(false)
   const [formData, setFormData] = useState({
@@ -51,12 +61,22 @@ export default function CustomsTrackingPage() {
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [memo, setMemo] = useState('')
   const [savingMemo, setSavingMemo] = useState(false)
+  
+  // PDF 관련 상태
+  const [showPdfModal, setShowPdfModal] = useState(false)
+  const [currentPdfUrl, setCurrentPdfUrl] = useState('')
+  const [currentPdfName, setCurrentPdfName] = useState('')
+  const [uploadingPdf, setUploadingPdf] = useState(false)
+  const [uploadingTrackingId, setUploadingTrackingId] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const fetchTrackings = useCallback(async () => {
     try {
       setLoading(true)
       const params = new URLSearchParams()
       if (statusFilter) params.append('status', statusFilter)
+      if (startDate) params.append('startDate', startDate)
+      if (endDate) params.append('endDate', endDate)
       
       const res = await fetch(`/api/customs/tracking?${params.toString()}`)
       const data = await res.json()
@@ -67,7 +87,7 @@ export default function CustomsTrackingPage() {
     } finally {
       setLoading(false)
     }
-  }, [statusFilter])
+  }, [statusFilter, startDate, endDate])
 
   useEffect(() => {
     fetchTrackings()
@@ -254,6 +274,94 @@ export default function CustomsTrackingPage() {
       setSavingMemo(false)
     }
   }
+  
+  // PDF 업로드 핸들러
+  const handlePdfUpload = async (trackingId: string, file: File) => {
+    try {
+      setUploadingPdf(true)
+      setUploadingTrackingId(trackingId)
+      
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('type', 'customs')
+      
+      const uploadRes = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      })
+      
+      if (!uploadRes.ok) {
+        const error = await uploadRes.json()
+        throw new Error(error.error || 'PDF 업로드에 실패했습니다.')
+      }
+      
+      const uploadData = await uploadRes.json()
+      
+      // DB 업데이트
+      const updateRes = await fetch(`/api/customs/tracking/${trackingId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pdfFileName: uploadData.fileName,
+          pdfFilePath: uploadData.filePath,
+          pdfUploadedAt: uploadData.uploadedAt,
+        }),
+      })
+      
+      if (!updateRes.ok) {
+        throw new Error('PDF 정보 저장에 실패했습니다.')
+      }
+      
+      alert('PDF가 업로드되었습니다.')
+      await fetchTrackings()
+      
+      // 상세 모달이 열려있으면 업데이트
+      if (selectedTracking && selectedTracking.id === trackingId) {
+        const updated = await fetch(`/api/customs/tracking/${trackingId}`)
+        const data = await updated.json()
+        setSelectedTracking(data)
+      }
+    } catch (error) {
+      console.error('PDF upload error:', error)
+      alert(error instanceof Error ? error.message : 'PDF 업로드 중 오류가 발생했습니다.')
+    } finally {
+      setUploadingPdf(false)
+      setUploadingTrackingId(null)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
+  }
+  
+  const handlePdfButtonClick = (trackingId: string) => {
+    setUploadingTrackingId(trackingId)
+    fileInputRef.current?.click()
+  }
+  
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file && uploadingTrackingId) {
+      handlePdfUpload(uploadingTrackingId, file)
+    }
+  }
+  
+  const handlePdfPreview = (tracking: CustomsTracking) => {
+    if (tracking.pdfFilePath) {
+      setCurrentPdfUrl(tracking.pdfFilePath)
+      setCurrentPdfName(tracking.pdfFileName || 'document.pdf')
+      setShowPdfModal(true)
+    }
+  }
+  
+  const handleDateFilter = () => {
+    fetchTrackings()
+  }
+  
+  const handleResetFilter = () => {
+    setStartDate('')
+    setEndDate('')
+    setStatusFilter('')
+  }
 
   const getStatusBadge = (status: string | null) => {
     if (!status) return <span className="text-gray-400">-</span>
@@ -432,57 +540,98 @@ export default function CustomsTrackingPage() {
 
       {/* 필터 */}
       <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-        <div className="flex gap-2">
-          <button
-            onClick={() => setStatusFilter('')}
-            className={`px-4 py-2 rounded-lg ${
-              statusFilter === ''
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            전체
-          </button>
-          <button
-            onClick={() => setStatusFilter('입항')}
-            className={`px-4 py-2 rounded-lg ${
-              statusFilter === '입항'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            입항
-          </button>
-          <button
-            onClick={() => setStatusFilter('검사중')}
-            className={`px-4 py-2 rounded-lg ${
-              statusFilter === '검사중'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            검사중
-          </button>
-          <button
-            onClick={() => setStatusFilter('심사중')}
-            className={`px-4 py-2 rounded-lg ${
-              statusFilter === '심사중'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            심사중
-          </button>
-          <button
-            onClick={() => setStatusFilter('통관완료')}
-            className={`px-4 py-2 rounded-lg ${
-              statusFilter === '통관완료'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            통관완료
-          </button>
+        {/* 날짜 필터 */}
+        <div className="mb-4 pb-4 border-b border-gray-200">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">입항일 기준 필터</h3>
+          <div className="flex gap-4 items-end flex-wrap">
+            <div className="flex-1 min-w-[150px]">
+              <label className="block text-sm text-gray-600 mb-1">시작일</label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex-1 min-w-[150px]">
+              <label className="block text-sm text-gray-600 mb-1">종료일</label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <button
+              onClick={handleDateFilter}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              조회
+            </button>
+            <button
+              onClick={handleResetFilter}
+              className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+            >
+              초기화
+            </button>
+          </div>
+        </div>
+        
+        {/* 상태 필터 */}
+        <div>
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">진행 상태</h3>
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={() => setStatusFilter('')}
+              className={`px-4 py-2 rounded-lg ${
+                statusFilter === ''
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              전체
+            </button>
+            <button
+              onClick={() => setStatusFilter('입항')}
+              className={`px-4 py-2 rounded-lg ${
+                statusFilter === '입항'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              입항
+            </button>
+            <button
+              onClick={() => setStatusFilter('검사중')}
+              className={`px-4 py-2 rounded-lg ${
+                statusFilter === '검사중'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              검사중
+            </button>
+            <button
+              onClick={() => setStatusFilter('심사중')}
+              className={`px-4 py-2 rounded-lg ${
+                statusFilter === '심사중'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              심사중
+            </button>
+            <button
+              onClick={() => setStatusFilter('통관완료')}
+              className={`px-4 py-2 rounded-lg ${
+                statusFilter === '통관완료'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              통관완료
+            </button>
+          </div>
         </div>
       </div>
 
@@ -496,31 +645,34 @@ export default function CustomsTrackingPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
+            <table className="min-w-full table-fixed divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="w-20 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     등록방식
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="w-40 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     BL/신고번호
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="w-48 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     품명
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="w-24 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     진행상태
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="w-24 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     입항일
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="w-24 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     통관일
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="w-28 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     관세
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="w-20 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    PDF
+                  </th>
+                  <th className="w-28 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     관리
                   </th>
                 </tr>
@@ -528,7 +680,7 @@ export default function CustomsTrackingPage() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {trackings.map((tracking) => (
                   <tr key={tracking.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-4 whitespace-nowrap">
                       <span className={`px-2 py-1 rounded text-xs font-medium ${
                         tracking.registrationType === 'BL' 
                           ? 'bg-blue-100 text-blue-800' 
@@ -537,8 +689,8 @@ export default function CustomsTrackingPage() {
                         {tracking.registrationType === 'BL' ? 'BL' : '신고번호'}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm font-medium text-gray-900">
+                    <td className="px-4 py-4">
+                      <div className="text-sm font-medium text-gray-900 truncate" title={tracking.registrationType === 'BL' ? tracking.blNumber || '' : tracking.declarationNumber || ''}>
                         {tracking.registrationType === 'BL' 
                           ? tracking.blNumber 
                           : tracking.declarationNumber}
@@ -549,31 +701,54 @@ export default function CustomsTrackingPage() {
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-gray-900">
+                    <td className="px-4 py-4">
+                      <div className="text-sm text-gray-900 truncate" title={tracking.productName || '-'}>
                         {tracking.productName || '-'}
                       </div>
                       {tracking.weight && (
                         <div className="text-xs text-gray-500">{tracking.weight}kg</div>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-4 whitespace-nowrap">
                       {getStatusBadge(tracking.status)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                       {tracking.arrivalDate
                         ? new Date(tracking.arrivalDate).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' })
                         : '-'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                       {tracking.clearanceDate
                         ? new Date(tracking.clearanceDate).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' })
                         : '-'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                       {tracking.totalTax ? formatCurrency(tracking.totalTax) : '-'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    {/* PDF 컬럼 */}
+                    <td className="px-4 py-4 whitespace-nowrap text-center">
+                      {tracking.pdfFilePath ? (
+                        <button
+                          onClick={() => handlePdfPreview(tracking)}
+                          className="text-blue-600 hover:text-blue-800 text-lg"
+                          title={tracking.pdfFileName || 'PDF 보기'}
+                        >
+                          📄
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handlePdfButtonClick(tracking.id)}
+                          disabled={uploadingPdf && uploadingTrackingId === tracking.id}
+                          className={`text-gray-400 hover:text-gray-600 text-lg ${
+                            uploadingPdf && uploadingTrackingId === tracking.id ? 'opacity-50 cursor-wait' : ''
+                          }`}
+                          title="PDF 업로드"
+                        >
+                          {uploadingPdf && uploadingTrackingId === tracking.id ? '⏳' : '📎'}
+                        </button>
+                      )}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm">
                       <div className="flex gap-2">
                         <button
                           onClick={() => handleViewDetail(tracking)}
@@ -748,6 +923,71 @@ export default function CustomsTrackingPage() {
                 </div>
               </div>
               
+              {/* 포워더 정보 */}
+              {(selectedTracking.forwarderCode || selectedTracking.forwarderName) && (
+                <div className="mb-6">
+                  <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
+                    <span className="mr-2">■</span> 포워더/특송업체 정보
+                  </h3>
+                  <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                    {selectedTracking.forwarderCode && (
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <span className="text-gray-600">포워더부호</span>
+                        <span className="font-medium">{selectedTracking.forwarderCode}</span>
+                      </div>
+                    )}
+                    {selectedTracking.forwarderName && (
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <span className="text-gray-600">포워더명</span>
+                        <span className="font-medium">{selectedTracking.forwarderName}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              {/* PDF 첨부파일 */}
+              <div className="mb-6">
+                <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
+                  <span className="mr-2">■</span> PDF 첨부파일
+                </h3>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  {selectedTracking.pdfFilePath ? (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl">📄</span>
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {selectedTracking.pdfFileName}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {selectedTracking.pdfUploadedAt 
+                              ? `업로드: ${new Date(selectedTracking.pdfUploadedAt).toLocaleDateString('ko-KR')}` 
+                              : ''}
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handlePdfPreview(selectedTracking)}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                      >
+                        미리보기
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-center py-4">
+                      <button
+                        onClick={() => handlePdfButtonClick(selectedTracking.id)}
+                        disabled={uploadingPdf}
+                        className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+                      >
+                        {uploadingPdf ? 'PDF 업로드 중...' : 'PDF 업로드'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
               {/* 메모 */}
               <div className="mb-6">
                 <h3 className="font-semibold text-gray-900 mb-3 flex items-center">
@@ -765,7 +1005,7 @@ export default function CustomsTrackingPage() {
               {/* 버튼 */}
               <div className="flex justify-end gap-3">
                 <button
-                  onClick={handleSaveMemo}
+                                    onClick={handleSaveMemo}
                   disabled={savingMemo}
                   className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed transition-colors"
                 >
@@ -782,6 +1022,23 @@ export default function CustomsTrackingPage() {
           </div>
         </div>
       )}
+      
+      {/* Hidden file input for PDF upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="application/pdf"
+        onChange={handleFileChange}
+        className="hidden"
+      />
+      
+      {/* PDF Preview Modal */}
+      <PdfPreviewModal
+        isOpen={showPdfModal}
+        onClose={() => setShowPdfModal(false)}
+        pdfUrl={currentPdfUrl}
+        fileName={currentPdfName}
+      />
     </div>
   )
 }

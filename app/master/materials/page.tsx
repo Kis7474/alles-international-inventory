@@ -242,7 +242,7 @@ export default function MasterMaterialsPage() {
   return (
     <div>
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">자재 관리</h1>
+        <h1 className="text-3xl font-bold text-gray-900">품목 관리</h1>
         <div className="flex gap-2">
           {selectedIds.length > 0 && (
             <button
@@ -256,7 +256,7 @@ export default function MasterMaterialsPage() {
             onClick={() => setShowModal(true)}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
-            + 자재 등록
+            + 품목 등록
           </button>
         </div>
       </div>
@@ -282,12 +282,12 @@ export default function MasterMaterialsPage() {
           </div>
           
           <div>
-            <label className="block text-sm font-medium mb-1 text-gray-700">자재명 검색</label>
+            <label className="block text-sm font-medium mb-1 text-gray-700">품목명 검색</label>
             <input
               type="text"
               value={filterSearchName}
               onChange={(e) => setFilterSearchName(e.target.value)}
-              placeholder="자재명 또는 코드로 검색"
+              placeholder="품목명 또는 코드로 검색"
               className="w-full px-3 py-2 border rounded-lg text-gray-900"
             />
           </div>
@@ -330,7 +330,7 @@ export default function MasterMaterialsPage() {
                   코드
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  자재명
+                  품목명
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                   단위
@@ -403,7 +403,7 @@ export default function MasterMaterialsPage() {
               {materials.length === 0 && (
                 <tr>
                   <td colSpan={8} className="px-6 py-4 text-center text-gray-500">
-                    등록된 자재가 없습니다.
+                    등록된 품목이 없습니다.
                   </td>
                 </tr>
               )}
@@ -417,7 +417,7 @@ export default function MasterMaterialsPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <h2 className="text-2xl font-bold mb-6 text-gray-900">
-              {editingMaterial ? '자재 수정' : '자재 등록'}
+              {editingMaterial ? '품목 수정' : '품목 등록'}
             </h2>
             <form onSubmit={handleSubmit}>
               <div className="grid grid-cols-2 gap-4 mb-4">
@@ -465,7 +465,7 @@ export default function MasterMaterialsPage() {
 
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">자재명 *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">품목명 *</label>
                   <input
                     type="text"
                     required
@@ -477,7 +477,7 @@ export default function MasterMaterialsPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    자재코드 (선택)
+                    품목코드 (선택)
                   </label>
                   <input
                     type="text"
