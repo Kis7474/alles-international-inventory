@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { isCustomsCleared } from '@/lib/utils'
 
 // POST /api/customs/tracking/[id]/transfer - 통관 정보를 수입/수출로 이동
 export async function POST(
@@ -29,11 +30,7 @@ export async function POST(
     }
     
     // 통관완료 상태 체크
-    const isCleared = tracking.status === '통관완료' || 
-                      tracking.status === '수입신고수리' ||
-                      tracking.status === '반출완료'
-    
-    if (!isCleared) {
+    if (!isCustomsCleared(tracking.status)) {
       return NextResponse.json(
         { error: '통관완료 상태의 건만 이동할 수 있습니다.' },
         { status: 400 }

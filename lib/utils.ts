@@ -166,3 +166,11 @@ export function calculateStorageMonths(startDate: Date, endDate: Date = new Date
   const months = diffDays / 30.44
   return Math.round(months * 10) / 10
 }
+
+/**
+ * Check if customs status is cleared (completed)
+ */
+export function isCustomsCleared(status: string | null | undefined): boolean {
+  if (!status) return false
+  return status === '통관완료' || status === '수입신고수리' || status === '반출완료'
+}

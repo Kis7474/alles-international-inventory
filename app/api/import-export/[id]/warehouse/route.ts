@@ -56,19 +56,20 @@ export async function POST(
     // 다중 품목인 경우
     if (importExport.items && importExport.items.length > 0) {
       // 각 품목별로 LOT 생성
+      const itemCount = importExport.items.length
       const lots = await Promise.all(
         importExport.items.map((item, index) => {
           const goodsAmount = importExport.goodsAmount 
-            ? (importExport.goodsAmount * importExport.exchangeRate) / importExport.items!.length 
+            ? (importExport.goodsAmount * importExport.exchangeRate) / itemCount
             : 0
           const dutyAmount = importExport.dutyAmount 
-            ? importExport.dutyAmount / importExport.items!.length 
+            ? importExport.dutyAmount / itemCount
             : 0
           const domesticFreight = importExport.shippingCost 
-            ? importExport.shippingCost / importExport.items!.length 
+            ? importExport.shippingCost / itemCount
             : 0
           const otherCost = importExport.otherCost 
-            ? importExport.otherCost / importExport.items!.length 
+            ? importExport.otherCost / itemCount
             : 0
           
           const totalCost = goodsAmount + dutyAmount + domesticFreight + otherCost

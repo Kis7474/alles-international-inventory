@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCargoProgress, verifyImportDeclaration, parseUnipassDate } from '@/lib/unipass'
 import { getUnipassSettings, getApiKeyForRegistrationType } from '@/lib/unipass-helpers'
+import { isCustomsCleared } from '@/lib/utils'
 
 interface TrackingDataInput {
   registrationType: string
@@ -195,7 +196,7 @@ export async function POST(request: NextRequest) {
     })
     
     // 통관완료 상태면 자동으로 수입내역에 연동
-    if (trackingData.status === '통관완료' || trackingData.status === '수입신고수리') {
+    if (isCustomsCleared(trackingData.status)) {
       await autoLinkToImport(tracking.id)
     }
     
@@ -242,11 +243,7 @@ async function autoLinkToImport(trackingId: string) {
     }
     
     // 통관완료 상태 체크
-    const isCleared = tracking.status === '통관완료' || 
-                      tracking.status === '수입신고수리' ||
-                      tracking.status === '반출완료'
-    
-    if (!isCleared) {
+    if (!isCustomsCleared(tracking.status)) {
       console.log('Not cleared yet:', tracking.status)
       return
     }

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, isCustomsCleared } from '@/lib/utils'
 import Link from 'next/link'
 
 interface CustomsTracking {
@@ -654,7 +654,7 @@ export default function CustomsTrackingPage() {
                             📋
                           </Link>
                         ) : (
-                          (tracking.status === '통관완료' || tracking.status === '수입신고수리' || tracking.status === '반출완료') && (
+                          isCustomsCleared(tracking.status) && (
                             <button
                               onClick={() => handleTransferToImportExport(tracking.id)}
                               className="text-purple-600 hover:text-purple-800"
