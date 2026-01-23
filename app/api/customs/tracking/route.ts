@@ -23,6 +23,8 @@ interface TrackingDataInput {
   clearanceDate?: Date | null
   customsDuty?: number | null
   totalTax?: number | null
+  forwarderCode?: string | null
+  forwarderName?: string | null
   rawData?: string
 }
 
@@ -31,14 +33,28 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
     const status = searchParams.get('status')
+    const startDate = searchParams.get('startDate')
+    const endDate = searchParams.get('endDate')
     
     interface WhereClause {
       status?: string
+      arrivalDate?: {
+        gte?: Date
+        lte?: Date
+      }
     }
     
     const where: WhereClause = {}
     if (status) {
       where.status = status
+    }
+    
+    // Add date range filter
+    if (startDate && endDate) {
+      where.arrivalDate = {
+        gte: new Date(startDate),
+        lte: new Date(endDate),
+      }
     }
     
     const trackings = await prisma.customsTracking.findMany({
@@ -130,6 +146,8 @@ export async function POST(request: NextRequest) {
       totalTax: cargoData.csclTotaTxamt ? parseFloat(cargoData.csclTotaTxamt) : null,
       packageCount: cargoData.pckGcnt ? parseInt(cargoData.pckGcnt) : null,
       packageUnit: cargoData.pckUt || null,
+      forwarderCode: cargoData.frwrSgn || null,
+      forwarderName: cargoData.frwrEntsConm || null,
       rawData: JSON.stringify(cargoData),
       syncCount: 1,
       lastSyncAt: new Date(),

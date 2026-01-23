@@ -77,6 +77,10 @@ export async function POST(
         dutyAmount: tracking.customsDuty || 0,
         vatAmount: tracking.vat || 0,
         totalAmount: tracking.totalTax || 0,
+        // PDF 정보 복사
+        pdfFileName: tracking.pdfFileName,
+        pdfFilePath: tracking.pdfFilePath,
+        pdfUploadedAt: tracking.pdfUploadedAt,
         memo: `[통관내역 연동] ${tracking.productName || ''}\nBL: ${tracking.blNumber || '-'}\n신고번호: ${tracking.declarationNumber || '-'}\n중량: ${tracking.weight ? tracking.weight + 'kg' : '-'}`,
       },
     })
