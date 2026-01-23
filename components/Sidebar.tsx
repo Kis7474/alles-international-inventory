@@ -98,23 +98,24 @@ export default function Sidebar() {
     <>
       {/* 모바일 햄버거 메뉴 버튼 */}
       <button
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-blue-600 text-white rounded-md"
+        className="md:hidden fixed top-4 left-4 z-50 p-3 bg-blue-600 text-white rounded-lg shadow-lg hover:bg-blue-700 transition-colors"
         onClick={() => setIsOpen(!isOpen)}
+        aria-label={isOpen ? '메뉴 닫기' : '메뉴 열기'}
       >
-        {isOpen ? '✕' : '☰'}
+        <span className="text-xl">{isOpen ? '✕' : '☰'}</span>
       </button>
 
       {/* 사이드바 */}
       <aside
         className={`
-          fixed lg:static inset-y-0 left-0 z-40
-          w-64 bg-gray-800 text-white
-          transform transition-transform duration-200 ease-in-out
-          ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+          fixed md:static inset-y-0 left-0 z-40
+          w-64 bg-gray-800 text-white overflow-y-auto
+          transform transition-transform duration-300 ease-in-out
+          ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
         `}
       >
-        <div className="p-6">
-          <h1 className="text-2xl font-bold mb-8 text-white">
+        <div className="p-4 md:p-6">
+          <h1 className="text-xl md:text-2xl font-bold mb-6 md:mb-8 text-white">
             알레스인터네셔날
           </h1>
           <nav>
@@ -256,8 +257,9 @@ export default function Sidebar() {
       {/* 모바일 오버레이 */}
       {isOpen && (
         <div
-          className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-30"
+          className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-30"
           onClick={() => setIsOpen(false)}
+          aria-hidden="true"
         />
       )}
     </>

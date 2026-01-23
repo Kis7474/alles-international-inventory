@@ -184,20 +184,20 @@ export default function ImportExportPage() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">수입/수출 관리</h1>
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-6 md:mb-8 gap-3">
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-900">수입/수출 관리</h1>
         <div className="flex gap-2">
           {selectedIds.length > 0 && (
             <button
               onClick={handleBulkDelete}
-              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
+              className="bg-red-600 text-white px-4 py-3 md:py-2 rounded-lg hover:bg-red-700 text-sm md:text-base min-h-[44px]"
             >
               선택 삭제 ({selectedIds.length}개)
             </button>
           )}
           <Link
             href="/import-export/new"
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            className="px-4 py-3 md:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center text-sm md:text-base min-h-[44px]"
           >
             + 수입/수출 등록
           </Link>
@@ -205,8 +205,8 @@ export default function ImportExportPage() {
       </div>
 
       {/* 필터 */}
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="bg-white rounded-lg shadow p-4 md:p-6 mb-4 md:mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               구분
@@ -214,7 +214,7 @@ export default function ImportExportPage() {
             <select
               value={filter.type}
               onChange={(e) => setFilter({ ...filter, type: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+              className="w-full px-3 py-3 md:py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
             >
               <option value="">전체</option>
               <option value="IMPORT">수입</option>
@@ -229,7 +229,7 @@ export default function ImportExportPage() {
               type="date"
               value={filter.startDate}
               onChange={(e) => setFilter({ ...filter, startDate: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+              className="w-full px-3 py-3 md:py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
             />
           </div>
           <div>
@@ -240,13 +240,13 @@ export default function ImportExportPage() {
               type="date"
               value={filter.endDate}
               onChange={(e) => setFilter({ ...filter, endDate: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+              className="w-full px-3 py-3 md:py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
             />
           </div>
           <div className="flex items-end">
             <button
               onClick={handleFilter}
-              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="w-full px-4 py-3 md:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 min-h-[44px]"
             >
               조회
             </button>
@@ -256,7 +256,8 @@ export default function ImportExportPage() {
 
       {/* 목록 */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Desktop Table View */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="min-w-full">
             <thead className="bg-gray-50 border-b">
               <tr>
@@ -405,6 +406,125 @@ export default function ImportExportPage() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Card View */}
+        <div className="md:hidden">
+          <div className="p-4 border-b bg-gray-50">
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={selectAll}
+                onChange={handleSelectAll}
+                className="w-4 h-4 rounded mr-2"
+              />
+              <span className="text-sm text-gray-700">전체 선택</span>
+            </label>
+          </div>
+          <div className="divide-y divide-gray-200">
+            {records.map((record) => (
+              <div key={record.id} className="p-4">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(record.id)}
+                      onChange={() => handleSelect(record.id)}
+                      className="w-4 h-4 rounded mt-1"
+                    />
+                    <div>
+                      <span className={`px-2 py-1 rounded text-xs ${
+                        record.type === 'IMPORT' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
+                      }`}>
+                        {record.type === 'IMPORT' ? '수입' : '수출'}
+                      </span>
+                      <div className="text-xs text-gray-600 mt-1">
+                        {new Date(record.date).toLocaleDateString('ko-KR')}
+                      </div>
+                    </div>
+                  </div>
+                  {record.pdfFilePath && (
+                    <button
+                      onClick={() => handlePdfPreview(record)}
+                      className="text-blue-600 hover:text-blue-800 text-lg"
+                      title={record.pdfFileName || 'PDF 보기'}
+                    >
+                      📄
+                    </button>
+                  )}
+                </div>
+                
+                <div className="font-bold text-gray-900 mb-2">
+                  {record.product?.name || '-'}
+                </div>
+                
+                <div className="space-y-1.5 text-sm mb-3">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">거래처:</span>
+                    <span className="text-gray-900">{record.vendor?.name || '-'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">수량:</span>
+                    <span className="text-gray-900">{record.quantity?.toLocaleString('ko-KR') || '-'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">외화금액:</span>
+                    <span className="text-gray-900">{formatCurrency(record.foreignAmount, record.currency)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">환율:</span>
+                    <span className="text-gray-900">{record.exchangeRate.toLocaleString('ko-KR')}</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-1 border-t">
+                    <span className="text-gray-600 font-medium">원화금액:</span>
+                    <span className="font-bold text-gray-900">{formatCurrency(record.krwAmount)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">보관:</span>
+                    <span className="text-gray-900">
+                      {record.storageType === 'WAREHOUSE' ? '창고' : record.storageType === 'OFFICE' ? '사무실' : '-'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-3 border-t">
+                  <Link
+                    href={`/import-export/${record.id}`}
+                    className="flex-1 text-center bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 text-sm min-h-[44px] flex items-center justify-center"
+                  >
+                    수정
+                  </Link>
+                  {record.type === 'IMPORT' && !record.storageType && record.product && (
+                    <>
+                      <button
+                        onClick={() => handleWarehouseTransfer(record.id, 'WAREHOUSE')}
+                        className="flex-1 bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 text-sm min-h-[44px]"
+                      >
+                        📦창고
+                      </button>
+                      <button
+                        onClick={() => handleWarehouseTransfer(record.id, 'OFFICE')}
+                        className="flex-1 bg-purple-600 text-white px-3 py-2 rounded-lg hover:bg-purple-700 text-sm min-h-[44px]"
+                      >
+                        🏢사무실
+                      </button>
+                    </>
+                  )}
+                  <button
+                    onClick={() => handleDelete(record.id)}
+                    className="bg-red-600 text-white px-3 py-2 rounded-lg hover:bg-red-700 text-sm min-h-[44px]"
+                  >
+                    삭제
+                  </button>
+                </div>
+              </div>
+            ))}
+            {records.length === 0 && (
+              <div className="px-6 py-8 text-center text-gray-500">
+                등록된 내역이 없습니다.
+              </div>
+            )}
+          </div>
         </div>
       </div>
       
