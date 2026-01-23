@@ -34,6 +34,7 @@ const menuItems: MenuItem[] = [
     submenu: [
       { href: '/import-export', label: '수입/수출 내역', icon: '📋' },
       { href: '/import-export/new', label: '수입/수출 등록', icon: '➕' },
+      { href: '/customs', label: '통관 현황', icon: '🚢' },
       { href: '/exchange-rates', label: '환율 관리', icon: '💱' },
     ],
   },
@@ -66,6 +67,7 @@ const menuItems: MenuItem[] = [
       { href: '/categories', label: '카테고리', icon: '📋' },
       { href: '/salesperson', label: '담당자', icon: '👤' },
       { href: '/master/vendor-prices', label: '가격', icon: '💰' },
+      { href: '/settings/unipass', label: '유니패스 설정', icon: '🔐' },
       { href: '/master/upload', label: '엑셀 업로드', icon: '📤' },
     ],
   },
@@ -78,7 +80,7 @@ export default function Sidebar() {
     pathname === '/' || pathname.startsWith('/sales')
   )
   const [importExportOpen, setImportExportOpen] = useState(
-    pathname.startsWith('/import-export') || pathname.startsWith('/exchange-rates')
+    pathname.startsWith('/import-export') || pathname.startsWith('/exchange-rates') || pathname.startsWith('/customs')
   )
   const [warehouseOpen, setWarehouseOpen] = useState(
     pathname.startsWith('/warehouse')
@@ -89,7 +91,7 @@ export default function Sidebar() {
   const [masterOpen, setMasterOpen] = useState(
     pathname.startsWith('/sales/vendors') || pathname.startsWith('/sales/product-status') ||
     pathname.startsWith('/salesperson') || pathname.startsWith('/categories') ||
-    pathname.startsWith('/master/')
+    pathname.startsWith('/master/') || pathname.startsWith('/settings/')
   )
 
   return (
