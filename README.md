@@ -46,7 +46,8 @@
 
 ### 데이터베이스
 - **Prisma ORM**
-- **SQLite** (개발용 - 추후 MySQL/PostgreSQL로 전환 가능)
+- **PostgreSQL** (Neon - 클라우드 배포용)
+- **SQLite** (로컬 개발용, 선택사항)
 
 ### 기타
 - date-fns (날짜 처리)
@@ -66,9 +67,18 @@ npm install
 ```
 
 ### 3. 환경 변수 설정
-`.env` 파일이 자동으로 생성되어 있습니다. 필요시 수정하세요.
-```
+`.env.example` 파일을 복사하여 `.env` 파일을 생성하세요.
+
+**로컬 개발 (SQLite 사용)**
+```bash
+# .env 파일 내용
 DATABASE_URL="file:./dev.db"
+```
+
+**또는 PostgreSQL 사용 (로컬 또는 클라우드)**
+```bash
+# .env 파일 내용
+DATABASE_URL="postgresql://username:password@host/database?sslmode=require"
 ```
 
 ### 4. 데이터베이스 초기화
@@ -86,6 +96,127 @@ npm run dev
 ```
 http://localhost:3000
 ```
+
+## 클라우드 배포 (Vercel + Neon PostgreSQL)
+
+여러 컴퓨터에서 2-3명이 동시에 사용하려면 클라우드에 배포하세요.
+
+### 아키텍처
+- **Vercel**: Next.js 앱 호스팅 (무료 플랜)
+- **Neon**: PostgreSQL 데이터베이스 (무료 512MB)
+
+### Step 1: Neon 데이터베이스 생성
+
+1. **Neon 가입 및 프로젝트 생성**
+   - https://neon.tech 접속 및 가입
+   - 새 프로젝트 생성
+   - Region 선택: **Singapore** 권장 (한국과 가장 가까움)
+   - Database name: `alles_inventory` (원하는 이름)
+
+2. **연결 URL 복사**
+   - 프로젝트 대시보드에서 **Connection String** 복사
+   - 형식: `postgresql://username:password@host/database?sslmode=require`
+   - 이 URL을 안전하게 보관하세요 (다음 단계에서 사용)
+
+### Step 2: Vercel 배포
+
+1. **Vercel 가입**
+   - https://vercel.com 접속 및 가입
+   - GitHub 계정으로 로그인 권장
+
+2. **프로젝트 Import**
+   - Vercel 대시보드에서 "Add New" → "Project" 클릭
+   - GitHub 저장소 선택: `Kis7474/alles-international-inventory`
+   - Import 클릭
+
+3. **환경 변수 설정**
+   - "Environment Variables" 섹션에서 다음 추가:
+   ```
+   Name: DATABASE_URL
+   Value: postgresql://username:password@host/database?sslmode=require
+   ```
+   - Step 1에서 복사한 Neon 연결 URL을 Value에 붙여넣기
+   - "Add" 클릭
+
+4. **배포 시작**
+   - "Deploy" 버튼 클릭
+   - 빌드 및 배포 완료 대기 (약 2-3분)
+   - 배포 완료 시 제공되는 URL 확인 (예: `https://your-app.vercel.app`)
+
+### Step 3: 데이터베이스 초기화
+
+배포 완료 후 데이터베이스 테이블을 생성해야 합니다.
+
+**방법 1: 로컬에서 초기화 (권장)**
+```bash
+# .env 파일에 Neon 연결 URL 추가
+DATABASE_URL="postgresql://username:password@host/database?sslmode=require"
+
+# Prisma로 데이터베이스 스키마 생성
+npx prisma db push
+
+# 확인
+npx prisma studio
+```
+
+**방법 2: Vercel CLI 사용**
+```bash
+# Vercel CLI 설치 (최초 1회)
+npm i -g vercel
+
+# Vercel 프로젝트 연결
+vercel link
+
+# 환경 변수와 함께 Prisma 실행
+vercel env pull .env.local
+npx prisma db push
+```
+
+### Step 4: 접속 및 사용
+
+1. **브라우저에서 접속**
+   - Vercel에서 제공한 URL로 접속 (예: `https://your-app.vercel.app`)
+   - 팀원들과 URL 공유
+
+2. **멀티유저 사용**
+   - 동일한 URL로 여러 명이 동시 접속 가능
+   - 2-3명까지 무료 플랜으로 충분히 사용 가능
+   - 데이터는 Neon PostgreSQL에 중앙 저장
+
+### 주의사항
+
+- **환경 변수 보안**: DATABASE_URL은 절대 GitHub에 커밋하지 마세요
+- **무료 플랜 제한**: 
+  - Neon: 512MB 스토리지, 무제한 연결
+  - Vercel: 월 100GB 대역폭, 무제한 배포
+- **백업**: 중요한 데이터는 정기적으로 백업하세요
+- **로컬 개발**: 로컬에서는 SQLite(`file:./dev.db`)를 계속 사용 가능
+
+### 업데이트 배포
+
+코드 변경 후:
+```bash
+git add .
+git commit -m "기능 추가"
+git push
+```
+- GitHub에 푸시하면 Vercel이 자동으로 재배포합니다
+
+### 문제 해결
+
+**데이터베이스 연결 실패 시**
+- Neon 연결 URL이 정확한지 확인
+- `?sslmode=require` 파라미터가 포함되어 있는지 확인
+- Vercel 환경 변수가 올바르게 설정되었는지 확인
+
+**빌드 실패 시**
+- Vercel 빌드 로그 확인
+- `postinstall` 스크립트가 실행되는지 확인
+- Prisma 버전 호환성 확인
+
+**성능 이슈 시**
+- Neon 대시보드에서 쿼리 성능 모니터링
+- 필요시 인덱스 추가 고려
 
 ## 데이터베이스 스키마
 
