@@ -168,6 +168,9 @@ export default function ImportExportEditPage() {
     totalAmount: 0,
   })
   
+  // Constants
+  const KRW_EXCHANGE_RATE = '1'
+  
   // Memoize the total foreign amount calculation
   const totalForeignAmount = useMemo(() => {
     return items.reduce((sum, item) => {
@@ -194,7 +197,7 @@ export default function ImportExportEditPage() {
     formData.shippingCost,
     formData.otherCost,
     formData.vatIncluded,
-    items,
+    totalForeignAmount,
   ])
 
   // Update available products when products or vendorId changes
@@ -283,7 +286,7 @@ export default function ImportExportEditPage() {
   // Auto-fetch exchange rate when currency or date changes
   const fetchExchangeRate = async (currency: string, date: string) => {
     if (!currency || currency === 'KRW' || !date) {
-      setFormData(prev => ({ ...prev, exchangeRate: '1' }))
+      setFormData(prev => ({ ...prev, exchangeRate: KRW_EXCHANGE_RATE }))
       return
     }
     
@@ -310,15 +313,8 @@ export default function ImportExportEditPage() {
   const calculateValues = () => {
     const quantity = parseFloat(formData.quantity) || 0
     const exchangeRate = parseFloat(formData.exchangeRate) || 0
-    let foreignAmount = parseFloat(formData.foreignAmount) || 0
-    
-    // If items exist, calculate total from items
-    if (items.length > 0) {
-      foreignAmount = items.reduce((sum, item) => {
-        const itemAmount = (parseFloat(item.quantity) || 0) * (parseFloat(item.unitPrice) || 0)
-        return sum + itemAmount
-      }, 0)
-    }
+    // Use totalForeignAmount for items, otherwise use formData.foreignAmount
+    const foreignAmount = items.length > 0 ? totalForeignAmount : (parseFloat(formData.foreignAmount) || 0)
     
     const goodsAmount = parseFloat(formData.goodsAmount) || 0
     const dutyAmount = parseFloat(formData.dutyAmount) || 0
@@ -1186,7 +1182,7 @@ export default function ImportExportEditPage() {
             </button>
           </div>
           <p className="text-xs text-gray-500 mt-2">
-            * PDF 파일을 선택한 후 &quot;PDF 업로드&quot; 버튼을 클릭하세요.
+            * PDF 파일을 선택한 후 &apos;PDF 업로드&apos; 버튼을 클릭하세요.
           </p>
         </div>
 
