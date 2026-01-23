@@ -22,12 +22,13 @@ interface Part {
   code: string | null
   name: string
   unit: string
+  type: string
   categoryId: number | null
   category: Category | null
   description: string | null
   defaultPurchasePrice: number | null
-  purchaseVendorId: number
-  purchaseVendor: Vendor
+  purchaseVendorId: number | null
+  purchaseVendor: Vendor | null
   salesVendorId: number | null
   salesVendor: Vendor | null
 }
@@ -49,6 +50,7 @@ export default function MasterPartsPage() {
     code: '',
     name: '',
     unit: 'EA',
+    type: 'PART',
     categoryId: '',
     description: '',
     defaultPurchasePrice: '',
@@ -102,11 +104,6 @@ export default function MasterPartsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    if (!formData.purchaseVendorId) {
-      alert('매입 거래처를 선택해주세요.')
-      return
-    }
     
     try {
       const url = '/api/parts'
@@ -207,10 +204,11 @@ export default function MasterPartsPage() {
       code: part.code || '',
       name: part.name,
       unit: part.unit,
+      type: 'PART',
       categoryId: part.categoryId?.toString() || '',
       description: part.description || '',
       defaultPurchasePrice: part.defaultPurchasePrice?.toString() || '',
-      purchaseVendorId: part.purchaseVendorId.toString(),
+      purchaseVendorId: part.purchaseVendorId?.toString() || '',
       salesVendorId: part.salesVendorId?.toString() || '',
     })
     setShowModal(true)
@@ -223,6 +221,7 @@ export default function MasterPartsPage() {
       code: '',
       name: '',
       unit: 'EA',
+      type: 'PART',
       categoryId: '',
       description: '',
       defaultPurchasePrice: '',
@@ -423,10 +422,25 @@ export default function MasterPartsPage() {
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    매입 거래처 *
+                    품목 유형 *
                   </label>
                   <select
                     required
+                    value={formData.type}
+                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                  >
+                    <option value="PART">부품</option>
+                    <option value="MATERIAL">재료</option>
+                    <option value="PRODUCT">일반 품목</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    매입 거래처
+                  </label>
+                  <select
                     value={formData.purchaseVendorId}
                     onChange={(e) => setFormData({ ...formData, purchaseVendorId: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
@@ -441,7 +455,9 @@ export default function MasterPartsPage() {
                       ))}
                   </select>
                 </div>
+              </div>
 
+              <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     매출 거래처

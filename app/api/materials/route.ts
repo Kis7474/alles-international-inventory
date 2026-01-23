@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-// GET /api/materials - 재료 목록 조회
+// GET /api/materials - 재료 목록 조회 (Product 테이블 사용, type=MATERIAL)
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
@@ -9,6 +9,7 @@ export async function GET(request: Request) {
     const searchName = searchParams.get('searchName')
     
     interface WhereClause {
+      type: string
       categoryId?: number
       OR?: Array<{
         name?: { contains: string }
@@ -16,7 +17,9 @@ export async function GET(request: Request) {
       }>
     }
     
-    const where: WhereClause = {}
+    const where: WhereClause = {
+      type: 'MATERIAL'
+    }
     
     if (categoryId) {
       where.categoryId = parseInt(categoryId)
@@ -28,24 +31,35 @@ export async function GET(request: Request) {
       ]
     }
     
-    const materials = await prisma.material.findMany({
+    const materials = await prisma.product.findMany({
       where,
       include: {
         category: true,
         purchaseVendor: true,
-        salesVendor: true,
+        salesVendors: {
+          include: {
+            vendor: true,
+          },
+        },
       },
       orderBy: { id: 'asc' },
     })
     
-    return NextResponse.json(materials)
+    // Transform to match Material interface for backward compatibility
+    const transformedMaterials = materials.map(product => ({
+      ...product,
+      salesVendor: product.salesVendors.length > 0 ? product.salesVendors[0].vendor : null,
+      salesVendorId: product.salesVendors.length > 0 ? product.salesVendors[0].vendorId : null,
+    }))
+    
+    return NextResponse.json(transformedMaterials)
   } catch (error) {
     console.error('Error fetching materials:', error)
     return NextResponse.json({ error: 'Failed to fetch materials' }, { status: 500 })
   }
 }
 
-// POST /api/materials - 재료 생성
+// POST /api/materials - 재료 생성 (Product 테이블 사용, type=MATERIAL)
 export async function POST(request: Request) {
   try {
     const body = await request.json()
@@ -64,36 +78,49 @@ export async function POST(request: Request) {
     if (!name) {
       return NextResponse.json({ error: '재료명을 입력해주세요.' }, { status: 400 })
     }
-    if (!purchaseVendorId) {
-      return NextResponse.json({ error: '매입처를 선택해주세요.' }, { status: 400 })
-    }
 
-    const material = await prisma.material.create({
+    const material = await prisma.product.create({
       data: {
         code,
         name,
-        unit: unit || 'EA',
+        unit: unit || 'KG',
+        type: 'MATERIAL',
         categoryId: categoryId ? parseInt(categoryId) : null,
         description,
         defaultPurchasePrice: defaultPurchasePrice ? parseFloat(defaultPurchasePrice) : null,
-        purchaseVendorId: parseInt(purchaseVendorId),
-        salesVendorId: salesVendorId ? parseInt(salesVendorId) : null,
+        purchaseVendorId: purchaseVendorId ? parseInt(purchaseVendorId) : null,
+        salesVendors: salesVendorId ? {
+          create: {
+            vendorId: parseInt(salesVendorId),
+          },
+        } : undefined,
       },
       include: {
         category: true,
         purchaseVendor: true,
-        salesVendor: true,
+        salesVendors: {
+          include: {
+            vendor: true,
+          },
+        },
       },
     })
 
-    return NextResponse.json(material, { status: 201 })
+    // Transform response for backward compatibility
+    const response = {
+      ...material,
+      salesVendor: material.salesVendors.length > 0 ? material.salesVendors[0].vendor : null,
+      salesVendorId: material.salesVendors.length > 0 ? material.salesVendors[0].vendorId : null,
+    }
+
+    return NextResponse.json(response, { status: 201 })
   } catch (error) {
     console.error('Error creating material:', error)
     return NextResponse.json({ error: 'Failed to create material' }, { status: 500 })
   }
 }
 
-// PUT /api/materials - 재료 수정
+// PUT /api/materials - 재료 수정 (Product 테이블 사용)
 export async function PUT(request: Request) {
   try {
     const body = await request.json()
@@ -113,44 +140,80 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'ID가 필요합니다.' }, { status: 400 })
     }
 
-    const material = await prisma.material.update({
+    // Delete existing sales vendor relationships
+    await prisma.productSalesVendor.deleteMany({
+      where: { productId: parseInt(id) },
+    })
+
+    const material = await prisma.product.update({
       where: { id: parseInt(id) },
       data: {
         code,
         name,
         unit,
+        type: 'MATERIAL',
         categoryId: categoryId ? parseInt(categoryId) : null,
         description,
         defaultPurchasePrice: defaultPurchasePrice ? parseFloat(defaultPurchasePrice) : null,
-        purchaseVendorId: parseInt(purchaseVendorId),
-        salesVendorId: salesVendorId ? parseInt(salesVendorId) : null,
+        purchaseVendorId: purchaseVendorId ? parseInt(purchaseVendorId) : null,
+        salesVendors: salesVendorId ? {
+          create: {
+            vendorId: parseInt(salesVendorId),
+          },
+        } : undefined,
       },
       include: {
         category: true,
         purchaseVendor: true,
-        salesVendor: true,
+        salesVendors: {
+          include: {
+            vendor: true,
+          },
+        },
       },
     })
 
-    return NextResponse.json(material)
+    // Transform response for backward compatibility
+    const response = {
+      ...material,
+      salesVendor: material.salesVendors.length > 0 ? material.salesVendors[0].vendor : null,
+      salesVendorId: material.salesVendors.length > 0 ? material.salesVendors[0].vendorId : null,
+    }
+
+    return NextResponse.json(response)
   } catch (error) {
     console.error('Error updating material:', error)
     return NextResponse.json({ error: 'Failed to update material' }, { status: 500 })
   }
 }
 
-// DELETE /api/materials - 재료 삭제
+// DELETE /api/materials - 재료 삭제 (Product 테이블 사용)
 export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
+    const body = await request.json().catch(() => null)
 
+    // Bulk delete
+    if (body && body.ids && Array.isArray(body.ids)) {
+      await prisma.product.deleteMany({
+        where: {
+          id: { in: body.ids.map((id: string | number) => parseInt(id.toString())) },
+          type: 'MATERIAL',
+        }
+      })
+      return NextResponse.json({ success: true, count: body.ids.length })
+    }
+
+    // Single delete
     if (!id) {
       return NextResponse.json({ error: 'ID가 필요합니다.' }, { status: 400 })
     }
 
-    await prisma.material.delete({
-      where: { id: parseInt(id) },
+    await prisma.product.delete({
+      where: { 
+        id: parseInt(id),
+      },
     })
 
     return NextResponse.json({ success: true })

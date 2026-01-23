@@ -20,13 +20,17 @@ model Product {
   code                  String?   @unique  // 선택적 품목코드
   name                  String
   unit                  String    @default("EA")  // 개, BOX, kg 등
+  
+  // 품목 유형 추가
+  type                  String    @default("PRODUCT")  // PRODUCT, MATERIAL, PART
+  
   categoryId            Int?
   category              Category? @relation(fields: [categoryId], references: [id])
   description           String?
   
-  // 매입 거래처 (필수, 1:1)
-  purchaseVendorId      Int
-  purchaseVendor        Vendor    @relation("PurchaseVendor", fields: [purchaseVendorId], references: [id])
+  // 매입 거래처 (선택적으로 변경 - 수입품목은 거래처 없이 등록 가능)
+  purchaseVendorId      Int?      // Int -> Int? (optional)
+  purchaseVendor        Vendor?   @relation("PurchaseVendor", fields: [purchaseVendorId], references: [id])
   
   // 매출 거래처 (다대다 관계)
   salesVendors          ProductSalesVendor[]
@@ -42,6 +46,7 @@ model Product {
   importExports         ImportExport[]         // 수입/수출
   importExportItems     ImportExportItem[]     // 수입/수출 품목 상세
   inventoryLots         InventoryLot[]         // 창고 입고
+  projectItems          ProjectItem[]          // 프로젝트 품목 연결 추가
   
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
@@ -561,9 +566,13 @@ model ProjectItem {
   projectId   Int
   project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   
-  itemType    String    // MATERIAL, PART, SERVICE
+  itemType    String    // MATERIAL, PART, SERVICE, PRODUCT
   
-  // 품목 참조 (하나만 사용)
+  // 통합 품목 참조 추가
+  productId   Int?
+  product     Product?  @relation(fields: [productId], references: [id])
+  
+  // 기존 참조 (하위 호환성 - 추후 제거 가능)
   materialId  Int?
   material    Material? @relation(fields: [materialId], references: [id])
   partId      Int?
