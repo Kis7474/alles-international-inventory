@@ -11,7 +11,8 @@ export default function UnipassSettingsPage() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   
   const [settings, setSettings] = useState({
-    apiKey: '',
+    apiKeyCargoProgress: '',      // API001 - 화물통관진행정보조회
+    apiKeyImportDeclaration: '',  // API022 - 수입신고필증검증
     businessNumber: '',
     autoSyncEnabled: false,
     syncInterval: 'daily',
@@ -29,7 +30,8 @@ export default function UnipassSettingsPage() {
       
       if (data?.value) {
         setSettings({
-          apiKey: data.value.apiKey || '',
+          apiKeyCargoProgress: data.value.apiKeyCargoProgress || '',
+          apiKeyImportDeclaration: data.value.apiKeyImportDeclaration || '',
           businessNumber: data.value.businessNumber || '',
           autoSyncEnabled: data.value.autoSyncEnabled || false,
           syncInterval: data.value.syncInterval || 'daily',
@@ -69,9 +71,16 @@ export default function UnipassSettingsPage() {
     }
   }
 
-  const handleTestConnection = async () => {
-    if (!settings.apiKey) {
-      setMessage({ type: 'error', text: 'API 인증키를 입력해주세요.' })
+  const handleTestConnection = async (apiType: 'CARGO_PROGRESS' | 'IMPORT_DECLARATION') => {
+    const apiKey = apiType === 'CARGO_PROGRESS' 
+      ? settings.apiKeyCargoProgress 
+      : settings.apiKeyImportDeclaration
+    
+    if (!apiKey) {
+      setMessage({ 
+        type: 'error', 
+        text: `${apiType === 'CARGO_PROGRESS' ? '화물통관진행정보조회' : '수입신고필증검증'} API 인증키를 입력해주세요.` 
+      })
       return
     }
 
@@ -83,14 +92,18 @@ export default function UnipassSettingsPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          apiKey: settings.apiKey,
+          apiKey,
+          apiType,
         }),
       })
 
       const data = await res.json()
 
       if (data.success) {
-        setMessage({ type: 'success', text: data.message || 'API 연결이 성공했습니다.' })
+        setMessage({ 
+          type: 'success', 
+          text: data.message || `${apiType === 'CARGO_PROGRESS' ? '화물통관진행정보조회' : '수입신고필증검증'} API 연결이 성공했습니다.` 
+        })
       } else {
         setMessage({ type: 'error', text: data.message || 'API 연결에 실패했습니다.' })
       }
@@ -135,17 +148,33 @@ export default function UnipassSettingsPage() {
         <div className="space-y-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              API 인증키 (crkyCn) *
+              화물통관진행정보조회 API 인증키 (API001) *
             </label>
             <input
               type="password"
-              value={settings.apiKey}
-              onChange={(e) => setSettings({ ...settings, apiKey: e.target.value })}
+              value={settings.apiKeyCargoProgress}
+              onChange={(e) => setSettings({ ...settings, apiKeyCargoProgress: e.target.value })}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="유니패스 API 인증키를 입력하세요"
+              placeholder="화물통관진행정보조회 API 인증키를 입력하세요"
             />
             <p className="text-sm text-gray-500 mt-1">
-              유니패스 오픈API 신청 후 발급받은 인증키를 입력하세요.
+              BL번호로 통관 진행상태 조회 시 사용
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              수입신고필증검증 API 인증키 (API022) *
+            </label>
+            <input
+              type="password"
+              value={settings.apiKeyImportDeclaration}
+              onChange={(e) => setSettings({ ...settings, apiKeyImportDeclaration: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="수입신고필증검증 API 인증키를 입력하세요"
+            />
+            <p className="text-sm text-gray-500 mt-1">
+              수입신고번호로 조회 시 사용
             </p>
           </div>
 
@@ -203,11 +232,19 @@ export default function UnipassSettingsPage() {
 
           <div className="border-t pt-6 flex gap-4">
             <button
-              onClick={handleTestConnection}
-              disabled={testing || !settings.apiKey}
+              onClick={() => handleTestConnection('CARGO_PROGRESS')}
+              disabled={testing || !settings.apiKeyCargoProgress}
               className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
             >
-              {testing ? '테스트 중...' : '연결 테스트'}
+              {testing ? '테스트 중...' : 'API001 테스트'}
+            </button>
+
+            <button
+              onClick={() => handleTestConnection('IMPORT_DECLARATION')}
+              disabled={testing || !settings.apiKeyImportDeclaration}
+              className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+            >
+              {testing ? '테스트 중...' : 'API022 테스트'}
             </button>
 
             <button

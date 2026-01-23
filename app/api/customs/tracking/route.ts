@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getCargoProgress, verifyImportDeclaration } from '@/lib/unipass'
+import { getCargoProgress, verifyImportDeclaration, parseUnipassDate } from '@/lib/unipass'
 
 interface TrackingDataInput {
   registrationType: string
@@ -61,19 +61,19 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { registrationType, blType, blNumber, blYear, declarationNumber } = body
     
-    // 유니패스 API 키 가져오기
-    const apiKeySetting = await prisma.systemSetting.findUnique({
-      where: { key: 'unipass_api_key' },
+    // 유니패스 설정 가져오기
+    const settings = await prisma.systemSetting.findUnique({
+      where: { key: 'unipass_settings' },
     })
     
-    if (!apiKeySetting || !apiKeySetting.value) {
+    if (!settings?.value) {
       return NextResponse.json(
-        { error: '유니패스 API 키가 설정되지 않았습니다. 설정 페이지에서 API 키를 등록해주세요.' },
+        { error: '유니패스 API 설정이 필요합니다. 설정 페이지에서 API 키를 등록해주세요.' },
         { status: 400 }
       )
     }
     
-    const apiKey = apiKeySetting.value
+    const parsed = typeof settings.value === 'string' ? JSON.parse(settings.value) : settings.value
     
     // 등록 방식에 따라 API 호출
     let apiResult
@@ -87,6 +87,15 @@ export async function POST(request: NextRequest) {
       if (!blType || !blNumber || !blYear) {
         return NextResponse.json(
           { error: 'BL 유형, BL번호, 입항년도를 모두 입력해주세요.' },
+          { status: 400 }
+        )
+      }
+      
+      // 화물통관진행정보조회 API 키 확인
+      const apiKey = parsed.apiKeyCargoProgress
+      if (!apiKey) {
+        return NextResponse.json(
+          { error: '화물통관진행정보조회 API 키가 설정되지 않았습니다.' },
           { status: 400 }
         )
       }
@@ -122,10 +131,10 @@ export async function POST(request: NextRequest) {
         cargoNumber: cargoData.cargMtNo,
         status: cargoData.prgsStts,
         productName: cargoData.prnm,
-        weight: cargoData.wght ? parseFloat(cargoData.wght) : null,
-        arrivalDate: cargoData.rlbrDt ? new Date(cargoData.rlbrDt) : null,
-        declarationDate: cargoData.dclrDt ? new Date(cargoData.dclrDt) : null,
-        clearanceDate: cargoData.tkofDt ? new Date(cargoData.tkofDt) : null,
+        weight: cargoData.ttwg ? parseFloat(cargoData.ttwg) : null,
+        arrivalDate: cargoData.etprDt ? parseUnipassDate(cargoData.etprDt) : null,
+        declarationDate: cargoData.dclrDt ? parseUnipassDate(cargoData.dclrDt) : null,
+        clearanceDate: cargoData.tkofDt ? parseUnipassDate(cargoData.tkofDt) : null,
         customsDuty: cargoData.csclTotaTxamt ? parseFloat(cargoData.csclTotaTxamt) : null,
         totalTax: cargoData.csclTotaTxamt ? parseFloat(cargoData.csclTotaTxamt) : null,
         rawData: JSON.stringify(cargoData),
@@ -134,6 +143,15 @@ export async function POST(request: NextRequest) {
       if (!declarationNumber) {
         return NextResponse.json(
           { error: '수입신고번호를 입력해주세요.' },
+          { status: 400 }
+        )
+      }
+      
+      // 수입신고필증검증 API 키 확인
+      const apiKey = parsed.apiKeyImportDeclaration
+      if (!apiKey) {
+        return NextResponse.json(
+          { error: '수입신고필증검증 API 키가 설정되지 않았습니다.' },
           { status: 400 }
         )
       }
@@ -162,7 +180,7 @@ export async function POST(request: NextRequest) {
         declarationNumber,
         status: declarationData.prgsStts || '수입신고수리',
         productName: declarationData.prnm,
-        weight: declarationData.wght ? parseFloat(declarationData.wght) : null,
+        weight: declarationData.ttwg ? parseFloat(declarationData.ttwg) : null,
         customsDuty: declarationData.csclTotaTxamt ? parseFloat(declarationData.csclTotaTxamt) : null,
         totalTax: declarationData.csclTotaTxamt ? parseFloat(declarationData.csclTotaTxamt) : null,
         rawData: JSON.stringify(declarationData),

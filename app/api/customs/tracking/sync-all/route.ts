@@ -1,24 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getCargoProgress, verifyImportDeclaration } from '@/lib/unipass'
+import { getCargoProgress, verifyImportDeclaration, parseUnipassDate } from '@/lib/unipass'
 
 // POST /api/customs/tracking/sync-all - 전체 동기화
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function POST(request: NextRequest) {
   try {
-    // 유니패스 API 키 가져오기
-    const apiKeySetting = await prisma.systemSetting.findUnique({
-      where: { key: 'unipass_api_key' },
+    // 유니패스 설정 가져오기
+    const settings = await prisma.systemSetting.findUnique({
+      where: { key: 'unipass_settings' },
     })
     
-    if (!apiKeySetting || !apiKeySetting.value) {
+    if (!settings?.value) {
       return NextResponse.json(
-        { error: '유니패스 API 키가 설정되지 않았습니다.' },
+        { error: '유니패스 API 설정이 필요합니다.' },
         { status: 400 }
       )
     }
     
-    const apiKey = apiKeySetting.value
+    const parsed = typeof settings.value === 'string' ? JSON.parse(settings.value) : settings.value
     
     // 모든 추적 정보 가져오기
     const trackings = await prisma.customsTracking.findMany()
@@ -30,11 +30,19 @@ export async function POST(request: NextRequest) {
     for (const tracking of trackings) {
       try {
         let apiResult
+        let apiKey: string
         
         if (tracking.registrationType === 'BL') {
           if (!tracking.blType || !tracking.blNumber || !tracking.blYear) {
             failCount++
             errors.push(`${tracking.id}: BL 정보가 올바르지 않습니다.`)
+            continue
+          }
+          
+          apiKey = parsed.apiKeyCargoProgress
+          if (!apiKey) {
+            failCount++
+            errors.push(`${tracking.id}: 화물통관진행정보조회 API 키가 설정되지 않았습니다.`)
             continue
           }
           
@@ -47,6 +55,13 @@ export async function POST(request: NextRequest) {
           if (!tracking.declarationNumber) {
             failCount++
             errors.push(`${tracking.id}: 수입신고번호가 올바르지 않습니다.`)
+            continue
+          }
+          
+          apiKey = parsed.apiKeyImportDeclaration
+          if (!apiKey) {
+            failCount++
+            errors.push(`${tracking.id}: 수입신고필증검증 API 키가 설정되지 않았습니다.`)
             continue
           }
           
@@ -71,10 +86,10 @@ export async function POST(request: NextRequest) {
           data: {
             status: data.prgsStts,
             productName: data.prnm,
-            weight: data.wght ? parseFloat(data.wght) : null,
-            arrivalDate: data.rlbrDt ? new Date(data.rlbrDt) : null,
-            declarationDate: data.dclrDt ? new Date(data.dclrDt) : null,
-            clearanceDate: data.tkofDt ? new Date(data.tkofDt) : null,
+            weight: data.ttwg ? parseFloat(data.ttwg) : null,
+            arrivalDate: data.etprDt ? parseUnipassDate(data.etprDt) : null,
+            declarationDate: data.dclrDt ? parseUnipassDate(data.dclrDt) : null,
+            clearanceDate: data.tkofDt ? parseUnipassDate(data.tkofDt) : null,
             customsDuty: data.csclTotaTxamt ? parseFloat(data.csclTotaTxamt) : null,
             totalTax: data.csclTotaTxamt ? parseFloat(data.csclTotaTxamt) : null,
             rawData: JSON.stringify(data),

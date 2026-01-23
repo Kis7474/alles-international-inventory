@@ -10,13 +10,26 @@ export interface UnipassCargoProgress {
   hblNo?: string          // House B/L 번호
   cargMtNo?: string       // 화물관리번호
   prgsStts?: string       // 진행상태
+  prgsStCd?: string       // 진행상태코드
   dclrNo?: string         // 수입신고번호
   prnm?: string           // 품명
-  wght?: string           // 중량
+  ttwg?: string           // 총중량 (수정: wght → ttwg)
+  wghtUt?: string         // 중량단위
+  pckGcnt?: string        // 포장개수
+  pckUt?: string          // 포장단위
   csclTotaTxamt?: string  // 통관총세액
   tkofDt?: string         // 반출일자
-  rlbrDt?: string         // 입항일자
+  etprDt?: string         // 입항일자 (수정: rlbrDt → etprDt)
+  etprCstm?: string       // 입항세관
   dclrDt?: string         // 신고일자
+  ldprCd?: string         // 적재항코드
+  ldprNm?: string         // 적재항명
+  dsprCd?: string         // 양륙항코드
+  dsprNm?: string         // 양륙항명
+  shcoFlco?: string       // 선사항공사
+  shipNm?: string         // 선박명
+  csclPrgsStts?: string   // 통관진행상태
+  prcsDttm?: string       // 처리일시
 }
 
 export interface UnipassApiResponse {
@@ -24,6 +37,20 @@ export interface UnipassApiResponse {
   message?: string
   data?: UnipassCargoProgress[]
   rawXml?: string
+  isMultiple?: boolean  // 다건 응답 플래그
+}
+
+/**
+ * 유니패스 날짜 형식 (YYYYMMDD) 파싱
+ * @param dateStr - 날짜 문자열 (예: "20260123")
+ * @returns Date 객체 또는 null
+ */
+export function parseUnipassDate(dateStr: string | undefined): Date | null {
+  if (!dateStr || dateStr.length < 8) return null
+  const year = dateStr.substring(0, 4)
+  const month = dateStr.substring(4, 6)
+  const day = dateStr.substring(6, 8)
+  return new Date(`${year}-${month}-${day}`)
 }
 
 /**
@@ -143,6 +170,32 @@ export async function getCargoProgress(
     // 에러 체크
     const notice = response.ntceInfo?.ntceCn
     if (notice && notice !== '정상처리되었습니다.') {
+      // 다건 응답 체크
+      if (notice && notice.startsWith('[N00]')) {
+        // 다건 응답 - 목록 반환
+        let dataList = response.cargCsclPrgsInfoQryVo
+        if (!dataList) {
+          return {
+            success: true,
+            isMultiple: true,
+            message: '다건 조회 결과이지만 데이터가 없습니다.',
+            data: [],
+            rawXml: xmlData
+          }
+        }
+        // 단일 결과를 배열로 변환
+        if (!Array.isArray(dataList)) {
+          dataList = [dataList]
+        }
+        return {
+          success: true,
+          isMultiple: true,
+          message: '다건 조회 결과입니다. 화물관리번호로 상세 조회가 필요합니다.',
+          data: dataList as UnipassCargoProgress[],
+          rawXml: xmlData
+        }
+      }
+      
       return {
         success: false,
         message: notice,
@@ -168,6 +221,7 @@ export async function getCargoProgress(
     
     return {
       success: true,
+      isMultiple: false,
       data: dataList as UnipassCargoProgress[],
       rawXml: xmlData
     }
