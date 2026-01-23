@@ -26,6 +26,7 @@ export default function ProductRegistrationModal({
   const [formData, setFormData] = useState({
     name: '',
     unit: 'EA',
+    type: 'PRODUCT',
     purchaseVendorId: '',
     code: '',
     description: '',
@@ -36,8 +37,8 @@ export default function ProductRegistrationModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!formData.name || !formData.purchaseVendorId) {
-      alert('품목명과 매입 거래처는 필수입니다.')
+    if (!formData.name) {
+      alert('품목명은 필수입니다.')
       return
     }
 
@@ -48,7 +49,7 @@ export default function ProductRegistrationModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
-          purchaseVendorId: parseInt(formData.purchaseVendorId),
+          purchaseVendorId: formData.purchaseVendorId ? parseInt(formData.purchaseVendorId) : null,
         }),
       })
 
@@ -64,6 +65,7 @@ export default function ProductRegistrationModal({
       setFormData({
         name: '',
         unit: 'EA',
+        type: 'PRODUCT',
         purchaseVendorId: '',
         code: '',
         description: '',
@@ -84,6 +86,7 @@ export default function ProductRegistrationModal({
     setFormData({
       name: '',
       unit: 'EA',
+      type: 'PRODUCT',
       purchaseVendorId: '',
       code: '',
       description: '',
@@ -121,6 +124,23 @@ export default function ProductRegistrationModal({
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="품목명을 입력하세요"
               />
+            </div>
+
+            {/* 품목 유형 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                품목 유형 <span className="text-red-500">*</span>
+              </label>
+              <select
+                required
+                value={formData.type}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="PRODUCT">일반 품목</option>
+                <option value="MATERIAL">재료</option>
+                <option value="PART">부품</option>
+              </select>
             </div>
 
             {/* 품목 코드 */}
@@ -161,10 +181,9 @@ export default function ProductRegistrationModal({
             {/* 매입 거래처 */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                매입 거래처 <span className="text-red-500">*</span>
+                매입 거래처
               </label>
               <select
-                required
                 value={formData.purchaseVendorId}
                 onChange={(e) => setFormData({ ...formData, purchaseVendorId: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
