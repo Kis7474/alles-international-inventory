@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     let apiKey = ''
     try {
       const parsed = JSON.parse(settings.value)
-      apiKey = parsed.apiKey || ''
+      apiKey = parsed.apiKeyImportDeclaration || ''
     } catch {
       return NextResponse.json(
         { error: 'UNI-PASS 설정을 읽을 수 없습니다.' },
