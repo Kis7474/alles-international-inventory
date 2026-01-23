@@ -62,7 +62,7 @@ const menuItems: MenuItem[] = [
     icon: '⚙️',
     submenu: [
       { href: '/sales/vendors', label: '거래처', icon: '🏢' },
-      { href: '/master/materials', label: '재료/부품', icon: '🧱' },
+      { href: '/master/materials', label: '품목 관리', icon: '🧱' },
       { href: '/master/services', label: '서비스', icon: '🔧' },
       { href: '/categories', label: '카테고리', icon: '📋' },
       { href: '/salesperson', label: '담당자', icon: '👤' },

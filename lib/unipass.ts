@@ -32,6 +32,8 @@ export interface UnipassCargoProgress {
   shipNm?: string         // 선박명
   csclPrgsStts?: string   // 통관진행상태
   prcsDttm?: string       // 처리일시
+  frwrSgn?: string        // 포워더부호
+  frwrEntsConm?: string   // 포워더명 (추가)
 }
 
 export interface UnipassApiResponse {
