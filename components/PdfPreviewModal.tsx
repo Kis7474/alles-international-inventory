@@ -45,6 +45,7 @@ export default function PdfPreviewModal({ isOpen, onClose, pdfUrl, fileName }: P
             src={pdfUrl}
             className="w-full h-full"
             title={fileName}
+            sandbox="allow-same-origin allow-scripts allow-popups allow-downloads"
           />
         </div>
       </div>

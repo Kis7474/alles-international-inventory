@@ -34,10 +34,11 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    // Generate unique filename
+    // Generate unique filename with random prefix
     const timestamp = Date.now()
-    const originalName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
-    const filename = `${timestamp}_${originalName}`
+    const randomPrefix = Math.random().toString(36).substring(2, 15)
+    const fileExtension = file.name.split('.').pop()?.toLowerCase() || 'pdf'
+    const filename = `${randomPrefix}_${timestamp}.${fileExtension}`
     
     // Determine upload directory
     const uploadDir = type === 'customs' ? 'customs' : 'import-export'
