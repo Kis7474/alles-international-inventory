@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
     
     // 등록 방식에 따라 API 호출
     let apiResult
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let trackingData: any = {
       registrationType,
       syncCount: 1,
@@ -169,11 +170,12 @@ export async function POST(request: NextRequest) {
       message: '통관 정보가 등록되었습니다.',
       tracking,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error creating customs tracking:', error)
     
     // Unique constraint error
-    if (error.code === 'P2002') {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if ((error as any).code === 'P2002') {
       return NextResponse.json(
         { error: '이미 등록된 BL번호 또는 수입신고번호입니다.' },
         { status: 400 }

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getCargoProgress, verifyImportDeclaration } from '@/lib/unipass'
 
 // POST /api/customs/tracking/sync-all - 전체 동기화
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function POST(request: NextRequest) {
   try {
     // 유니패스 API 키 가져오기

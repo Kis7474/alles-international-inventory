@@ -35,6 +35,7 @@ export async function POST(
     
     // 등록 방식에 따라 API 호출
     let apiResult
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let updateData: any = {
       lastSyncAt: new Date(),
       syncCount: tracking.syncCount + 1,
