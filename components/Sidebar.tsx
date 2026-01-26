@@ -58,6 +58,15 @@ const menuItems: MenuItem[] = [
     ],
   },
   {
+    label: '문서 관리',
+    icon: '📄',
+    submenu: [
+      { href: '/documents', label: '문서 대시보드', icon: '📊' },
+      { href: '/documents/quotation', label: '견적서', icon: '📝' },
+      { href: '/documents/transaction-statement', label: '거래명세서', icon: '📋' },
+    ],
+  },
+  {
     label: '설정',
     icon: '⚙️',
     submenu: [
@@ -87,6 +96,9 @@ export default function Sidebar() {
   )
   const [projectsOpen, setProjectsOpen] = useState(
     pathname.startsWith('/projects')
+  )
+  const [documentsOpen, setDocumentsOpen] = useState(
+    pathname.startsWith('/documents')
   )
   const [masterOpen, setMasterOpen] = useState(
     pathname.startsWith('/sales/vendors') || pathname.startsWith('/sales/product-status') ||
@@ -127,8 +139,9 @@ export default function Sidebar() {
                   const isImportExport = item.label === '수입/수출'
                   const isWarehouse = item.label === '재고 관리'
                   const isProjects = item.label === '프로젝트'
+                  const isDocuments = item.label === '문서 관리'
                   const isMaster = item.label === '설정'
-                  const isExpanded = isSales ? salesOpen : isImportExport ? importExportOpen : isWarehouse ? warehouseOpen : isProjects ? projectsOpen : isMaster ? masterOpen : false
+                  const isExpanded = isSales ? salesOpen : isImportExport ? importExportOpen : isWarehouse ? warehouseOpen : isProjects ? projectsOpen : isDocuments ? documentsOpen : isMaster ? masterOpen : false
                   const toggleFunc = isSales
                     ? () => setSalesOpen(!salesOpen)
                     : isImportExport
@@ -137,6 +150,8 @@ export default function Sidebar() {
                     ? () => setWarehouseOpen(!warehouseOpen)
                     : isProjects
                     ? () => setProjectsOpen(!projectsOpen)
+                    : isDocuments
+                    ? () => setDocumentsOpen(!documentsOpen)
                     : isMaster
                     ? () => setMasterOpen(!masterOpen)
                     : () => {}
