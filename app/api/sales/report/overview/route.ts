@@ -146,15 +146,22 @@ export async function GET() {
   } catch (error) {
     console.error('Error generating overview:', error)
     
-    // Prisma 초기화 에러인 경우
-    if (error instanceof Error && error.message.includes('prisma')) {
-      return NextResponse.json(
-        { 
-          error: '데이터베이스 연결에 실패했습니다.',
-          details: process.env.NODE_ENV === 'development' ? error.message : undefined
-        },
-        { status: 503 }
-      )
+    // Database connection error
+    if (error instanceof Error) {
+      // Check for Prisma Client initialization errors
+      if (error.message.includes('PrismaClient') || 
+          error.message.includes('database') ||
+          error.message.includes('connect') ||
+          error.name === 'PrismaClientInitializationError' ||
+          error.name === 'PrismaClientKnownRequestError') {
+        return NextResponse.json(
+          { 
+            error: '데이터베이스 연결에 실패했습니다.',
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+          },
+          { status: 503 }
+        )
+      }
     }
     
     return NextResponse.json(
