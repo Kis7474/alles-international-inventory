@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { generateDocumentNumber, calculateVAT } from '@/lib/document-utils'
 
 // GET /api/documents/quotation - 견적서 목록 조회
 export async function GET(request: NextRequest) {
@@ -62,33 +63,15 @@ export async function POST(request: NextRequest) {
       notes,
     } = body
 
-    // 견적서 번호 생성 (AQ + YYMMDD + 순번)
-    const today = new Date()
-    const dateStr = today.toISOString().slice(2, 10).replace(/-/g, '').slice(0, 6) // YYMMDD
-    const prefix = `AQ${dateStr}`
-    
-    // 오늘 날짜의 마지막 견적서 찾기
+    // 견적서 번호 생성
     const lastQuotation = await prisma.quotation.findFirst({
-      where: {
-        quotationNumber: {
-          startsWith: prefix
-        }
-      },
       orderBy: { quotationNumber: 'desc' }
     })
-
-    let sequence = 1
-    if (lastQuotation) {
-      const lastSeq = parseInt(lastQuotation.quotationNumber.slice(-2))
-      sequence = lastSeq + 1
-    }
-
-    const quotationNumber = `${prefix}${sequence.toString().padStart(2, '0')}`
+    const quotationNumber = generateDocumentNumber('AQ', lastQuotation?.quotationNumber || null)
 
     // 금액 계산
     const subtotal = items.reduce((sum: number, item: { amount: number }) => sum + item.amount, 0)
-    const vatAmount = Math.round(subtotal * 0.1)
-    const totalAmount = subtotal + vatAmount
+    const { vatAmount, totalAmount } = calculateVAT(subtotal)
 
     // 견적서 생성
     const quotation = await prisma.quotation.create({

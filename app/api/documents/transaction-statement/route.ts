@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { generateDocumentNumber, calculateVAT } from '@/lib/document-utils'
 
 // GET /api/documents/transaction-statement - 거래명세서 목록 조회
 export async function GET(request: NextRequest) {
@@ -58,33 +59,15 @@ export async function POST(request: NextRequest) {
       receiverSignature,
     } = body
 
-    // 거래번호 생성 (TS + YYMMDD + 순번)
-    const today = new Date()
-    const dateStr = today.toISOString().slice(2, 10).replace(/-/g, '').slice(0, 6) // YYMMDD
-    const prefix = `TS${dateStr}`
-    
-    // 오늘 날짜의 마지막 거래명세서 찾기
+    // 거래번호 생성
     const lastStatement = await prisma.transactionStatement.findFirst({
-      where: {
-        statementNumber: {
-          startsWith: prefix
-        }
-      },
       orderBy: { statementNumber: 'desc' }
     })
-
-    let sequence = 1
-    if (lastStatement) {
-      const lastSeq = parseInt(lastStatement.statementNumber.slice(-2))
-      sequence = lastSeq + 1
-    }
-
-    const statementNumber = `${prefix}${sequence.toString().padStart(2, '0')}`
+    const statementNumber = generateDocumentNumber('TS', lastStatement?.statementNumber || null)
 
     // 금액 계산
     const subtotal = items.reduce((sum: number, item: { amount: number }) => sum + item.amount, 0)
-    const vatAmount = Math.round(subtotal * 0.1)
-    const totalAmount = subtotal + vatAmount
+    const { vatAmount, totalAmount } = calculateVAT(subtotal)
 
     // 거래명세서 생성
     const statement = await prisma.transactionStatement.create({

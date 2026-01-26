@@ -143,12 +143,6 @@ export async function GET(
     <div class="footer-section">홈페이지: http://www.alleskr.com/</div>
     <div class="footer-section">은행: 하나은행 586-910007-02104 (예금주: 알레스인터네셔날 주식회사)</div>
   </div>
-
-  <script>
-    window.onload = function() {
-      window.print();
-    }
-  </script>
 </body>
 </html>
     `

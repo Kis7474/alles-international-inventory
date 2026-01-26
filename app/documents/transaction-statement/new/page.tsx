@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { VAT_RATE } from '@/lib/document-utils'
 
 interface StatementItem {
   productName: string
@@ -49,7 +50,7 @@ export default function NewTransactionStatementPage() {
 
   const calculateTotals = () => {
     const subtotal = items.reduce((sum, item) => sum + item.amount, 0)
-    const vatAmount = Math.round(subtotal * 0.1)
+    const vatAmount = Math.round(subtotal * VAT_RATE)
     const totalAmount = subtotal + vatAmount
     return { subtotal, vatAmount, totalAmount }
   }

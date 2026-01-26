@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { calculateVAT } from '@/lib/document-utils'
 
 // GET /api/documents/transaction-statement/[id] - 거래명세서 상세 조회
 export async function GET(
@@ -58,8 +59,7 @@ export async function PUT(
 
     // 금액 계산
     const subtotal = items.reduce((sum: number, item: { amount: number }) => sum + item.amount, 0)
-    const vatAmount = Math.round(subtotal * 0.1)
-    const totalAmount = subtotal + vatAmount
+    const { vatAmount, totalAmount } = calculateVAT(subtotal)
 
     // 기존 품목 삭제 후 새로 생성
     await prisma.transactionStatementItem.deleteMany({

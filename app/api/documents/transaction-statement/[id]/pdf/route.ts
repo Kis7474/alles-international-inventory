@@ -156,12 +156,6 @@ export async function GET(
     <div class="footer-section">주소: 김포시 태장로 741 경동미르웰시티 632호</div>
     <div class="footer-section">전화: (02) 2645-8886 | 팩스: (031) 983-8867</div>
   </div>
-
-  <script>
-    window.onload = function() {
-      window.print();
-    }
-  </script>
 </body>
 </html>
     `
