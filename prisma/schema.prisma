@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -676,4 +676,110 @@ model CustomsTracking {
   
   @@unique([blNumber, blYear], name: "bl_unique")
   @@index([declarationNumber], name: "declaration_idx")
+}
+
+// ============================================
+// 문서 관리 (견적서, 거래명세서)
+// ============================================
+
+// 견적서
+model Quotation {
+  id              Int       @id @default(autoincrement())
+  quotationNumber String    @unique
+  quotationDate   DateTime
+  validUntil      DateTime?
+  
+  // 거래처 정보
+  customerName    String?
+  customerRef     String?
+  customerPhone   String?
+  customerFax     String?
+  customerEmail   String?
+  
+  // 담당자 정보
+  salesPersonName String?
+  salesPersonPhone String?
+  
+  // 품목
+  items           QuotationItem[]
+  
+  // 금액
+  subtotal        Float
+  vatAmount       Float
+  totalAmount     Float
+  
+  // 추가 조건
+  deliveryTerms   String?
+  paymentTerms    String?
+  validityPeriod  String?
+  notes           String?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// 견적서 품목
+model QuotationItem {
+  id          Int       @id @default(autoincrement())
+  quotationId Int
+  quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  
+  itemNo      Int
+  description String
+  quantity    Float
+  unit        String?
+  unitPrice   Float
+  amount      Float
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// 거래명세서 (납품명세서)
+model TransactionStatement {
+  id              Int       @id @default(autoincrement())
+  statementNumber String    @unique
+  deliveryDate    DateTime
+  
+  // 거래처 정보
+  recipientName   String?
+  recipientRef    String?
+  recipientPhone  String?
+  recipientFax    String?
+  
+  // 품목
+  items           TransactionStatementItem[]
+  
+  // 금액
+  subtotal        Float
+  vatAmount       Float
+  totalAmount     Float
+  
+  // 지불 조건
+  paymentTerms    String?
+  bankAccount     String?
+  
+  // 인수자 서명
+  receiverName    String?
+  receiverSignature String?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// 거래명세서 품목
+model TransactionStatementItem {
+  id          Int                    @id @default(autoincrement())
+  statementId Int
+  statement   TransactionStatement   @relation(fields: [statementId], references: [id], onDelete: Cascade)
+  
+  itemNo      Int
+  productName String
+  specification String?
+  quantity    Float
+  unitPrice   Float
+  amount      Float
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
