@@ -113,7 +113,7 @@ export async function GET(
 
     // 품목 데이터
     let currentRow = headerRow + 1
-    quotation.items.forEach((item, index) => {
+    quotation.items.forEach((item) => {
       worksheet.getCell(currentRow, 1).value = item.itemNo
       worksheet.getCell(currentRow, 2).value = item.description
       worksheet.getCell(currentRow, 3).value = item.quantity

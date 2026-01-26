@@ -61,7 +61,7 @@ export async function PUT(
     } = body
 
     // 금액 계산
-    const subtotal = items.reduce((sum: number, item: any) => sum + item.amount, 0)
+    const subtotal = items.reduce((sum: number, item: { amount: number }) => sum + item.amount, 0)
     const vatAmount = Math.round(subtotal * 0.1)
     const totalAmount = subtotal + vatAmount
 
@@ -90,7 +90,7 @@ export async function PUT(
         validityPeriod,
         notes,
         items: {
-          create: items.map((item: any, index: number) => ({
+          create: items.map((item: { description: string; quantity: number; unit?: string; unitPrice: number; amount: number }, index: number) => ({
             itemNo: index + 1,
             description: item.description,
             quantity: item.quantity,

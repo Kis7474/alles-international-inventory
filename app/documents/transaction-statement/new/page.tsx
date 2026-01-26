@@ -36,7 +36,7 @@ export default function NewTransactionStatementPage() {
     setItems(items.filter((_, i) => i !== index))
   }
 
-  const updateItem = (index: number, field: keyof StatementItem, value: any) => {
+  const updateItem = (index: number, field: keyof StatementItem, value: string | number) => {
     const newItems = [...items]
     newItems[index] = { ...newItems[index], [field]: value }
     

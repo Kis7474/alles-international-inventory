@@ -43,7 +43,7 @@ export default function NewQuotationPage() {
     setItems(items.filter((_, i) => i !== index))
   }
 
-  const updateItem = (index: number, field: keyof QuotationItem, value: any) => {
+  const updateItem = (index: number, field: keyof QuotationItem, value: string | number) => {
     const newItems = [...items]
     newItems[index] = { ...newItems[index], [field]: value }
     

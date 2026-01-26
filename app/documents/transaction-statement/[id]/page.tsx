@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { formatNumber } from '@/lib/utils'
 
@@ -37,13 +37,7 @@ export default function TransactionStatementDetailPage() {
   const [statement, setStatement] = useState<TransactionStatement | null>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    if (params.id) {
-      fetchStatement()
-    }
-  }, [params.id])
-
-  const fetchStatement = async () => {
+  const fetchStatement = useCallback(async () => {
     try {
       const response = await fetch(`/api/documents/transaction-statement/${params.id}`)
       if (response.ok) {
@@ -59,7 +53,13 @@ export default function TransactionStatementDetailPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [params.id, router])
+
+  useEffect(() => {
+    if (params.id) {
+      fetchStatement()
+    }
+  }, [params.id, fetchStatement])
 
   if (loading) {
     return (

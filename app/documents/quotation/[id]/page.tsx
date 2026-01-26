@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { formatNumber } from '@/lib/utils'
 
@@ -42,13 +42,7 @@ export default function QuotationDetailPage() {
   const [quotation, setQuotation] = useState<Quotation | null>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    if (params.id) {
-      fetchQuotation()
-    }
-  }, [params.id])
-
-  const fetchQuotation = async () => {
+  const fetchQuotation = useCallback(async () => {
     try {
       const response = await fetch(`/api/documents/quotation/${params.id}`)
       if (response.ok) {
@@ -64,7 +58,13 @@ export default function QuotationDetailPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [params.id, router])
+
+  useEffect(() => {
+    if (params.id) {
+      fetchQuotation()
+    }
+  }, [params.id, fetchQuotation])
 
   if (loading) {
     return (
