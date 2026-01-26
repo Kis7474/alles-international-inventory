@@ -373,6 +373,87 @@ npx prisma generate
 - 엑셀 내보내기/가져오기
 - 대시보드 차트 및 분석
 
+## 배포 가이드 (Vercel + Supabase PostgreSQL)
+
+### 1. Supabase 데이터베이스 설정
+
+1. [Supabase](https://supabase.com)에 가입하고 새 프로젝트 생성
+2. 프로젝트 설정에서 Database connection string 복사
+   - Settings > Database > Connection String
+   - Transaction pooler 모드 사용 (포트 6543)
+   - 예시: `postgresql://postgres.[project-ref]:[password]@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres`
+
+### 2. Vercel 배포
+
+1. GitHub 리포지토리와 Vercel 연동
+2. 환경 변수 설정:
+   ```
+   DATABASE_URL=postgresql://postgres.[project-ref]:[password]@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres
+   KOREAEXIM_API_KEY=your_api_key (선택사항)
+   ```
+3. 배포 실행
+
+### 3. 데이터베이스 마이그레이션
+
+배포 후 데이터베이스 스키마를 동기화합니다:
+
+**방법 1: 로컬에서 실행**
+```bash
+# DATABASE_URL을 .env 파일에 추가
+npx prisma db push
+```
+
+**방법 2: Supabase SQL Editor에서 직접 실행**
+1. Prisma 스키마 기반 SQL 생성
+   ```bash
+   npx prisma migrate dev --name init --create-only
+   ```
+2. 생성된 SQL을 Supabase SQL Editor에 복사하여 실행
+
+### 4. 배포 후 확인사항
+
+- [ ] Vercel 빌드가 성공적으로 완료되었는지 확인
+- [ ] 대시보드 페이지가 정상적으로 로드되는지 확인
+- [ ] API 엔드포인트가 정상적으로 응답하는지 확인
+- [ ] 데이터베이스 연결이 정상적으로 작동하는지 확인
+
+### 5. 로컬 개발 환경 설정
+
+```bash
+# 의존성 설치
+npm install
+
+# 환경변수 설정 (.env 파일 생성)
+DATABASE_URL="postgresql://localhost:5432/alles_inventory"
+# 또는 로컬 SQLite 사용
+# DATABASE_URL="file:./dev.db"
+
+# Prisma 클라이언트 생성
+npx prisma generate
+
+# 데이터베이스 마이그레이션
+npx prisma db push
+
+# 개발 서버 실행
+npm run dev
+```
+
+### 6. 문제 해결
+
+**데이터베이스 연결 실패**
+- Supabase connection string이 올바른지 확인
+- Transaction pooler 모드 (포트 6543) 사용 확인
+- 환경변수가 Vercel에 올바르게 설정되어 있는지 확인
+
+**빌드 실패**
+- `package.json`의 build 스크립트에 `prisma generate`가 포함되어 있는지 확인
+- Node.js 버전 호환성 확인 (Node.js 18 이상 권장)
+
+**API 에러 처리**
+- 개발 모드에서는 상세한 에러 메시지 확인 가능
+- 프로덕션 모드에서는 일반적인 에러 메시지만 표시됨
+- 서버 로그에서 상세 에러 확인
+
 ## 라이선스
 
 MIT
