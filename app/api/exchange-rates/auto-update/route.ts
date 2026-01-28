@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import https from 'https'
+import { proxyFetch, isProxyConfigured } from '@/lib/api-proxy'
 
 // 한국수출입은행 환율 API
 const KOREAEXIM_API_URL = 'https://www.koreaexim.go.kr/site/program/financial/exchangeJSON'
@@ -101,6 +102,37 @@ function fetchWithSSLBypass(url: string, maxRedirects = 5): Promise<KoreaEximRat
   })
 }
 
+/**
+ * Fetch exchange rate data with proxy support
+ * @param url - API URL to fetch
+ * @returns Parsed exchange rate data
+ */
+async function fetchExchangeRates(url: string): Promise<KoreaEximRate[]> {
+  // Try proxy first if configured
+  if (isProxyConfigured()) {
+    try {
+      console.log('Using Cloudflare Workers proxy for Korea Eximbank API')
+      const data = await proxyFetch(url, { timeout: 15000 })
+      const parsed = JSON.parse(data)
+      
+      if (!Array.isArray(parsed)) {
+        throw new Error('API 응답 형식이 올바르지 않습니다')
+      }
+      
+      return parsed
+    } catch (error) {
+      // If proxy fails, fall back to direct fetch
+      if (error instanceof Error && error.message !== 'PROXY_NOT_CONFIGURED') {
+        console.warn('Proxy fetch failed, falling back to direct fetch:', error.message)
+      }
+    }
+  }
+  
+  // Direct fetch (fallback)
+  console.log('Using direct fetch for Korea Eximbank API')
+  return await fetchWithSSLBypass(url)
+}
+
 // POST /api/exchange-rates/auto-update - 환율 자동 업데이트
 export async function POST() {
   try {
@@ -131,7 +163,7 @@ export async function POST() {
     const searchDate = today.toISOString().slice(0, 10).replace(/-/g, '')
     
     // 한국수출입은행 API 호출
-    let data: KoreaEximRate[] = await fetchWithSSLBypass(
+    let data: KoreaEximRate[] = await fetchExchangeRates(
       `${KOREAEXIM_API_URL}?authkey=${apiKey}&searchdate=${searchDate}&data=AP01`
     )
     
@@ -143,7 +175,7 @@ export async function POST() {
         pastDate.setDate(pastDate.getDate() - daysAgo)
         const pastDateStr = pastDate.toISOString().slice(0, 10).replace(/-/g, '')
         
-        const retryData = await fetchWithSSLBypass(
+        const retryData = await fetchExchangeRates(
           `${KOREAEXIM_API_URL}?authkey=${apiKey}&searchdate=${pastDateStr}&data=AP01`
         )
         
