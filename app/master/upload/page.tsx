@@ -81,10 +81,11 @@ export default function ExcelUploadPage() {
     setErrors([])
 
     // Create AbortController for timeout handling
+    // Set to slightly less than server timeout (60s) to get proper server errors
     const controller = new AbortController()
     const timeoutId = setTimeout(() => {
       controller.abort()
-    }, 120000) // 2 minutes timeout
+    }, 55000) // 55 seconds timeout (server is 60s)
 
     try {
       const formData = new FormData()
@@ -434,7 +435,7 @@ export default function ExcelUploadPage() {
             disabled={!file || uploading}
             className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
-            {uploading ? '처리 중... (최대 2분 소요될 수 있습니다)' : '업로드 시작'}
+            {uploading ? '처리 중... (최대 1분 소요될 수 있습니다)' : '업로드 시작'}
           </button>
           
           {uploading && (

@@ -100,13 +100,24 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
     const errors: Array<{ row: number; message: string }> = []
     
     // Initialize caches for entities to avoid repeated DB queries
-    const vendorCache = new Map<string, { id: number; isNew: boolean }>()
-    const categoryCache = new Map<string, { id: number; isNew: boolean }>()
-    const productCache = new Map<string, { id: number; isNew: boolean }>()
-    const salespersonCache = new Map<string, { id: number; isNew: boolean }>()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const vendorCache = new Map<string, { id: number; data: any; isNew: boolean }>()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const categoryCache = new Map<string, { id: number; data: any; isNew: boolean }>()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const productCache = new Map<string, { id: number; data: any; isNew: boolean }>()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const salespersonCache = new Map<string, { id: number; data: any; isNew: boolean }>()
+    
+    // Counter for unique code generation within this transaction
+    let codeCounter = 0
     
     // Wrap the entire upload process in a transaction
     await prisma.$transaction(async (tx) => {
+      // Pre-fetch default salesperson and category once to avoid repeated queries
+      const defaultSalesperson = await getDefaultSalespersonInTransaction(tx)
+      const defaultCategory = await getDefaultCategoryInTransaction(tx)
+      
       // Process each row
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i]
@@ -127,12 +138,12 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
         // Branch based on category
         if (categoryName === 'Service' || categoryName === '서비스') {
           // Create/update Service entry
-          await handleServiceEntryInTransaction(row as unknown as ExcelRow, summary, options, tx, vendorCache, categoryCache)
+          await handleServiceEntryInTransaction(row as unknown as ExcelRow, summary, options, tx, vendorCache, categoryCache, { value: codeCounter++ })
           summary.successRows++
           continue
         } else if (categoryName === 'Project' || categoryName === '프로젝트') {
           // Create/update Project entry
-          await handleProjectEntryInTransaction(row as unknown as ExcelRow, summary, options, tx)
+          await handleProjectEntryInTransaction(row as unknown as ExcelRow, summary, options, tx, { value: codeCounter++ })
           summary.successRows++
           continue
         }
@@ -162,7 +173,8 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
             'DOMESTIC_PURCHASE',
             options.createVendors || false,
             vendorCache,
-            tx
+            tx,
+            { value: codeCounter++ }
           )
           if (!purchaseVendor && options.createProducts) {
             throw new Error(`품목 '${row.productName}'의 매입처가 필요합니다. 매입처 열을 입력해주세요.`)
@@ -178,7 +190,8 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
             'DOMESTIC_SALES',
             options.createVendors || false,
             vendorCache,
-            tx
+            tx,
+            { value: codeCounter++ }
           )
           if (salesVendor?.isNew) summary.vendorsCreated++
         }
@@ -186,7 +199,7 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
         // 3. Find or create category - using cache
         let category = null
         if (row.category) {
-          category = await findOrCreateCategoryWithCache(row.category, options.createCategories || false, categoryCache, tx)
+          category = await findOrCreateCategoryWithCache(row.category, options.createCategories || false, categoryCache, tx, { value: codeCounter++ })
           if (category && category.isNew) summary.categoriesCreated++
         }
         
@@ -202,7 +215,8 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
           row.unitPrice,
           options.createProducts || false,
           productCache,
-          tx
+          tx,
+          { value: codeCounter++ }
         )
         if (!product) {
           throw new Error(`품목 '${row.productName}'를 찾을 수 없습니다. 자동 생성 옵션을 활성화하세요.`)
@@ -253,7 +267,7 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
         // 6. Find or create salesperson - using cache
         let salesperson = null
         if (row.salesperson) {
-          salesperson = await findOrCreateSalespersonWithCache(row.salesperson, options.createSalespersons || false, salespersonCache, tx)
+          salesperson = await findOrCreateSalespersonWithCache(row.salesperson, options.createSalespersons || false, salespersonCache, tx, { value: codeCounter++ })
           if (salesperson && salesperson.isNew) summary.salespersonsCreated++
         }
         
@@ -276,10 +290,6 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
           throw new Error(`${vendorType}가 필요합니다.`)
         }
         const vendorNameForTransaction = transactionType === 'SALES' ? row.salesVendorName : row.purchaseVendorName
-        
-        // Get or create default salesperson and category if needed
-        const defaultSalesperson = await getDefaultSalespersonInTransaction(tx)
-        const defaultCategory = await getDefaultCategoryInTransaction(tx)
         
         await tx.salesRecord.create({
           data: {
@@ -920,9 +930,11 @@ async function findOrCreateVendorByTypeWithCache(
   name: string,
   type: 'DOMESTIC_PURCHASE' | 'DOMESTIC_SALES' | 'INTERNATIONAL_PURCHASE' | 'INTERNATIONAL_SALES',
   autoCreate: boolean,
-  cache: Map<string, { id: number; isNew: boolean }>,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  tx: any
+  cache: Map<string, { id: number; data: any; isNew: boolean }>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  tx: any,
+  codeCounter: { value: number }
 ) {
   if (!name) return null
   
@@ -931,8 +943,7 @@ async function findOrCreateVendorByTypeWithCache(
   // Check cache first
   if (cache.has(cacheKey)) {
     const cached = cache.get(cacheKey)!
-    // For cached items, we need to return in the same format as findOrCreateVendorByType
-    return { data: { id: cached.id }, isNew: false }
+    return { data: cached.data, isNew: false }
   }
   
   // Find in database
@@ -941,7 +952,7 @@ async function findOrCreateVendorByTypeWithCache(
   })
   
   if (existing) {
-    cache.set(cacheKey, { id: existing.id, isNew: false })
+    cache.set(cacheKey, { id: existing.id, data: existing, isNew: false })
     return { data: existing, isNew: false }
   }
   
@@ -949,8 +960,9 @@ async function findOrCreateVendorByTypeWithCache(
     return null
   }
   
-  // Create new vendor
-  const code = `V${Date.now().toString().slice(-6)}`
+  // Create new vendor with unique code using counter
+  codeCounter.value++
+  const code = `V${Date.now().toString().slice(-8)}-${codeCounter.value.toString().padStart(4, '0')}`
   const newVendor = await tx.vendor.create({
     data: {
       code,
@@ -960,7 +972,7 @@ async function findOrCreateVendorByTypeWithCache(
     },
   })
   
-  cache.set(cacheKey, { id: newVendor.id, isNew: true })
+  cache.set(cacheKey, { id: newVendor.id, data: newVendor, isNew: true })
   return { data: newVendor, isNew: true }
 }
 
@@ -970,16 +982,18 @@ async function findOrCreateVendorByTypeWithCache(
 async function findOrCreateCategoryWithCache(
   name: string,
   autoCreate: boolean,
-  cache: Map<string, { id: number; isNew: boolean }>,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  tx: any
+  cache: Map<string, { id: number; data: any; isNew: boolean }>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  tx: any,
+  codeCounter: { value: number }
 ) {
   if (!name) return null
   
   // Check cache first
   if (cache.has(name)) {
     const cached = cache.get(name)!
-    return { data: { id: cached.id }, isNew: false }
+    return { data: cached.data, isNew: false }
   }
   
   // Find in database
@@ -988,7 +1002,7 @@ async function findOrCreateCategoryWithCache(
   })
   
   if (existing) {
-    cache.set(name, { id: existing.id, isNew: false })
+    cache.set(name, { id: existing.id, data: existing, isNew: false })
     return { data: existing, isNew: false }
   }
   
@@ -996,16 +1010,18 @@ async function findOrCreateCategoryWithCache(
     return null
   }
   
-  // Create new category
+  // Create new category with unique code using counter
+  codeCounter.value++
+  const code = `CAT${Date.now().toString().slice(-8)}-${codeCounter.value.toString().padStart(4, '0')}`
   const newCategory = await tx.category.create({
     data: {
-      code: generateCode(name),
+      code,
       name,
       nameKo: name,
     },
   })
   
-  cache.set(name, { id: newCategory.id, isNew: true })
+  cache.set(name, { id: newCategory.id, data: newCategory, isNew: true })
   return { data: newCategory, isNew: true }
 }
 
@@ -1018,16 +1034,18 @@ async function findOrCreateProductWithVendorWithCache(
   categoryId: number | undefined,
   unitPrice: number,
   autoCreate: boolean,
-  cache: Map<string, { id: number; isNew: boolean }>,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  tx: any
+  cache: Map<string, { id: number; data: any; isNew: boolean }>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  tx: any,
+  codeCounter: { value: number }
 ) {
   if (!name) return null
   
   // Check cache first
   if (cache.has(name)) {
     const cached = cache.get(name)!
-    return { data: { id: cached.id }, isNew: false }
+    return { data: cached.data, isNew: false }
   }
   
   // Find existing product
@@ -1036,7 +1054,7 @@ async function findOrCreateProductWithVendorWithCache(
   })
   
   if (existing) {
-    cache.set(name, { id: existing.id, isNew: false })
+    cache.set(name, { id: existing.id, data: existing, isNew: false })
     return { data: existing, isNew: false }
   }
   
@@ -1048,8 +1066,9 @@ async function findOrCreateProductWithVendorWithCache(
     throw new Error(`품목 '${name}'의 매입처가 필요합니다.`)
   }
   
-  // Create new product
-  const code = `P${Date.now().toString().slice(-6)}`
+  // Create new product with unique code using counter
+  codeCounter.value++
+  const code = `P${Date.now().toString().slice(-8)}-${codeCounter.value.toString().padStart(4, '0')}`
   const newProduct = await tx.product.create({
     data: {
       code,
@@ -1061,7 +1080,7 @@ async function findOrCreateProductWithVendorWithCache(
     },
   })
   
-  cache.set(name, { id: newProduct.id, isNew: true })
+  cache.set(name, { id: newProduct.id, data: newProduct, isNew: true })
   return { data: newProduct, isNew: true }
 }
 
@@ -1071,14 +1090,16 @@ async function findOrCreateProductWithVendorWithCache(
 async function findOrCreateSalespersonWithCache(
   name: string,
   autoCreate: boolean,
-  cache: Map<string, { id: number; isNew: boolean }>,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  tx: any
+  cache: Map<string, { id: number; data: any; isNew: boolean }>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  tx: any,
+  codeCounter: { value: number }
 ) {
   // Check cache first
   if (cache.has(name)) {
     const cached = cache.get(name)!
-    return { data: { id: cached.id }, isNew: false }
+    return { data: cached.data, isNew: false }
   }
   
   // Find in database
@@ -1087,7 +1108,7 @@ async function findOrCreateSalespersonWithCache(
   })
   
   if (existing) {
-    cache.set(name, { id: existing.id, isNew: false })
+    cache.set(name, { id: existing.id, data: existing, isNew: false })
     return { data: existing, isNew: false }
   }
   
@@ -1095,16 +1116,18 @@ async function findOrCreateSalespersonWithCache(
     return null
   }
   
-  // Create new salesperson
+  // Create new salesperson with unique code using counter
+  codeCounter.value++
+  const code = `SP${Date.now().toString().slice(-8)}-${codeCounter.value.toString().padStart(4, '0')}`
   const newSalesperson = await tx.salesperson.create({
     data: {
-      code: generateCode(name),
+      code,
       name,
       commissionRate: 0,
     },
   })
   
-  cache.set(name, { id: newSalesperson.id, isNew: true })
+  cache.set(name, { id: newSalesperson.id, data: newSalesperson, isNew: true })
   return { data: newSalesperson, isNew: true }
 }
 
@@ -1161,8 +1184,11 @@ async function handleServiceEntryInTransaction(
   options: UploadOptions,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tx: any,
-  vendorCache: Map<string, { id: number; isNew: boolean }>,
-  categoryCache: Map<string, { id: number; isNew: boolean }>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  vendorCache: Map<string, { id: number; data: any; isNew: boolean }>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  categoryCache: Map<string, { id: number; data: any; isNew: boolean }>,
+  codeCounter: { value: number }
 ) {
   // Find or create sales vendor
   let salesVendor = null
@@ -1172,7 +1198,8 @@ async function handleServiceEntryInTransaction(
       'DOMESTIC_SALES',
       options.createVendors || false,
       vendorCache,
-      tx
+      tx,
+      codeCounter
     )
     if (salesVendor?.isNew) summary.vendorsCreated++
   }
@@ -1180,7 +1207,7 @@ async function handleServiceEntryInTransaction(
   // Find or create category
   let category = null
   if (row.category) {
-    category = await findOrCreateCategoryWithCache(row.category, options.createCategories || false, categoryCache, tx)
+    category = await findOrCreateCategoryWithCache(row.category, options.createCategories || false, categoryCache, tx, codeCounter)
     if (category?.isNew) {
       summary.categoriesCreated = (summary.categoriesCreated || 0) + 1
     }
@@ -1216,8 +1243,9 @@ async function handleServiceEntryInTransaction(
       })
     }
   } else {
-    // Create new service
-    const code = `SVC-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`
+    // Create new service with unique code using counter
+    codeCounter.value++
+    const code = `SVC${Date.now().toString().slice(-8)}-${codeCounter.value.toString().padStart(4, '0')}`
     await tx.service.create({
       data: {
         code,
@@ -1241,7 +1269,8 @@ async function handleProjectEntryInTransaction(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   options: UploadOptions,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  tx: any
+  tx: any,
+  codeCounter: { value: number }
 ) {
   // Find or create project
   const existingProject = await tx.project.findFirst({
@@ -1269,8 +1298,9 @@ async function handleProjectEntryInTransaction(
       })
     }
   } else {
-    // Create new project
-    const code = `PRJ-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`
+    // Create new project with unique code using counter
+    codeCounter.value++
+    const code = `PRJ${Date.now().toString().slice(-8)}-${codeCounter.value.toString().padStart(4, '0')}`
     const startDate = row.date && typeof row.date === 'string' ? new Date(row.date) : new Date()
     const unitPrice = typeof row.unitPrice === 'number' ? row.unitPrice : 0
     const quantity = typeof row.quantity === 'number' ? row.quantity : 1
