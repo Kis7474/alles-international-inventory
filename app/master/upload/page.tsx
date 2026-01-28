@@ -80,6 +80,12 @@ export default function ExcelUploadPage() {
     setSummary(null)
     setErrors([])
 
+    // Create AbortController for timeout handling
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => {
+      controller.abort()
+    }, 120000) // 2 minutes timeout
+
     try {
       const formData = new FormData()
       formData.append('file', file)
@@ -91,7 +97,10 @@ export default function ExcelUploadPage() {
       const res = await fetch('/api/upload/excel', {
         method: 'POST',
         body: formData,
+        signal: controller.signal,
       })
+
+      clearTimeout(timeoutId)
 
       const data = await res.json()
 
@@ -104,8 +113,13 @@ export default function ExcelUploadPage() {
         alert(data.error || '업로드 중 오류가 발생했습니다.')
       }
     } catch (error) {
+      clearTimeout(timeoutId)
       console.error('Error uploading file:', error)
-      alert('업로드 중 오류가 발생했습니다.')
+      if (error instanceof Error && error.name === 'AbortError') {
+        alert('업로드 시간이 초과되었습니다. 파일 크기를 줄이거나 다시 시도해주세요.')
+      } else {
+        alert('업로드 중 오류가 발생했습니다.')
+      }
     } finally {
       setUploading(false)
     }
@@ -420,8 +434,19 @@ export default function ExcelUploadPage() {
             disabled={!file || uploading}
             className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
-            {uploading ? '업로드 중...' : '업로드 시작'}
+            {uploading ? '처리 중... (최대 2분 소요될 수 있습니다)' : '업로드 시작'}
           </button>
+          
+          {uploading && (
+            <div className="mt-4 bg-blue-50 border border-blue-200 rounded-md p-4">
+              <div className="flex items-center space-x-3">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                <div className="text-sm text-blue-700">
+                  엑셀 파일을 처리하고 있습니다. 잠시만 기다려주세요...
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 결과 표시 */}

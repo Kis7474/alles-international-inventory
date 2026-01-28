@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { parseExcelFile, parseTransactionExcel, generateCode } from '@/lib/excel-parser'
 
+// Vercel API route configuration
+export const maxDuration = 60 // Maximum execution time in seconds (Vercel Pro: 60s)
+export const dynamic = 'force-dynamic' // Disable static optimization
+
 interface UploadOptions {
   duplicateHandling: 'overwrite' | 'skip' | 'merge'
   createVendors: boolean
@@ -95,10 +99,18 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
     
     const errors: Array<{ row: number; message: string }> = []
     
-    // Process each row
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i]
-      const rowNumber = i + 2 // +2 because Excel is 1-indexed and we skip header
+    // Initialize caches for entities to avoid repeated DB queries
+    const vendorCache = new Map<string, { id: number; isNew: boolean }>()
+    const categoryCache = new Map<string, { id: number; isNew: boolean }>()
+    const productCache = new Map<string, { id: number; isNew: boolean }>()
+    const salespersonCache = new Map<string, { id: number; isNew: boolean }>()
+    
+    // Wrap the entire upload process in a transaction
+    await prisma.$transaction(async (tx) => {
+      // Process each row
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i]
+        const rowNumber = i + 2 // +2 because Excel is 1-indexed and we skip header
       
       try {
         // Validate required fields
@@ -115,12 +127,12 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
         // Branch based on category
         if (categoryName === 'Service' || categoryName === '서비스') {
           // Create/update Service entry
-          await handleServiceEntry(row as unknown as ExcelRow, summary, options)
+          await handleServiceEntryInTransaction(row as unknown as ExcelRow, summary, options, tx, vendorCache, categoryCache)
           summary.successRows++
           continue
         } else if (categoryName === 'Project' || categoryName === '프로젝트') {
           // Create/update Project entry
-          await handleProjectEntry(row as unknown as ExcelRow, summary, options)
+          await handleProjectEntryInTransaction(row as unknown as ExcelRow, summary, options, tx)
           summary.successRows++
           continue
         }
@@ -142,13 +154,15 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
           throw new Error('거래 유형이 선택되지 않았습니다.')
         }
         
-        // 1. Find or create purchase vendor (매입처 - 매입 유형)
+        // 1. Find or create purchase vendor (매입처 - 매입 유형) - using cache
         let purchaseVendor = null
         if (row.purchaseVendorName) {
-          purchaseVendor = await findOrCreateVendorByType(
+          purchaseVendor = await findOrCreateVendorByTypeWithCache(
             row.purchaseVendorName,
             'DOMESTIC_PURCHASE',
-            options.createVendors || false
+            options.createVendors || false,
+            vendorCache,
+            tx
           )
           if (!purchaseVendor && options.createProducts) {
             throw new Error(`품목 '${row.productName}'의 매입처가 필요합니다. 매입처 열을 입력해주세요.`)
@@ -156,35 +170,39 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
           if (purchaseVendor?.isNew) summary.vendorsCreated++
         }
         
-        // 2. Find or create sales vendor (판매처 - 매출 유형)
+        // 2. Find or create sales vendor (판매처 - 매출 유형) - using cache
         let salesVendor = null
         if (row.salesVendorName) {
-          salesVendor = await findOrCreateVendorByType(
+          salesVendor = await findOrCreateVendorByTypeWithCache(
             row.salesVendorName,
             'DOMESTIC_SALES',
-            options.createVendors || false
+            options.createVendors || false,
+            vendorCache,
+            tx
           )
           if (salesVendor?.isNew) summary.vendorsCreated++
         }
         
-        // 3. Find or create category
+        // 3. Find or create category - using cache
         let category = null
         if (row.category) {
-          category = await findOrCreateCategory(row.category, options.createCategories || false)
+          category = await findOrCreateCategoryWithCache(row.category, options.createCategories || false, categoryCache, tx)
           if (category && category.isNew) summary.categoriesCreated++
         }
         
-        // 4. Find or create product (매입처 연결 필수)
+        // 4. Find or create product (매입처 연결 필수) - using cache
         if (!purchaseVendor && options.createProducts) {
           throw new Error(`품목 '${row.productName}'의 매입처가 필요합니다. 매입처 열을 입력해주세요.`)
         }
         
-        const product = await findOrCreateProductWithVendor(
+        const product = await findOrCreateProductWithVendorWithCache(
           row.productName,
           purchaseVendor?.data.id || null,
           category?.data.id,
           row.unitPrice,
-          options.createProducts || false
+          options.createProducts || false,
+          productCache,
+          tx
         )
         if (!product) {
           throw new Error(`품목 '${row.productName}'를 찾을 수 없습니다. 자동 생성 옵션을 활성화하세요.`)
@@ -208,7 +226,7 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
           
           // Update if there's any data to update
           if (Object.keys(updateData).length > 0) {
-            await prisma.product.update({
+            await tx.product.update({
               where: { id: product.data.id },
               data: updateData
             })
@@ -217,7 +235,7 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
         
         // 5. Link product to sales vendor (ProductSalesVendor)
         if (product && salesVendor) {
-          await prisma.productSalesVendor.upsert({
+          await tx.productSalesVendor.upsert({
             where: {
               productId_vendorId: {
                 productId: product.data.id,
@@ -232,10 +250,10 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
           })
         }
         
-        // 6. Find or create salesperson
+        // 6. Find or create salesperson - using cache
         let salesperson = null
         if (row.salesperson) {
-          salesperson = await findOrCreateSalesperson(row.salesperson, options.createSalespersons || false)
+          salesperson = await findOrCreateSalespersonWithCache(row.salesperson, options.createSalespersons || false, salespersonCache, tx)
           if (salesperson && salesperson.isNew) summary.salespersonsCreated++
         }
         
@@ -259,14 +277,18 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
         }
         const vendorNameForTransaction = transactionType === 'SALES' ? row.salesVendorName : row.purchaseVendorName
         
-        await prisma.salesRecord.create({
+        // Get or create default salesperson and category if needed
+        const defaultSalesperson = await getDefaultSalespersonInTransaction(tx)
+        const defaultCategory = await getDefaultCategoryInTransaction(tx)
+        
+        await tx.salesRecord.create({
           data: {
             date: transactionDate,
             type: transactionType,
             vendorId: vendorForTransaction.data.id,
             productId: product.data.id,
-            salespersonId: salesperson?.data.id || (await getDefaultSalesperson()).id,
-            categoryId: category?.data.id || (await getDefaultCategory()).id,
+            salespersonId: salesperson?.data.id || defaultSalesperson.id,
+            categoryId: category?.data.id || defaultCategory.id,
             itemName: row.productName,
             customer: vendorNameForTransaction, // Store vendor name in customer field for backward compatibility
             quantity: row.quantity,
@@ -294,6 +316,10 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
         summary.failedRows++
       }
     }
+    }, {
+      // Transaction timeout configuration (in milliseconds)
+      timeout: 55000, // 55 seconds, slightly less than maxDuration
+    })
     
     return NextResponse.json({
       success: true,
@@ -489,6 +515,7 @@ async function handlePriceMatrixUpload(file: File, options: UploadOptions) {
 /**
  * Handle Service category entry
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function handleServiceEntry(row: ExcelRow, summary: UploadSummary, options: UploadOptions) {
   // Find or create sales vendor
   let salesVendor = null
@@ -737,6 +764,7 @@ async function findOrCreateProduct(name: string, categoryId: number | undefined,
 /**
  * Find or create product with vendor connection
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function findOrCreateProductWithVendor(
   name: string,
   purchaseVendorId: number | null,
@@ -782,6 +810,7 @@ async function findOrCreateProductWithVendor(
 /**
  * Find or create salesperson
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function findOrCreateSalesperson(name: string, autoCreate: boolean) {
   const existing = await prisma.salesperson.findFirst({
     where: { name },
@@ -839,6 +868,7 @@ async function findOrCreateCategory(name: string, autoCreate: boolean) {
 /**
  * Get default salesperson (create if not exists)
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function getDefaultSalesperson() {
   let salesperson = await prisma.salesperson.findFirst({
     where: { code: 'DEFAULT' },
@@ -860,6 +890,7 @@ async function getDefaultSalesperson() {
 /**
  * Get default category (create if not exists)
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function getDefaultCategory() {
   let category = await prisma.category.findFirst({
     where: { code: 'DEFAULT' },
@@ -876,4 +907,396 @@ async function getDefaultCategory() {
   }
   
   return category
+}
+
+/**
+ * Cached helper functions for transaction processing
+ */
+
+/**
+ * Find or create vendor by specific type with caching
+ */
+async function findOrCreateVendorByTypeWithCache(
+  name: string,
+  type: 'DOMESTIC_PURCHASE' | 'DOMESTIC_SALES' | 'INTERNATIONAL_PURCHASE' | 'INTERNATIONAL_SALES',
+  autoCreate: boolean,
+  cache: Map<string, { id: number; isNew: boolean }>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  tx: any
+) {
+  if (!name) return null
+  
+  const cacheKey = `${name}:${type}`
+  
+  // Check cache first
+  if (cache.has(cacheKey)) {
+    const cached = cache.get(cacheKey)!
+    // For cached items, we need to return in the same format as findOrCreateVendorByType
+    return { data: { id: cached.id }, isNew: false }
+  }
+  
+  // Find in database
+  const existing = await tx.vendor.findFirst({
+    where: { name },
+  })
+  
+  if (existing) {
+    cache.set(cacheKey, { id: existing.id, isNew: false })
+    return { data: existing, isNew: false }
+  }
+  
+  if (!autoCreate) {
+    return null
+  }
+  
+  // Create new vendor
+  const code = `V${Date.now().toString().slice(-6)}`
+  const newVendor = await tx.vendor.create({
+    data: {
+      code,
+      name,
+      type,
+      currency: type.includes('INTERNATIONAL') ? 'USD' : 'KRW',
+    },
+  })
+  
+  cache.set(cacheKey, { id: newVendor.id, isNew: true })
+  return { data: newVendor, isNew: true }
+}
+
+/**
+ * Find or create category with caching
+ */
+async function findOrCreateCategoryWithCache(
+  name: string,
+  autoCreate: boolean,
+  cache: Map<string, { id: number; isNew: boolean }>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  tx: any
+) {
+  if (!name) return null
+  
+  // Check cache first
+  if (cache.has(name)) {
+    const cached = cache.get(name)!
+    return { data: { id: cached.id }, isNew: false }
+  }
+  
+  // Find in database
+  const existing = await tx.category.findFirst({
+    where: { nameKo: name },
+  })
+  
+  if (existing) {
+    cache.set(name, { id: existing.id, isNew: false })
+    return { data: existing, isNew: false }
+  }
+  
+  if (!autoCreate) {
+    return null
+  }
+  
+  // Create new category
+  const newCategory = await tx.category.create({
+    data: {
+      code: generateCode(name),
+      name,
+      nameKo: name,
+    },
+  })
+  
+  cache.set(name, { id: newCategory.id, isNew: true })
+  return { data: newCategory, isNew: true }
+}
+
+/**
+ * Find or create product with vendor connection and caching
+ */
+async function findOrCreateProductWithVendorWithCache(
+  name: string,
+  purchaseVendorId: number | null,
+  categoryId: number | undefined,
+  unitPrice: number,
+  autoCreate: boolean,
+  cache: Map<string, { id: number; isNew: boolean }>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  tx: any
+) {
+  if (!name) return null
+  
+  // Check cache first
+  if (cache.has(name)) {
+    const cached = cache.get(name)!
+    return { data: { id: cached.id }, isNew: false }
+  }
+  
+  // Find existing product
+  const existing = await tx.product.findFirst({
+    where: { name },
+  })
+  
+  if (existing) {
+    cache.set(name, { id: existing.id, isNew: false })
+    return { data: existing, isNew: false }
+  }
+  
+  if (!autoCreate) {
+    return null
+  }
+  
+  if (!purchaseVendorId) {
+    throw new Error(`품목 '${name}'의 매입처가 필요합니다.`)
+  }
+  
+  // Create new product
+  const code = `P${Date.now().toString().slice(-6)}`
+  const newProduct = await tx.product.create({
+    data: {
+      code,
+      name,
+      unit: 'EA',
+      categoryId: categoryId,
+      purchaseVendorId,
+      defaultPurchasePrice: unitPrice,
+    },
+  })
+  
+  cache.set(name, { id: newProduct.id, isNew: true })
+  return { data: newProduct, isNew: true }
+}
+
+/**
+ * Find or create salesperson with caching
+ */
+async function findOrCreateSalespersonWithCache(
+  name: string,
+  autoCreate: boolean,
+  cache: Map<string, { id: number; isNew: boolean }>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  tx: any
+) {
+  // Check cache first
+  if (cache.has(name)) {
+    const cached = cache.get(name)!
+    return { data: { id: cached.id }, isNew: false }
+  }
+  
+  // Find in database
+  const existing = await tx.salesperson.findFirst({
+    where: { name },
+  })
+  
+  if (existing) {
+    cache.set(name, { id: existing.id, isNew: false })
+    return { data: existing, isNew: false }
+  }
+  
+  if (!autoCreate) {
+    return null
+  }
+  
+  // Create new salesperson
+  const newSalesperson = await tx.salesperson.create({
+    data: {
+      code: generateCode(name),
+      name,
+      commissionRate: 0,
+    },
+  })
+  
+  cache.set(name, { id: newSalesperson.id, isNew: true })
+  return { data: newSalesperson, isNew: true }
+}
+
+/**
+ * Get default salesperson in transaction context
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function getDefaultSalespersonInTransaction(tx: any) {
+  let salesperson = await tx.salesperson.findFirst({
+    where: { code: 'DEFAULT' },
+  })
+  
+  if (!salesperson) {
+    salesperson = await tx.salesperson.create({
+      data: {
+        code: 'DEFAULT',
+        name: '미지정',
+        commissionRate: 0,
+      },
+    })
+  }
+  
+  return salesperson
+}
+
+/**
+ * Get default category in transaction context
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function getDefaultCategoryInTransaction(tx: any) {
+  let category = await tx.category.findFirst({
+    where: { code: 'DEFAULT' },
+  })
+  
+  if (!category) {
+    category = await tx.category.create({
+      data: {
+        code: 'DEFAULT',
+        name: '미분류',
+        nameKo: '미분류',
+      },
+    })
+  }
+  
+  return category
+}
+
+/**
+ * Handle Service category entry in transaction
+ */
+async function handleServiceEntryInTransaction(
+  row: ExcelRow,
+  summary: UploadSummary,
+  options: UploadOptions,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  tx: any,
+  vendorCache: Map<string, { id: number; isNew: boolean }>,
+  categoryCache: Map<string, { id: number; isNew: boolean }>
+) {
+  // Find or create sales vendor
+  let salesVendor = null
+  if (row.salesVendorName) {
+    salesVendor = await findOrCreateVendorByTypeWithCache(
+      row.salesVendorName,
+      'DOMESTIC_SALES',
+      options.createVendors || false,
+      vendorCache,
+      tx
+    )
+    if (salesVendor?.isNew) summary.vendorsCreated++
+  }
+  
+  // Find or create category
+  let category = null
+  if (row.category) {
+    category = await findOrCreateCategoryWithCache(row.category, options.createCategories || false, categoryCache, tx)
+    if (category?.isNew) {
+      summary.categoriesCreated = (summary.categoriesCreated || 0) + 1
+    }
+  }
+  
+  // Find or create service
+  const existingService = await tx.service.findFirst({
+    where: { name: row.productName }
+  })
+  
+  if (existingService) {
+    // Update service with non-blank fields
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const updateData: any = {}
+    
+    if (row.serviceHours && typeof row.serviceHours === 'number' && row.serviceHours > 0) {
+      updateData.serviceHours = row.serviceHours
+    }
+    if (salesVendor) {
+      updateData.salesVendorId = salesVendor.data.id
+    }
+    if (category) {
+      updateData.categoryId = category.data.id
+    }
+    if (row.description) {
+      updateData.description = row.description
+    }
+    
+    if (Object.keys(updateData).length > 0) {
+      await tx.service.update({
+        where: { id: existingService.id },
+        data: updateData
+      })
+    }
+  } else {
+    // Create new service
+    const code = `SVC-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`
+    await tx.service.create({
+      data: {
+        code,
+        name: row.productName || 'Unknown Service',
+        description: row.description || null,
+        serviceHours: row.serviceHours && typeof row.serviceHours === 'number' && row.serviceHours > 0 ? row.serviceHours : null,
+        salesVendorId: salesVendor?.data.id || null,
+        categoryId: category?.data.id || null,
+      }
+    })
+    summary.productsCreated++
+  }
+}
+
+/**
+ * Handle Project category entry in transaction
+ */
+async function handleProjectEntryInTransaction(
+  row: ExcelRow,
+  summary: UploadSummary,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  options: UploadOptions,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  tx: any
+) {
+  // Find or create project
+  const existingProject = await tx.project.findFirst({
+    where: { name: row.productName }
+  })
+  
+  if (existingProject) {
+    // Update project with non-blank fields
+    const updateData: Record<string, unknown> = {}
+    
+    if (row.salesVendorName) {
+      updateData.customer = row.salesVendorName
+    }
+    if (row.unitPrice && typeof row.unitPrice === 'number' && row.unitPrice > 0) {
+      updateData.salesPrice = row.unitPrice * ((typeof row.quantity === 'number' ? row.quantity : 0) || 1)
+    }
+    if (row.description) {
+      updateData.memo = row.description
+    }
+    
+    if (Object.keys(updateData).length > 0) {
+      await tx.project.update({
+        where: { id: existingProject.id },
+        data: updateData
+      })
+    }
+  } else {
+    // Create new project
+    const code = `PRJ-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`
+    const startDate = row.date && typeof row.date === 'string' ? new Date(row.date) : new Date()
+    const unitPrice = typeof row.unitPrice === 'number' ? row.unitPrice : 0
+    const quantity = typeof row.quantity === 'number' ? row.quantity : 1
+    const salesPrice = unitPrice * quantity
+    
+    await tx.project.create({
+      data: {
+        code,
+        name: row.productName || 'Unknown Project',
+        customer: row.salesVendorName || null,
+        startDate: startDate,
+        status: 'IN_PROGRESS',
+        currency: 'KRW',
+        exchangeRate: 1,
+        partsCost: 0,
+        laborCost: 0,
+        customsCost: 0,
+        shippingCost: 0,
+        otherCost: 0,
+        totalCost: 0,
+        salesPrice: salesPrice,
+        margin: salesPrice,
+        marginRate: 100,
+        memo: row.description || null,
+      }
+    })
+    summary.productsCreated++
+  }
 }
