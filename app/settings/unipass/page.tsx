@@ -256,7 +256,7 @@ export default function UnipassSettingsPage() {
             </button>
 
             <button
-              onClick={() => router.push('/customs')}
+              onClick={() => router.push('/customs/tracking')}
               className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
             >
               통관 현황 보기
