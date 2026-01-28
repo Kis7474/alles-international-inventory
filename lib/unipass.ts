@@ -107,6 +107,7 @@ function fetchWithSSLBypass(url: string, maxRedirects = 5): Promise<string> {
       path: urlObj.pathname + urlObj.search,
       method: 'GET',
       rejectUnauthorized: false, // SSL 검증 우회
+      timeout: 15000, // 15초 타임아웃
     }
     
     const req = https.request(options, (res) => {
@@ -136,8 +137,19 @@ function fetchWithSSLBypass(url: string, maxRedirects = 5): Promise<string> {
       })
     })
     
+    req.on('timeout', () => {
+      req.destroy()
+      reject(new Error('UNI-PASS API 요청 시간 초과 (15초) - 서버가 응답하지 않습니다'))
+    })
+    
     req.on('error', (e) => {
-      reject(e)
+      if (e.message.includes('ETIMEDOUT')) {
+        reject(new Error('UNI-PASS API 연결 시간 초과 - 서버에 연결할 수 없습니다 (211.173.39.20:38010)'))
+      } else if (e.message.includes('ECONNREFUSED')) {
+        reject(new Error('UNI-PASS API 연결 거부 - 서버가 연결을 거부했습니다'))
+      } else {
+        reject(new Error(`UNI-PASS API 네트워크 오류: ${e.message}`))
+      }
     })
     
     req.end()

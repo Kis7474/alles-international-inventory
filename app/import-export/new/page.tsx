@@ -128,7 +128,7 @@ export default function ImportExportNewPage() {
       fetchExchangeRate(formData.currency, formData.date)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [formData.currency, formData.date])
 
   const fetchMasterData = async () => {
     try {
@@ -168,16 +168,16 @@ export default function ImportExportNewPage() {
     }
     
     try {
-      // 해당 날짜 이전의 가장 최근 환율 조회
-      const res = await fetch(`/api/exchange-rates?currency=${currency}&date=${date}`)
-      const rates = await res.json()
+      // 특정 날짜의 환율을 조회 (by-date API 사용)
+      const res = await fetch(`/api/exchange-rates/by-date?currency=${currency}&date=${date}`)
+      const result = await res.json()
       
-      if (rates && rates.length > 0) {
-        // 가장 최근 환율 사용
-        setFormData(prev => ({ ...prev, exchangeRate: rates[0].rate.toString() }))
+      if (result.success && result.rate) {
+        setFormData(prev => ({ ...prev, exchangeRate: result.rate.toString() }))
       } else {
-        // 환율 데이터가 없으면 알림
-        console.warn(`${currency} 환율 데이터가 없습니다.`)
+        // 환율 데이터가 없으면 경고 표시
+        console.warn(`${currency} 환율 데이터를 가져올 수 없습니다:`, result.error)
+        // 기존 환율 유지 또는 기본값 설정하지 않음
       }
     } catch (error) {
       console.error('Error fetching exchange rate:', error)
