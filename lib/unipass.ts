@@ -1,5 +1,6 @@
 import https from 'https'
 import { parseString } from 'xml2js'
+import { proxyFetch, isProxyConfigured } from './api-proxy'
 
 const UNIPASS_API_BASE = 'unipass.customs.go.kr'
 const UNIPASS_API_PORT = 38010
@@ -157,6 +158,30 @@ function fetchWithSSLBypass(url: string, maxRedirects = 5): Promise<string> {
 }
 
 /**
+ * Fetch UNI-PASS API data with proxy support
+ * @param url - API URL to fetch
+ * @returns Response text
+ */
+async function fetchUnipassData(url: string): Promise<string> {
+  // Try proxy first if configured
+  if (isProxyConfigured()) {
+    try {
+      console.log('Using Cloudflare Workers proxy for UNI-PASS API')
+      return await proxyFetch(url, { timeout: 15000 })
+    } catch (error) {
+      // If proxy fails, fall back to direct fetch
+      if (error instanceof Error && error.message !== 'PROXY_NOT_CONFIGURED') {
+        console.warn('Proxy fetch failed, falling back to direct fetch:', error.message)
+      }
+    }
+  }
+  
+  // Direct fetch (fallback)
+  console.log('Using direct fetch for UNI-PASS API')
+  return await fetchWithSSLBypass(url)
+}
+
+/**
  * XML을 JSON으로 파싱
  */
 function parseXml(xml: string): Promise<Record<string, unknown>> {
@@ -190,7 +215,7 @@ export async function getCargoProgress(
     
     const url = `https://${UNIPASS_API_BASE}:${UNIPASS_API_PORT}/ext/rest/cargCsclPrgsInfoQry/retrieveCargCsclPrgsInfo?crkyCn=${encodeURIComponent(apiKey)}&${blParam}=${encodeURIComponent(blNumber)}&blYy=${encodeURIComponent(blYear)}`
     
-    const xmlData = await fetchWithSSLBypass(url)
+    const xmlData = await fetchUnipassData(url)
     const parsed = await parseXml(xmlData)
     
     // XML 구조 파싱
@@ -283,7 +308,7 @@ export async function getImportDeclaration(
   try {
     const url = `https://${UNIPASS_API_BASE}:${UNIPASS_API_PORT}/ext/rest/cargCsclPrgsInfoQry/retrieveCargCsclPrgsInfo?crkyCn=${encodeURIComponent(apiKey)}&cargMtNo=${encodeURIComponent(cargoNumber)}`
     
-    const xmlData = await fetchWithSSLBypass(url)
+    const xmlData = await fetchUnipassData(url)
     const parsed = await parseXml(xmlData)
     
     // XML 구조 파싱
@@ -346,7 +371,7 @@ export async function testConnection(apiKey: string): Promise<UnipassApiResponse
     // 테스트용 더미 BL 번호로 조회 시도 (응답 형식 확인용)
     const url = `https://${UNIPASS_API_BASE}:${UNIPASS_API_PORT}/ext/rest/cargCsclPrgsInfoQry/retrieveCargCsclPrgsInfo?crkyCn=${encodeURIComponent(apiKey)}&mblNo=TEST&blYy=2024`
     
-    const xmlData = await fetchWithSSLBypass(url)
+    const xmlData = await fetchUnipassData(url)
     const parsed = await parseXml(xmlData)
     
     const response = parsed?.cargCsclPrgsInfoQryRtnVo as UnipassRawResponse
@@ -397,7 +422,7 @@ export async function verifyImportDeclaration(
   try {
     const url = `https://${UNIPASS_API_BASE}:${UNIPASS_API_PORT}/ext/rest/impCdslPaprVrfcSrvc/retrieveImpCdslPaprVrfc?crkyCn=${encodeURIComponent(apiKey)}&dclrNo=${encodeURIComponent(declarationNumber)}`
     
-    const xmlData = await fetchWithSSLBypass(url)
+    const xmlData = await fetchUnipassData(url)
     const parsed = await parseXml(xmlData)
     
     // XML 구조 파싱
