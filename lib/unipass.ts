@@ -1,5 +1,6 @@
 import https from 'https'
 import { parseString } from 'xml2js'
+import { isProxyEnabled, fetchThroughProxy } from '@/lib/api-proxy'
 
 const UNIPASS_API_BASE = 'unipass.customs.go.kr'
 const UNIPASS_API_PORT = 38010
@@ -90,9 +91,24 @@ export function parseUnipassDate(dateStr: string | undefined): Date | null {
  * 대안 고려사항:
  * - 정부 API 인증서를 Node.js 신뢰 저장소에 추가
  * - 환경 변수로 SSL 검증 우회 여부를 제어
- * - API 게이트웨이를 통한 프록시 사용
+ * - API 게이트웨이를 통한 프록시 사용 (현재 Railway 프록시 적용)
+ * 
+ * 프록시 서버가 설정되어 있으면 프록시를 통해 요청, 아니면 직접 요청 (폴백)
  */
-function fetchWithSSLBypass(url: string, maxRedirects = 5): Promise<string> {
+async function fetchWithSSLBypass(url: string, maxRedirects = 5): Promise<string> {
+  // 프록시 서버를 통한 요청 (Railway 프록시)
+  if (isProxyEnabled()) {
+    try {
+      return await fetchThroughProxy(url)
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`프록시를 통한 UNI-PASS API 호출 실패: ${error.message}`)
+      }
+      throw new Error('프록시를 통한 UNI-PASS API 호출 중 오류가 발생했습니다')
+    }
+  }
+  
+  // 폴백: 기존 직접 호출 방식 (프록시 미설정 시)
   return new Promise((resolve, reject) => {
     if (maxRedirects <= 0) {
       reject(new Error(`Too many redirects (max ${5}). Possible redirect loop.`))
