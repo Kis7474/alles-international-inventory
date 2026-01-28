@@ -291,19 +291,16 @@ export default function ImportExportEditPage() {
     }
     
     try {
-      const res = await fetch(`/api/exchange-rates?currency=${currency}&date=${date}`)
+      // 특정 날짜의 환율을 조회 (by-date API 사용)
+      const res = await fetch(`/api/exchange-rates/by-date?currency=${currency}&date=${date}`)
+      const result = await res.json()
       
-      if (!res.ok) {
-        console.warn(`환율 조회 실패: ${res.status}`)
-        return
-      }
-      
-      const rates = await res.json()
-      
-      if (rates && rates.length > 0) {
-        setFormData(prev => ({ ...prev, exchangeRate: rates[0].rate.toString() }))
+      if (result.success && result.rate) {
+        setFormData(prev => ({ ...prev, exchangeRate: result.rate.toString() }))
       } else {
-        console.warn(`${currency} 환율 데이터가 없습니다.`)
+        // 환율 데이터가 없으면 경고 표시
+        console.warn(`${currency} 환율 데이터를 가져올 수 없습니다:`, result.error)
+        // 기존 환율 유지
       }
     } catch (error) {
       console.error('Error fetching exchange rate:', error)

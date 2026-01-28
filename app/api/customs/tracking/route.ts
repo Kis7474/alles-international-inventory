@@ -115,8 +115,17 @@ export async function POST(request: NextRequest) {
     })
     
     if (!apiResult.success) {
+      // 타임아웃이나 연결 오류인 경우 더 명확한 메시지
+      let errorMessage = apiResult.message || '유니패스 API 조회에 실패했습니다.'
+      
+      if (errorMessage.includes('시간 초과') || errorMessage.includes('ETIMEDOUT')) {
+        errorMessage = 'UNI-PASS API 서버 응답 시간 초과입니다. 잠시 후 다시 시도해주세요.'
+      } else if (errorMessage.includes('연결') || errorMessage.includes('ECONNREFUSED')) {
+        errorMessage = 'UNI-PASS API 서버에 연결할 수 없습니다. 네트워크 연결을 확인하거나 잠시 후 다시 시도해주세요.'
+      }
+      
       return NextResponse.json(
-        { error: apiResult.message || '유니패스 API 조회에 실패했습니다.' },
+        { error: errorMessage },
         { status: 400 }
       )
     }
