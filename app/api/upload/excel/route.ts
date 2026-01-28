@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { parseExcelFile, parseTransactionExcel, generateCode } from '@/lib/excel-parser'
 
 // Vercel API route configuration
-export const maxDuration = 60 // Maximum execution time in seconds (Vercel Pro: 60s)
+export const maxDuration = 300 // Maximum execution time in seconds (5 minutes)
 export const dynamic = 'force-dynamic' // Disable static optimization
 
 interface UploadOptions {
@@ -427,28 +427,48 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
           summary.transactionsCreated += salesRecordsToCreate.length
         }
         
-        // Bulk update products
-        for (const update of productUpdates) {
-          await tx.product.update({ where: { id: update.id }, data: update.data })
+        // Bulk update products - optimized with parallel execution
+        if (productUpdates.length > 0) {
+          await Promise.all(productUpdates.map(update => 
+            tx.product.update({ where: { id: update.id }, data: update.data })
+          ))
         }
         
-        // Bulk upsert ProductSalesVendor relationships
-        for (const psv of productSalesVendorsToCreate) {
-          await tx.productSalesVendor.upsert({
+        // Bulk upsert ProductSalesVendor relationships - optimized
+        if (productSalesVendorsToCreate.length > 0) {
+          // First, find existing relationships
+          const existingPsvs = await tx.productSalesVendor.findMany({
             where: {
-              productId_vendorId: {
+              OR: productSalesVendorsToCreate.map(psv => ({
                 productId: psv.productId,
                 vendorId: psv.vendorId,
-              },
+              })),
             },
-            update: {},
-            create: psv,
+            select: { productId: true, vendorId: true },
           })
+
+          // Create a Set for fast lookup
+          const existingPsvSet = new Set(
+            existingPsvs.map(p => `${p.productId}-${p.vendorId}`)
+          )
+
+          // Filter out existing ones to get only new relationships
+          const newPsvs = productSalesVendorsToCreate.filter(
+            psv => !existingPsvSet.has(`${psv.productId}-${psv.vendorId}`)
+          )
+
+          // Bulk create new relationships
+          if (newPsvs.length > 0) {
+            await tx.productSalesVendor.createMany({ 
+              data: newPsvs, 
+              skipDuplicates: true 
+            })
+          }
         }
       }
     }, {
       // Transaction timeout configuration (in milliseconds)
-      timeout: 55000, // 55 seconds, slightly less than maxDuration
+      timeout: 290000, // 290 seconds (4 minutes 50 seconds), slightly less than maxDuration
     })
     
     return NextResponse.json({
@@ -669,7 +689,7 @@ async function handlePriceMatrixUpload(file: File, options: UploadOptions) {
       }
     }, {
       // Transaction timeout configuration
-      timeout: 55000, // 55 seconds
+      timeout: 290000, // 290 seconds (4 minutes 50 seconds)
     })
     
     return NextResponse.json({
