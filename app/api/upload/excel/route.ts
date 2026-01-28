@@ -427,19 +427,37 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
           summary.transactionsCreated += salesRecordsToCreate.length
         }
         
+        // Deduplicate product updates by ID (keep last update for each product)
+        const productUpdateMap = new Map<number, { defaultPurchasePrice?: number; defaultSalesPrice?: number }>()
+        productUpdates.forEach(update => {
+          const existing = productUpdateMap.get(update.id)
+          productUpdateMap.set(update.id, { ...existing, ...update.data })
+        })
+        
         // Bulk update products - optimized with parallel execution
-        if (productUpdates.length > 0) {
-          await Promise.all(productUpdates.map(update => 
-            tx.product.update({ where: { id: update.id }, data: update.data })
+        if (productUpdateMap.size > 0) {
+          await Promise.all(Array.from(productUpdateMap.entries()).map(([id, data]) => 
+            tx.product.update({ where: { id }, data })
           ))
         }
         
+        // Deduplicate ProductSalesVendor entries within the batch
+        const psvSet = new Set<string>()
+        const uniqueProductSalesVendors = productSalesVendorsToCreate.filter(psv => {
+          const key = `${psv.productId}-${psv.vendorId}`
+          if (psvSet.has(key)) {
+            return false
+          }
+          psvSet.add(key)
+          return true
+        })
+        
         // Bulk upsert ProductSalesVendor relationships - optimized
-        if (productSalesVendorsToCreate.length > 0) {
+        if (uniqueProductSalesVendors.length > 0) {
           // First, find existing relationships
           const existingPsvs = await tx.productSalesVendor.findMany({
             where: {
-              OR: productSalesVendorsToCreate.map(psv => ({
+              OR: uniqueProductSalesVendors.map(psv => ({
                 productId: psv.productId,
                 vendorId: psv.vendorId,
               })),
@@ -453,7 +471,7 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
           )
 
           // Filter out existing ones to get only new relationships
-          const newPsvs = productSalesVendorsToCreate.filter(
+          const newPsvs = uniqueProductSalesVendors.filter(
             psv => !existingPsvSet.has(`${psv.productId}-${psv.vendorId}`)
           )
 
@@ -678,12 +696,14 @@ async function handlePriceMatrixUpload(file: File, options: UploadOptions) {
             summary.pricesCreated += newPrices.length
           }
           
-          // Bulk update existing prices
-          for (const update of pricesToUpdate) {
-            await tx.vendorProductPrice.update({
-              where: { id: update.id },
-              data: update.data,
-            })
+          // Bulk update existing prices - optimized with parallel execution
+          if (pricesToUpdate.length > 0) {
+            await Promise.all(pricesToUpdate.map(update =>
+              tx.vendorProductPrice.update({
+                where: { id: update.id },
+                data: update.data,
+              })
+            ))
           }
         }
       }
