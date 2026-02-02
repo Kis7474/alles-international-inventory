@@ -160,15 +160,29 @@ export async function PUT(request: NextRequest) {
         )
       }
       
-      // 총 잔량 계산
-      const totalQuantity = lots.reduce((sum, lot) => sum + lot.quantityRemaining, 0)
+      // 배분 기준일 (해당 월의 마지막 날 또는 현재 날짜)
+      const [year, month] = yearMonth.split('-').map(Number)
+      const distributionDate = new Date(year, month, 0) // 해당 월의 마지막 날
+      const now = new Date()
+      const baseDate = distributionDate > now ? now : distributionDate
+      
+      // 각 LOT의 가중치 계산 (잔량 × 보관일수)
+      const lotsWithWeight = lots.map(lot => {
+        const receivedDate = new Date(lot.receivedDate)
+        const storageDays = Math.max(1, Math.ceil((baseDate.getTime() - receivedDate.getTime()) / (1000 * 60 * 60 * 24)))
+        const weight = lot.quantityRemaining * storageDays
+        return { ...lot, storageDays, weight }
+      })
+      
+      // 전체 가중치 합계
+      const totalWeight = lotsWithWeight.reduce((sum, lot) => sum + lot.weight, 0)
       
       // 트랜잭션으로 배분 처리
       const result = await prisma.$transaction(async (tx) => {
         // 각 LOT에 창고료 배분
         await Promise.all(
-          lots.map(async (lot) => {
-            const ratio = lot.quantityRemaining / totalQuantity
+          lotsWithWeight.map(async (lot) => {
+            const ratio = lot.weight / totalWeight
             const distributedFee = fee.totalFee * ratio
             
             // 배분 내역 생성
