@@ -31,6 +31,11 @@ export async function GET(request: NextRequest) {
               product: true,
             },
           },
+          inventoryLots: {
+            include: {
+              product: true,
+            },
+          },
         },
       })
       

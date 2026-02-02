@@ -31,6 +31,11 @@ interface Lot {
     name: string
     unit: string
   } | null
+  importExport: {
+    id: number
+    date: string
+    type: string
+  } | null
 }
 
 export default function LotsPage() {
@@ -49,6 +54,7 @@ export default function LotsPage() {
   const [filterStartDate, setFilterStartDate] = useState('')
   const [filterEndDate, setFilterEndDate] = useState('')
   const [filterProductId, setFilterProductId] = useState('')
+  const [filterImportExportId, setFilterImportExportId] = useState('')
   
   const [formData, setFormData] = useState({
     productId: '',
@@ -98,6 +104,7 @@ export default function LotsPage() {
       if (filterStartDate) params.append('startDate', filterStartDate)
       if (filterEndDate) params.append('endDate', filterEndDate)
       if (filterProductId) params.append('productId', filterProductId)
+      if (filterImportExportId) params.append('importExportId', filterImportExportId)
       if (activeTab !== 'ALL') params.append('storageLocation', activeTab)
 
       const res = await fetch(`/api/lots?${params.toString()}`)
@@ -320,7 +327,7 @@ export default function LotsPage() {
       {/* 필터 */}
       <div className="bg-white p-6 rounded-lg shadow mb-6">
         <h2 className="text-lg font-bold mb-4 text-gray-900">필터</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700">시작일</label>
             <input
@@ -356,6 +363,17 @@ export default function LotsPage() {
               ))}
             </select>
           </div>
+          
+          <div>
+            <label className="block text-sm font-medium mb-1 text-gray-700">수입/수출 ID</label>
+            <input
+              type="text"
+              value={filterImportExportId}
+              onChange={(e) => setFilterImportExportId(e.target.value)}
+              placeholder="ID 입력"
+              className="w-full px-3 py-2 border rounded-lg text-gray-900"
+            />
+          </div>
         </div>
         
         <div className="mt-4">
@@ -370,6 +388,7 @@ export default function LotsPage() {
               setFilterStartDate('')
               setFilterEndDate('')
               setFilterProductId('')
+              setFilterImportExportId('')
               fetchData()
             }}
             className="ml-2 bg-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-400"
@@ -585,6 +604,9 @@ export default function LotsPage() {
                 LOT 코드
               </th>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                수입/수출
+              </th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
                 입고일
               </th>
               <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">
@@ -619,6 +641,16 @@ export default function LotsPage() {
                   {lot.product ? `[${lot.product.code}] ${lot.product.name}` : lot.item ? `[${lot.item.code}] ${lot.item.name}` : '-'}
                 </td>
                 <td className="px-4 py-4">{lot.lotCode || '-'}</td>
+                <td className="px-4 py-4">
+                  {lot.importExport ? (
+                    <a
+                      href={`/import-export/${lot.importExport.id}`}
+                      className="text-blue-600 hover:text-blue-800 underline"
+                    >
+                      #{lot.importExport.id} ({lot.importExport.type === 'IMPORT' ? '수입' : '수출'})
+                    </a>
+                  ) : '-'}
+                </td>
                 <td className="px-4 py-4">
                   {new Date(lot.receivedDate).toLocaleDateString('ko-KR')}
                 </td>

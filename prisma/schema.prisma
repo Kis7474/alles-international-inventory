@@ -215,7 +215,7 @@ model ImportExport {
   
   // 보관 옵션
   storageType     String?      // WAREHOUSE(창고입고), OFFICE(사무실보관), DIRECT_DELIVERY(직배), OTHER(기타)
-  inventoryLot    InventoryLot? // 자동 입고 시 생성된 LOT 참조
+  inventoryLots   InventoryLot[] // 자동 입고 시 생성된 LOT 참조 (1:N 관계)
   
   // 부가세
   vatIncluded     Boolean      @default(false)
@@ -301,7 +301,7 @@ model InventoryLot {
   storageLocation   String       @default("WAREHOUSE")  // 'WAREHOUSE' 또는 'OFFICE'
   
   // 수입/수출 참조 (자동 생성된 경우)
-  importExportId    Int?         @unique
+  importExportId    Int?         // @unique 제거 - 1:N 관계 지원
   importExport      ImportExport? @relation(fields: [importExportId], references: [id])
   
   createdAt         DateTime     @default(now())

@@ -52,9 +52,6 @@ export default function ImportExportNewPage() {
   // Filtered products based on vendor
   const [availableProducts, setAvailableProducts] = useState<Product[]>([])
   
-  // Search states
-  const [productSearch, setProductSearch] = useState('')
-  
   // Multi-item support
   interface ItemEntry {
     productId: string
@@ -75,11 +72,9 @@ export default function ImportExportNewPage() {
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     type: 'IMPORT',
-    productId: '',
     vendorId: '',
     salespersonId: '',
     categoryId: '',
-    quantity: '',
     currency: 'USD',
     exchangeRate: '',
     foreignAmount: '',
@@ -111,7 +106,6 @@ export default function ImportExportNewPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     formData.type,
-    formData.quantity,
     formData.exchangeRate,
     formData.foreignAmount,
     formData.goodsAmount,
@@ -185,7 +179,8 @@ export default function ImportExportNewPage() {
   }
   
   const calculateValues = () => {
-    const quantity = parseFloat(formData.quantity) || 0
+    // Calculate total quantity from items
+    const quantity = items.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0)
     const exchangeRate = parseFloat(formData.exchangeRate) || 0
     let foreignAmount = parseFloat(formData.foreignAmount) || 0
     
@@ -243,8 +238,7 @@ export default function ImportExportNewPage() {
   }
   
   const handleVendorChange = (vendorId: string) => {
-    setFormData({ ...formData, vendorId, productId: '' })
-    setProductSearch('')
+    setFormData({ ...formData, vendorId })
     
     if (vendorId) {
       // 수입/수출: 선택한 거래처가 매입처인 품목 필터링
@@ -274,8 +268,8 @@ export default function ImportExportNewPage() {
       setAvailableProducts(filtered)
     }
     
-    // Auto-select the newly registered product
-    setFormData({ ...formData, productId: productId.toString() })
+    // Set the newly registered product in currentItem for adding to items
+    setCurrentItem({ ...currentItem, productId: productId.toString() })
   }
 
   // 날짜 변경 핸들러
@@ -311,20 +305,16 @@ export default function ImportExportNewPage() {
       return
     }
     
-    // Check if using items or single product
+    // Check if using items - must have at least one
     if (items.length === 0) {
-      if (!formData.productId || !formData.quantity) {
-        alert('품목과 수량을 입력하거나 품목 목록에 항목을 추가해주세요.')
-        return
-      }
+      alert('품목 목록에 최소 1개 이상의 항목을 추가해주세요.')
+      return
     }
     
     setSubmitting(true)
     
     try {
-      const payload = items.length > 0 
-        ? { ...formData, items } 
-        : formData
+      const payload = { ...formData, items }
       
       const res = await fetch('/api/import-export', {
         method: 'POST',
@@ -432,41 +422,6 @@ export default function ImportExportNewPage() {
               </select>
             </div>
             
-            <div className="flex gap-2 items-end">
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  품목 <span className="text-red-500">*</span> <span className="text-xs text-blue-600">(선택한 거래처의 품목)</span>
-                </label>
-                <select
-                  name="productId"
-                  value={formData.productId}
-                  onChange={handleChange}
-                  required
-                  disabled={!formData.vendorId}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                >
-                  <option value="">{formData.vendorId ? '품목을 선택하세요' : '거래처를 먼저 선택하세요'}</option>
-                  {availableProducts
-                    .filter(p => 
-                      p.name.toLowerCase().includes(productSearch.toLowerCase())
-                    )
-                    .map((product) => (
-                      <option key={product.id} value={product.id}>
-                        [{product.code}] {product.name} ({product.unit})
-                      </option>
-                    ))}
-                </select>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowProductModal(true)}
-                className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-bold text-lg"
-                title="새 품목 등록"
-              >
-                +
-              </button>
-            </div>
-            
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 담당자
@@ -503,25 +458,6 @@ export default function ImportExportNewPage() {
                   </option>
                 ))}
               </select>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                수량 <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                name="quantity"
-                value={formData.quantity}
-                onChange={handleChange}
-                required={items.length === 0}
-                step="0.01"
-                disabled={items.length > 0}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 disabled:bg-gray-100"
-              />
-              {items.length > 0 && (
-                <p className="text-xs text-gray-500 mt-1">품목 목록 사용 중</p>
-              )}
             </div>
           </div>
         </div>
