@@ -239,6 +239,29 @@ async function autoLinkToImport(trackingId: string): Promise<{ success: boolean;
       })
     }
     
+    // ★★★ 환율 자동 조회 ★★★
+    const importDate = tracking.clearanceDate || tracking.arrivalDate || new Date()
+    let exchangeRate = 1300 // 기본값
+    
+    try {
+      const latestRate = await prisma.exchangeRate.findFirst({
+        where: {
+          currency: 'USD',
+          date: { lte: importDate },
+        },
+        orderBy: { date: 'desc' },
+      })
+      
+      if (latestRate) {
+        exchangeRate = latestRate.rate
+      }
+    } catch (e) {
+      console.warn('Failed to fetch exchange rate, using default:', e)
+    }
+    
+    // ★★★ 관세 정보 반영 ★★★
+    const dutyAmount = tracking.customsDuty || tracking.totalTax || 0
+    
     // 메모 생성
     const memo = generateImportLinkMemo(tracking)
     
@@ -246,12 +269,13 @@ async function autoLinkToImport(trackingId: string): Promise<{ success: boolean;
     const importRecord = await prisma.importExport.create({
       data: {
         type: 'IMPORT',
-        date: tracking.clearanceDate || tracking.arrivalDate || new Date(),
+        date: importDate,
         vendorId: vendor.id,
         currency: 'USD',
-        exchangeRate: 1300,
+        exchangeRate,  // 자동 조회된 환율
         foreignAmount: 0,
         krwAmount: 0,
+        dutyAmount,    // 통관 정보의 관세 반영
         storageType: 'WAREHOUSE',  // 기본값으로 창고입고 설정
         memo,
         pdfFileName: tracking.pdfFileName,

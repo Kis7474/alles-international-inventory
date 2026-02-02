@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import ExchangeRateHistoryModal from '@/components/ExchangeRateHistoryModal'
 
 interface ExchangeRate {
   id: number
@@ -15,6 +16,8 @@ export default function ExchangeRatesPage() {
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
+  const [showHistoryModal, setShowHistoryModal] = useState(false)
+  const [selectedCurrency, setSelectedCurrency] = useState<string>('')
   const [editingRate, setEditingRate] = useState<ExchangeRate | null>(null)
   const [updating, setUpdating] = useState(false)
   const [lastUpdate, setLastUpdate] = useState<string | null>(null)
@@ -277,9 +280,20 @@ export default function ExchangeRatesPage() {
               </div>
               
               <div className="border-t pt-4">
-                <div className="text-sm font-medium text-gray-700 mb-2">이력</div>
+                <div className="flex justify-between items-center mb-2">
+                  <div className="text-sm font-medium text-gray-700">이력</div>
+                  <button
+                    onClick={() => {
+                      setSelectedCurrency(currency)
+                      setShowHistoryModal(true)
+                    }}
+                    className="text-sm text-blue-600 hover:text-blue-900"
+                  >
+                    전체 이력 보기 →
+                  </button>
+                </div>
                 <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {currencyRates.slice(0, 5).map((rate) => (
+                  {currencyRates.slice(0, 3).map((rate) => (
                     <div key={rate.id} className="flex justify-between items-center text-sm">
                       <span className="text-gray-600">
                         {new Date(rate.date).toLocaleDateString('ko-KR')}
@@ -542,6 +556,14 @@ export default function ExchangeRatesPage() {
           </div>
         </div>
       )}
+
+      {/* 환율 이력 모달 */}
+      <ExchangeRateHistoryModal
+        isOpen={showHistoryModal}
+        onClose={() => setShowHistoryModal(false)}
+        currency={selectedCurrency}
+        onRateDeleted={fetchRates}
+      />
     </div>
   )
 }
