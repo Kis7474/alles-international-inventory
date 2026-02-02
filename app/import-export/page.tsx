@@ -31,7 +31,6 @@ export default function ImportExportPage() {
   const [records, setRecords] = useState<ImportExport[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState({
-    type: '',
     startDate: '',
     endDate: '',
   })
@@ -51,7 +50,7 @@ export default function ImportExportPage() {
   const fetchRecords = async () => {
     try {
       const params = new URLSearchParams()
-      if (filter.type) params.append('type', filter.type)
+      params.append('type', 'IMPORT') // Only fetch IMPORT records
       if (filter.startDate) params.append('startDate', filter.startDate)
       if (filter.endDate) params.append('endDate', filter.endDate)
 
@@ -185,7 +184,7 @@ export default function ImportExportPage() {
   return (
     <div>
       <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-6 md:mb-8 gap-3">
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-900">수입/수출 관리</h1>
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-900">수입 관리</h1>
         <div className="flex gap-2">
           {selectedIds.length > 0 && (
             <button
@@ -199,28 +198,14 @@ export default function ImportExportPage() {
             href="/import-export/new"
             className="px-4 py-3 md:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center text-sm md:text-base min-h-[44px]"
           >
-            + 수입/수출 등록
+            + 수입 등록
           </Link>
         </div>
       </div>
 
       {/* 필터 */}
       <div className="bg-white rounded-lg shadow p-4 md:p-6 mb-4 md:mb-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              구분
-            </label>
-            <select
-              value={filter.type}
-              onChange={(e) => setFilter({ ...filter, type: e.target.value })}
-              className="w-full px-3 py-3 md:py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-            >
-              <option value="">전체</option>
-              <option value="IMPORT">수입</option>
-              <option value="EXPORT">수출</option>
-            </select>
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               시작일
@@ -273,9 +258,6 @@ export default function ImportExportPage() {
                   날짜
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  구분
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                   품목
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
@@ -317,13 +299,6 @@ export default function ImportExportPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {new Date(record.date).toLocaleDateString('ko-KR')}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <span className={`px-2 py-1 rounded text-xs ${
-                      record.type === 'IMPORT' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
-                    }`}>
-                      {record.type === 'IMPORT' ? '수입' : '수출'}
-                    </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {record.product?.name || '-'}
@@ -399,7 +374,7 @@ export default function ImportExportPage() {
               ))}
               {records.length === 0 && (
                 <tr>
-                  <td colSpan={12} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={11} className="px-6 py-4 text-center text-gray-500">
                     등록된 내역이 없습니다.
                   </td>
                 </tr>
@@ -433,12 +408,7 @@ export default function ImportExportPage() {
                       className="w-4 h-4 rounded mt-1"
                     />
                     <div>
-                      <span className={`px-2 py-1 rounded text-xs ${
-                        record.type === 'IMPORT' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
-                      }`}>
-                        {record.type === 'IMPORT' ? '수입' : '수출'}
-                      </span>
-                      <div className="text-xs text-gray-600 mt-1">
+                      <div className="text-xs text-gray-600">
                         {new Date(record.date).toLocaleDateString('ko-KR')}
                       </div>
                     </div>

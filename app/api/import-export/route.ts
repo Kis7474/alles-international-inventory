@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { calculateImportCost } from '@/lib/utils'
 import { 
   createLotsFromItems, 
   createSingleLot, 
@@ -105,12 +104,10 @@ export async function POST(request: NextRequest) {
       productId,
       vendorId,
       salespersonId,
-      categoryId,
       quantity,
       currency,
       exchangeRate,
       foreignAmount,
-      goodsAmount,
       dutyAmount,
       shippingCost,
       otherCost,
@@ -136,21 +133,18 @@ export async function POST(request: NextRequest) {
     // 원화 환산 금액
     const krwAmount = totalForeignAmount * parseFloat(exchangeRate)
 
-    // 수입 원가 계산 (수입인 경우)
+    // 수입 원가 계산 - Use krwAmount as goods amount
     let totalCost = null
     let unitCost = null
     
-    if (type === 'IMPORT' && goodsAmount) {
-      const costCalc = calculateImportCost({
-        goodsAmount: parseFloat(goodsAmount),
-        exchangeRate: parseFloat(exchangeRate),
-        dutyAmount: parseFloat(dutyAmount || 0),
-        shippingCost: parseFloat(shippingCost || 0),
-        otherCost: parseFloat(otherCost || 0),
-        quantity: isMultiItem ? (items as ItemInput[]).reduce((sum, item) => sum + parseFloat(item.quantity), 0) : parseFloat(quantity),
-      })
-      totalCost = costCalc.totalCost
-      unitCost = costCalc.unitCost
+    if (type === 'IMPORT') {
+      const totalQuantity = isMultiItem 
+        ? (items as ItemInput[]).reduce((sum, item) => sum + parseFloat(item.quantity), 0) 
+        : parseFloat(quantity)
+      
+      // Calculate total cost = goods amount (krw) + duty + shipping + other costs
+      totalCost = krwAmount + (parseFloat(dutyAmount) || 0) + (parseFloat(shippingCost) || 0) + (parseFloat(otherCost) || 0)
+      unitCost = totalQuantity > 0 ? totalCost / totalQuantity : 0
     }
 
     // 부가세 계산
@@ -178,13 +172,13 @@ export async function POST(request: NextRequest) {
           productId: isMultiItem ? null : parseInt(productId),
           vendorId: parseInt(vendorId),
           salespersonId: salespersonId ? parseInt(salespersonId) : null,
-          categoryId: categoryId ? parseInt(categoryId) : null,
+          categoryId: null, // Category removed
           quantity: isMultiItem ? null : parseFloat(quantity),
           currency,
           exchangeRate: parseFloat(exchangeRate),
           foreignAmount: totalForeignAmount,
           krwAmount,
-          goodsAmount: goodsAmount ? parseFloat(goodsAmount) : null,
+          goodsAmount: null, // goodsAmount removed, using krwAmount instead
           dutyAmount: dutyAmount ? parseFloat(dutyAmount) : null,
           shippingCost: shippingCost ? parseFloat(shippingCost) : null,
           otherCost: otherCost ? parseFloat(otherCost) : null,
@@ -236,7 +230,7 @@ export async function POST(request: NextRequest) {
           storageType,
           unitCost,
           exchangeRate: parseFloat(exchangeRate),
-          goodsAmount: goodsAmount ? parseFloat(goodsAmount) : null,
+          goodsAmount: totalForeignAmount, // Use total foreign amount
           dutyAmount: dutyAmount ? parseFloat(dutyAmount) : null,
           shippingCost: shippingCost ? parseFloat(shippingCost) : null,
           otherCost: otherCost ? parseFloat(otherCost) : null,
@@ -250,7 +244,7 @@ export async function POST(request: NextRequest) {
           storageType,
           unitCost,
           exchangeRate: parseFloat(exchangeRate),
-          goodsAmountKrw: goodsAmount ? parseFloat(goodsAmount) * parseFloat(exchangeRate) : 0,
+          goodsAmountKrw: krwAmount, // Use krwAmount directly
           dutyAmount: dutyAmount ? parseFloat(dutyAmount) : null,
           shippingCost: shippingCost ? parseFloat(shippingCost) : null,
           otherCost: otherCost ? parseFloat(otherCost) : null,
@@ -279,12 +273,10 @@ export async function PUT(request: NextRequest) {
       productId,
       vendorId,
       salespersonId,
-      categoryId,
       quantity,
       currency,
       exchangeRate,
       foreignAmount,
-      goodsAmount,
       dutyAmount,
       shippingCost,
       otherCost,
@@ -309,20 +301,18 @@ export async function PUT(request: NextRequest) {
 
     const krwAmount = totalForeignAmount * parseFloat(exchangeRate)
 
+    // 수입 원가 계산 - Use krwAmount as goods amount
     let totalCost = null
     let unitCost = null
     
-    if (type === 'IMPORT' && goodsAmount) {
-      const costCalc = calculateImportCost({
-        goodsAmount: parseFloat(goodsAmount),
-        exchangeRate: parseFloat(exchangeRate),
-        dutyAmount: parseFloat(dutyAmount || 0),
-        shippingCost: parseFloat(shippingCost || 0),
-        otherCost: parseFloat(otherCost || 0),
-        quantity: isMultiItem ? (items as ItemInput[]).reduce((sum, item) => sum + parseFloat(item.quantity), 0) : parseFloat(quantity),
-      })
-      totalCost = costCalc.totalCost
-      unitCost = costCalc.unitCost
+    if (type === 'IMPORT') {
+      const totalQuantity = isMultiItem 
+        ? (items as ItemInput[]).reduce((sum, item) => sum + parseFloat(item.quantity), 0) 
+        : parseFloat(quantity)
+      
+      // Calculate total cost = goods amount (krw) + duty + shipping + other costs
+      totalCost = krwAmount + (parseFloat(dutyAmount) || 0) + (parseFloat(shippingCost) || 0) + (parseFloat(otherCost) || 0)
+      unitCost = totalQuantity > 0 ? totalCost / totalQuantity : 0
     }
 
     let supplyAmount = null
@@ -354,13 +344,13 @@ export async function PUT(request: NextRequest) {
         productId: isMultiItem ? null : parseInt(productId),
         vendorId: parseInt(vendorId),
         salespersonId: salespersonId ? parseInt(salespersonId) : null,
-        categoryId: categoryId ? parseInt(categoryId) : null,
+        categoryId: null, // Category removed
         quantity: isMultiItem ? null : parseFloat(quantity),
         currency,
         exchangeRate: parseFloat(exchangeRate),
         foreignAmount: totalForeignAmount,
         krwAmount,
-        goodsAmount: goodsAmount ? parseFloat(goodsAmount) : null,
+        goodsAmount: null, // goodsAmount removed, using krwAmount instead
         dutyAmount: dutyAmount ? parseFloat(dutyAmount) : null,
         shippingCost: shippingCost ? parseFloat(shippingCost) : null,
         otherCost: otherCost ? parseFloat(otherCost) : null,
@@ -427,7 +417,7 @@ export async function PUT(request: NextRequest) {
               storageType,
               unitCost,
               exchangeRate: parseFloat(exchangeRate),
-              goodsAmount: goodsAmount ? parseFloat(goodsAmount) : null,
+              goodsAmount: totalForeignAmount, // Use total foreign amount
               dutyAmount: dutyAmount ? parseFloat(dutyAmount) : null,
               shippingCost: shippingCost ? parseFloat(shippingCost) : null,
               otherCost: otherCost ? parseFloat(otherCost) : null,
@@ -440,7 +430,7 @@ export async function PUT(request: NextRequest) {
               storageType,
               unitCost,
               exchangeRate: parseFloat(exchangeRate),
-              goodsAmountKrw: goodsAmount ? parseFloat(goodsAmount) * parseFloat(exchangeRate) : 0,
+              goodsAmountKrw: krwAmount, // Use krwAmount directly
               dutyAmount: dutyAmount ? parseFloat(dutyAmount) : null,
               shippingCost: shippingCost ? parseFloat(shippingCost) : null,
               otherCost: otherCost ? parseFloat(otherCost) : null,
@@ -457,7 +447,7 @@ export async function PUT(request: NextRequest) {
             storageType,
             unitCost,
             exchangeRate: parseFloat(exchangeRate),
-            goodsAmount: goodsAmount ? parseFloat(goodsAmount) : null,
+            goodsAmount: totalForeignAmount, // Use total foreign amount
             dutyAmount: dutyAmount ? parseFloat(dutyAmount) : null,
             shippingCost: shippingCost ? parseFloat(shippingCost) : null,
             otherCost: otherCost ? parseFloat(otherCost) : null,
@@ -470,7 +460,7 @@ export async function PUT(request: NextRequest) {
             storageType,
             unitCost,
             exchangeRate: parseFloat(exchangeRate),
-            goodsAmountKrw: goodsAmount ? parseFloat(goodsAmount) * parseFloat(exchangeRate) : 0,
+            goodsAmountKrw: krwAmount, // Use krwAmount directly
             dutyAmount: dutyAmount ? parseFloat(dutyAmount) : null,
             shippingCost: shippingCost ? parseFloat(shippingCost) : null,
             otherCost: otherCost ? parseFloat(otherCost) : null,
