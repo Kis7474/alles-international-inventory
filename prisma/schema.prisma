@@ -304,10 +304,14 @@ model InventoryLot {
   importExportId    Int?         // @unique 제거 - 1:N 관계 지원
   importExport      ImportExport? @relation(fields: [importExportId], references: [id])
   
+  // 창고료 누적
+  warehouseFee              Float    @default(0)  // 누적 창고료
+  
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
   
   movements         InventoryMovement[]
+  warehouseFeeDistributions WarehouseFeeDistribution[]
 }
 
 // 입출고 이력
@@ -340,6 +344,33 @@ model StorageExpense {
   memo        String?
   
   createdAt   DateTime @default(now())
+}
+
+// 창고료 관리
+model WarehouseFee {
+  id            Int       @id @default(autoincrement())
+  yearMonth     String    @unique // "2026-01" 형식
+  totalFee      Float     // 해당 월 총 창고료
+  distributedAt DateTime? // 배분 완료 시각
+  memo          String?   // 메모
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  distributions WarehouseFeeDistribution[]
+}
+
+// 창고료 배분 내역
+model WarehouseFeeDistribution {
+  id              Int          @id @default(autoincrement())
+  warehouseFeeId  Int
+  warehouseFee    WarehouseFee @relation(fields: [warehouseFeeId], references: [id], onDelete: Cascade)
+  lotId           Int
+  lot             InventoryLot @relation(fields: [lotId], references: [id], onDelete: Cascade)
+  distributedFee  Float        // 배분된 창고료
+  quantityAtTime  Float        // 배분 시점의 잔량
+  createdAt       DateTime     @default(now())
+  
+  @@unique([warehouseFeeId, lotId])
 }
 
 // 매입매출 기록

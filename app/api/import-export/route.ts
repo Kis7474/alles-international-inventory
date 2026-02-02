@@ -228,9 +228,8 @@ export async function POST(request: NextRequest) {
           salespersonId: salespersonId ? parseInt(salespersonId) : null,
           date: new Date(date),
           storageType,
-          unitCost,
+          unitCost: null, // Will be calculated per item
           exchangeRate: parseFloat(exchangeRate),
-          goodsAmount: totalForeignAmount, // Use total foreign amount
           dutyAmount: dutyAmount ? parseFloat(dutyAmount) : null,
           shippingCost: shippingCost ? parseFloat(shippingCost) : null,
           otherCost: otherCost ? parseFloat(otherCost) : null,
@@ -415,9 +414,8 @@ export async function PUT(request: NextRequest) {
               salespersonId: salespersonId ? parseInt(salespersonId) : null,
               date: new Date(date),
               storageType,
-              unitCost,
+              unitCost: null, // Will be calculated per item
               exchangeRate: parseFloat(exchangeRate),
-              goodsAmount: totalForeignAmount, // Use total foreign amount
               dutyAmount: dutyAmount ? parseFloat(dutyAmount) : null,
               shippingCost: shippingCost ? parseFloat(shippingCost) : null,
               otherCost: otherCost ? parseFloat(otherCost) : null,
@@ -445,9 +443,8 @@ export async function PUT(request: NextRequest) {
             salespersonId: salespersonId ? parseInt(salespersonId) : null,
             date: new Date(date),
             storageType,
-            unitCost,
+            unitCost: null, // Will be calculated per item
             exchangeRate: parseFloat(exchangeRate),
-            goodsAmount: totalForeignAmount, // Use total foreign amount
             dutyAmount: dutyAmount ? parseFloat(dutyAmount) : null,
             shippingCost: shippingCost ? parseFloat(shippingCost) : null,
             otherCost: otherCost ? parseFloat(otherCost) : null,
