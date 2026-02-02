@@ -188,6 +188,25 @@ export default function ImportExportEditPage() {
       return sum + amount
     }, 0)
   }, [items])
+  
+  // Helper function to get the current items to use
+  const getCurrentItems = (): ItemEntry[] => {
+    if (editableItems.length > 0) {
+      return editableItems.map(item => ({
+        productId: item.productId.toString(),
+        quantity: item.quantity.toString(),
+        unitPrice: item.unitPrice.toString()
+      }))
+    }
+    if (items.length > 0) {
+      return items
+    }
+    return (recordData?.items || []).map(item => ({
+      productId: item.productId.toString(),
+      quantity: item.quantity.toString(),
+      unitPrice: item.unitPrice.toString()
+    }))
+  }
 
   useEffect(() => {
     fetchMasterData()
@@ -320,20 +339,8 @@ export default function ImportExportEditPage() {
   }
   
   const calculateValues = () => {
-    // Get items to calculate from either new items, editable items, or existing items from recordData
-    const itemsToCalculate = editableItems.length > 0 
-      ? editableItems.map(item => ({
-          productId: item.productId.toString(),
-          quantity: item.quantity.toString(),
-          unitPrice: item.unitPrice.toString()
-        }))
-      : items.length > 0 
-        ? items 
-        : (recordData?.items || []).map(item => ({
-            productId: item.productId.toString(),
-            quantity: item.quantity.toString(),
-            unitPrice: item.unitPrice.toString()
-          }))
+    // Get items to calculate using the helper function
+    const itemsToCalculate = getCurrentItems()
     
     // Calculate total quantity from items
     const quantity = itemsToCalculate.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0)
@@ -477,20 +484,8 @@ export default function ImportExportEditPage() {
       return
     }
     
-    // Use editable items if they exist, otherwise use new items, otherwise use original items
-    const itemsToSubmit = editableItems.length > 0 
-      ? editableItems.map(item => ({
-          productId: item.productId.toString(),
-          quantity: item.quantity.toString(),
-          unitPrice: item.unitPrice.toString()
-        }))
-      : items.length > 0 
-        ? items 
-        : (recordData?.items || []).map(item => ({
-            productId: item.productId.toString(),
-            quantity: item.quantity.toString(),
-            unitPrice: item.unitPrice.toString()
-          }))
+    // Use helper function to get current items
+    const itemsToSubmit = getCurrentItems()
     
     if (itemsToSubmit.length === 0) {
       alert('품목 목록이 없습니다. 품목을 추가해주세요.')

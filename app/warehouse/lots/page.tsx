@@ -754,7 +754,13 @@ export default function LotsPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {lots.map((lot) => (
+            {lots.map((lot) => {
+              // Calculate final unit cost including warehouse fees
+              const finalUnitCost = lot.quantityRemaining > 0 
+                ? lot.unitCost + (lot.warehouseFee || 0) / lot.quantityRemaining 
+                : lot.unitCost
+              
+              return (
               <tr key={lot.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3">
                   <input
@@ -804,10 +810,10 @@ export default function LotsPage() {
                   ₩{formatNumber(lot.warehouseFee || 0, 0)}
                 </td>
                 <td className="px-4 py-4 text-right font-semibold">
-                  ₩{formatNumber(lot.quantityRemaining > 0 ? lot.unitCost + (lot.warehouseFee || 0) / lot.quantityRemaining : lot.unitCost, 2)}
+                  ₩{formatNumber(finalUnitCost, 2)}
                 </td>
                 <td className="px-4 py-4 text-right">
-                  ₩{formatNumber(lot.quantityRemaining * (lot.quantityRemaining > 0 ? lot.unitCost + (lot.warehouseFee || 0) / lot.quantityRemaining : lot.unitCost), 0)}
+                  ₩{formatNumber(lot.quantityRemaining * finalUnitCost, 0)}
                 </td>
                 <td className="px-4 py-4 text-center">
                   <button
@@ -818,7 +824,8 @@ export default function LotsPage() {
                   </button>
                 </td>
               </tr>
-            ))}
+              )
+            })}
             {lots.length === 0 && (
               <tr>
                 <td
