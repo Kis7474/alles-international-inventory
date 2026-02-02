@@ -185,6 +185,52 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// PUT - LOT 수정 (보관위치 변경 등)
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { id, storageLocation } = body
+    
+    if (!id) {
+      return NextResponse.json(
+        { error: 'LOT ID가 필요합니다.' },
+        { status: 400 }
+      )
+    }
+    
+    const updateData: { storageLocation?: string } = {}
+    
+    if (storageLocation) {
+      if (!['WAREHOUSE', 'OFFICE'].includes(storageLocation)) {
+        return NextResponse.json(
+          { error: '보관위치는 WAREHOUSE 또는 OFFICE만 가능합니다.' },
+          { status: 400 }
+        )
+      }
+      updateData.storageLocation = storageLocation
+    }
+    
+    const lot = await prisma.inventoryLot.update({
+      where: { id: parseInt(id) },
+      data: updateData,
+      include: {
+        product: true,
+        importExport: {
+          select: { id: true, date: true, type: true }
+        }
+      }
+    })
+    
+    return NextResponse.json(lot)
+  } catch (error) {
+    console.error('Error updating lot:', error)
+    return NextResponse.json(
+      { error: 'LOT 수정 중 오류가 발생했습니다.' },
+      { status: 500 }
+    )
+  }
+}
+
 // DELETE - 입고 내역 삭제 (단일 또는 다중)
 export async function DELETE(request: NextRequest) {
   try {
