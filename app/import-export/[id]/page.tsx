@@ -125,9 +125,6 @@ export default function ImportExportEditPage() {
   // Filtered products based on vendor
   const [availableProducts, setAvailableProducts] = useState<Product[]>([])
   
-  // Search states
-  const [productSearch, setProductSearch] = useState('')
-  
   // Multi-item support
   const [items, setItems] = useState<ItemEntry[]>([])
   const [currentItem, setCurrentItem] = useState<ItemEntry>({
@@ -199,7 +196,6 @@ export default function ImportExportEditPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     formData.type,
-    formData.quantity,
     formData.exchangeRate,
     formData.foreignAmount,
     formData.goodsAmount,
@@ -208,6 +204,7 @@ export default function ImportExportEditPage() {
     formData.otherCost,
     formData.vatIncluded,
     totalForeignAmount,
+    items,
   ])
 
   // Update available products when products or vendorId changes
@@ -259,11 +256,9 @@ export default function ImportExportEditPage() {
       setFormData({
         date: new Date(data.date).toISOString().split('T')[0],
         type: data.type,
-        productId: data.productId?.toString() || '',
         vendorId: data.vendor.id.toString(),
         salespersonId: data.salesperson?.id.toString() || '',
         categoryId: data.category?.id.toString() || '',
-        quantity: data.quantity?.toString() || '',
         currency: data.currency,
         exchangeRate: data.exchangeRate.toString(),
         foreignAmount: data.foreignAmount.toString(),
@@ -318,7 +313,8 @@ export default function ImportExportEditPage() {
   }
   
   const calculateValues = () => {
-    const quantity = parseFloat(formData.quantity) || 0
+    // Calculate total quantity from items
+    const quantity = items.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0)
     const exchangeRate = parseFloat(formData.exchangeRate) || 0
     // Use totalForeignAmount for items, otherwise use formData.foreignAmount
     const foreignAmount = items.length > 0 ? totalForeignAmount : (parseFloat(formData.foreignAmount) || 0)
@@ -369,8 +365,7 @@ export default function ImportExportEditPage() {
   }
   
   const handleVendorChange = (vendorId: string) => {
-    setFormData({ ...formData, vendorId, productId: '' })
-    setProductSearch('')
+    setFormData({ ...formData, vendorId })
     
     if (vendorId) {
       const filtered = products.filter(p => p.purchaseVendorId === parseInt(vendorId))
@@ -403,7 +398,8 @@ export default function ImportExportEditPage() {
       setAvailableProducts(filtered)
     }
     
-    setFormData({ ...formData, productId: productId.toString() })
+    // Set the newly registered product in currentItem for adding to items
+    setCurrentItem({ ...currentItem, productId: productId.toString() })
   }
 
   const handleAddItem = () => {
@@ -616,8 +612,6 @@ export default function ImportExportEditPage() {
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                담당자
-              </label>
                 담당자
               </label>
               <select

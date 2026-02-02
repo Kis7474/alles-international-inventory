@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
 import { formatNumber, calculateUnitCost } from '@/lib/utils'
 
 interface Product {
@@ -40,7 +39,6 @@ interface Lot {
 }
 
 export default function LotsPage() {
-  const searchParams = useSearchParams()
   const [lots, setLots] = useState<Lot[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
@@ -56,7 +54,7 @@ export default function LotsPage() {
   const [filterStartDate, setFilterStartDate] = useState('')
   const [filterEndDate, setFilterEndDate] = useState('')
   const [filterProductId, setFilterProductId] = useState('')
-  const [filterImportExportId, setFilterImportExportId] = useState(searchParams?.get('importExportId') || '')
+  const [filterImportExportId, setFilterImportExportId] = useState('')
   
   const [formData, setFormData] = useState({
     productId: '',
@@ -77,7 +75,7 @@ export default function LotsPage() {
   useEffect(() => {
     handleFilter()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, filterImportExportId])
+  }, [activeTab])
 
   const fetchData = async () => {
     try {
@@ -329,7 +327,7 @@ export default function LotsPage() {
       {/* 필터 */}
       <div className="bg-white p-6 rounded-lg shadow mb-6">
         <h2 className="text-lg font-bold mb-4 text-gray-900">필터</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700">시작일</label>
             <input
@@ -365,6 +363,17 @@ export default function LotsPage() {
               ))}
             </select>
           </div>
+          
+          <div>
+            <label className="block text-sm font-medium mb-1 text-gray-700">수입/수출 ID</label>
+            <input
+              type="text"
+              value={filterImportExportId}
+              onChange={(e) => setFilterImportExportId(e.target.value)}
+              placeholder="ID 입력"
+              className="w-full px-3 py-2 border rounded-lg text-gray-900"
+            />
+          </div>
         </div>
         
         <div className="mt-4">
@@ -379,6 +388,7 @@ export default function LotsPage() {
               setFilterStartDate('')
               setFilterEndDate('')
               setFilterProductId('')
+              setFilterImportExportId('')
               fetchData()
             }}
             className="ml-2 bg-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-400"

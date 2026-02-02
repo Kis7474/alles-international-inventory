@@ -52,9 +52,6 @@ export default function ImportExportNewPage() {
   // Filtered products based on vendor
   const [availableProducts, setAvailableProducts] = useState<Product[]>([])
   
-  // Search states
-  const [productSearch, setProductSearch] = useState('')
-  
   // Multi-item support
   interface ItemEntry {
     productId: string
@@ -109,7 +106,6 @@ export default function ImportExportNewPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     formData.type,
-    formData.quantity,
     formData.exchangeRate,
     formData.foreignAmount,
     formData.goodsAmount,
@@ -183,7 +179,8 @@ export default function ImportExportNewPage() {
   }
   
   const calculateValues = () => {
-    const quantity = parseFloat(formData.quantity) || 0
+    // Calculate total quantity from items
+    const quantity = items.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0)
     const exchangeRate = parseFloat(formData.exchangeRate) || 0
     let foreignAmount = parseFloat(formData.foreignAmount) || 0
     
@@ -241,8 +238,7 @@ export default function ImportExportNewPage() {
   }
   
   const handleVendorChange = (vendorId: string) => {
-    setFormData({ ...formData, vendorId, productId: '' })
-    setProductSearch('')
+    setFormData({ ...formData, vendorId })
     
     if (vendorId) {
       // 수입/수출: 선택한 거래처가 매입처인 품목 필터링
@@ -272,8 +268,8 @@ export default function ImportExportNewPage() {
       setAvailableProducts(filtered)
     }
     
-    // Auto-select the newly registered product
-    setFormData({ ...formData, productId: productId.toString() })
+    // Set the newly registered product in currentItem for adding to items
+    setCurrentItem({ ...currentItem, productId: productId.toString() })
   }
 
   // 날짜 변경 핸들러
@@ -428,8 +424,6 @@ export default function ImportExportNewPage() {
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                담당자
-              </label>
                 담당자
               </label>
               <select
