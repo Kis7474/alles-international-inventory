@@ -415,72 +415,84 @@ export async function PUT(request: NextRequest) {
       }))
     }
 
-    // ★★★ Auto-create inventory lot when storageType changes to WAREHOUSE/OFFICE ★★★
-    // Condition: Previously not warehouse AND now warehouse/office AND type is IMPORT
-    const wasNotWarehouse = !existingRecord?.storageType || 
-      (existingRecord.storageType !== 'WAREHOUSE' && existingRecord.storageType !== 'OFFICE')
-    const isNowWarehouse = storageType === 'WAREHOUSE' || storageType === 'OFFICE'
-    
-    if (wasNotWarehouse && isNowWarehouse && type === 'IMPORT') {
-      // Check if LOT already exists for this import record
-      const existingLot = await prisma.inventoryLot.findFirst({
+    // ★★★ 입고관리(LOT) 자동 연동 로직 ★★★
+    // storageType이 WAREHOUSE 또는 OFFICE이고 IMPORT인 경우 LOT 생성/수정
+    if ((storageType === 'WAREHOUSE' || storageType === 'OFFICE') && type === 'IMPORT') {
+      // 기존 LOT 조회
+      const existingLots = await prisma.inventoryLot.findMany({
         where: { importExportId: parseInt(id) },
       })
       
-      // Create new LOT only if it doesn't exist
-      if (!existingLot) {
-        if (isMultiItem) {
-          // Multi-item: create inventory lot for each item
-          const costs = distributeCostsAcrossItems({
-            goodsAmount: goodsAmount ? parseFloat(goodsAmount) : null,
-            dutyAmount: dutyAmount ? parseFloat(dutyAmount) : null,
-            shippingCost: shippingCost ? parseFloat(shippingCost) : null,
-            otherCost: otherCost ? parseFloat(otherCost) : null,
-            exchangeRate: parseFloat(exchangeRate),
-            itemCount: (items as ItemInput[]).length,
-          })
-          
-          await Promise.all((items as ItemInput[]).map((item, index) => {
-            return prisma.inventoryLot.create({
-              data: {
-                productId: parseInt(item.productId),
-                vendorId: parseInt(vendorId),
-                salespersonId: salespersonId ? parseInt(salespersonId) : null,
-                lotCode: `IE-${record.id}-${index + 1}-${Date.now().toString().slice(-4)}`,
-                receivedDate: new Date(date),
-                quantityReceived: parseFloat(item.quantity),
-                quantityRemaining: parseFloat(item.quantity),
-                goodsAmount: costs.goodsAmountPerItem,
-                dutyAmount: costs.dutyAmountPerItem,
-                domesticFreight: costs.shippingCostPerItem,
-                otherCost: costs.otherCostPerItem,
-                unitCost: unitCost || 0,
-                storageLocation: storageType,
-                importExportId: record.id,
-              },
-            })
-          }))
-        } else {
-          // Single item
-          await prisma.inventoryLot.create({
+      if (existingLots.length > 0) {
+        // 기존 LOT이 있으면 삭제 후 재생성 (수정된 items 반영)
+        await prisma.inventoryLot.deleteMany({
+          where: { importExportId: parseInt(id) }
+        })
+      }
+      
+      // items 또는 단일 품목으로 LOT 생성
+      if (isMultiItem && (items as ItemInput[]).length > 0) {
+        // Multi-item: create inventory lot for each item
+        const costs = distributeCostsAcrossItems({
+          goodsAmount: goodsAmount ? parseFloat(goodsAmount) : null,
+          dutyAmount: dutyAmount ? parseFloat(dutyAmount) : null,
+          shippingCost: shippingCost ? parseFloat(shippingCost) : null,
+          otherCost: otherCost ? parseFloat(otherCost) : null,
+          exchangeRate: parseFloat(exchangeRate),
+          itemCount: (items as ItemInput[]).length,
+        })
+        
+        await Promise.all((items as ItemInput[]).map((item, index) => {
+          return prisma.inventoryLot.create({
             data: {
-              productId: parseInt(productId),
+              productId: parseInt(item.productId),
               vendorId: parseInt(vendorId),
               salespersonId: salespersonId ? parseInt(salespersonId) : null,
-              lotCode: `IE-${record.id}-${Date.now().toString().slice(-4)}`,
+              lotCode: `IE-${record.id}-${index + 1}-${Date.now().toString().slice(-4)}`,
               receivedDate: new Date(date),
-              quantityReceived: parseFloat(quantity),
-              quantityRemaining: parseFloat(quantity),
-              goodsAmount: goodsAmount ? parseFloat(goodsAmount) * parseFloat(exchangeRate) : 0,
-              dutyAmount: dutyAmount ? parseFloat(dutyAmount) : 0,
-              domesticFreight: shippingCost ? parseFloat(shippingCost) : 0,
-              otherCost: otherCost ? parseFloat(otherCost) : 0,
+              quantityReceived: parseFloat(item.quantity),
+              quantityRemaining: parseFloat(item.quantity),
+              goodsAmount: costs.goodsAmountPerItem,
+              dutyAmount: costs.dutyAmountPerItem,
+              domesticFreight: costs.shippingCostPerItem,
+              otherCost: costs.otherCostPerItem,
               unitCost: unitCost || 0,
               storageLocation: storageType,
               importExportId: record.id,
             },
           })
-        }
+        }))
+      } else if (productId && quantity) {
+        // Single item: create a single LOT
+        await prisma.inventoryLot.create({
+          data: {
+            productId: parseInt(productId),
+            vendorId: parseInt(vendorId),
+            salespersonId: salespersonId ? parseInt(salespersonId) : null,
+            lotCode: `IE-${record.id}-${Date.now().toString().slice(-4)}`,
+            receivedDate: new Date(date),
+            quantityReceived: parseFloat(quantity),
+            quantityRemaining: parseFloat(quantity),
+            goodsAmount: goodsAmount ? parseFloat(goodsAmount) * parseFloat(exchangeRate) : 0,
+            dutyAmount: dutyAmount ? parseFloat(dutyAmount) : 0,
+            domesticFreight: shippingCost ? parseFloat(shippingCost) : 0,
+            otherCost: otherCost ? parseFloat(otherCost) : 0,
+            unitCost: unitCost || 0,
+            storageLocation: storageType,
+            importExportId: record.id,
+          },
+        })
+      }
+    } else if (type === 'IMPORT') {
+      // storageType이 WAREHOUSE/OFFICE가 아닌 경우, 기존 LOT 삭제
+      const existingLots = await prisma.inventoryLot.findMany({
+        where: { importExportId: parseInt(id) },
+      })
+      
+      if (existingLots.length > 0) {
+        await prisma.inventoryLot.deleteMany({
+          where: { importExportId: parseInt(id) }
+        })
       }
     }
 
