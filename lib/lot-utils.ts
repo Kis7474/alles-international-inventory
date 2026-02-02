@@ -1,5 +1,4 @@
 import { prisma } from '@/lib/prisma'
-import { distributeCostsAcrossItems } from '@/lib/utils'
 
 interface ItemInput {
   productId: string
@@ -33,26 +32,32 @@ export async function createLotsFromItems(
     salespersonId,
     date,
     storageType,
-    unitCost,
     exchangeRate,
-    goodsAmount,
     dutyAmount,
     shippingCost,
     otherCost
   } = options
 
-  // 비용 분배 계산
-  const costs = distributeCostsAcrossItems({
-    goodsAmount: goodsAmount || null,
-    dutyAmount: dutyAmount || null,
-    shippingCost: shippingCost || null,
-    otherCost: otherCost || null,
-    exchangeRate,
-    itemCount: items.length,
-  })
+  // 총 수량 계산 (부대비용 분배용)
+  const totalQuantity = items.reduce((sum, item) => sum + parseFloat(item.quantity), 0)
+  
+  // 부대비용 합계 (관세 + 운송료 + 기타비용)
+  const totalAdditionalCosts = (dutyAmount || 0) + (shippingCost || 0) + (otherCost || 0)
+  
+  // 부대비용 단가 = 총 부대비용 / 총 수량
+  const additionalCostPerUnit = totalQuantity > 0 ? totalAdditionalCosts / totalQuantity : 0
 
   // 각 item별로 LOT 생성
   return Promise.all(items.map((item, index) => {
+    const quantity = parseFloat(item.quantity)
+    const unitPrice = parseFloat(item.unitPrice)
+    
+    // 품목별 외화 금액 (원화 환산)
+    const itemGoodsAmountKrw = unitPrice * exchangeRate * quantity
+    
+    // 품목별 입고 단가 = (외화 단가 × 환율) + (부대비용 / 총 수량)
+    const itemUnitCost = (unitPrice * exchangeRate) + additionalCostPerUnit
+    
     return prisma.inventoryLot.create({
       data: {
         productId: parseInt(item.productId),
@@ -60,13 +65,13 @@ export async function createLotsFromItems(
         salespersonId: salespersonId || null,
         lotCode: `IE-${importExportId}-${index + 1}-${Date.now().toString().slice(-4)}`,
         receivedDate: date,
-        quantityReceived: parseFloat(item.quantity),
-        quantityRemaining: parseFloat(item.quantity),
-        goodsAmount: costs.goodsAmountPerItem,
-        dutyAmount: costs.dutyAmountPerItem,
-        domesticFreight: costs.shippingCostPerItem,
-        otherCost: costs.otherCostPerItem,
-        unitCost: unitCost || 0,
+        quantityReceived: quantity,
+        quantityRemaining: quantity,
+        goodsAmount: itemGoodsAmountKrw,
+        dutyAmount: (dutyAmount || 0) * (quantity / totalQuantity),
+        domesticFreight: (shippingCost || 0) * (quantity / totalQuantity),
+        otherCost: (otherCost || 0) * (quantity / totalQuantity),
+        unitCost: itemUnitCost,
         storageLocation: storageType,
         importExportId,
       },

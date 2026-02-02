@@ -55,25 +55,23 @@ export async function POST(
     
     // 다중 품목인 경우
     if (importExport.items && importExport.items.length > 0) {
+      // 총 수량 계산 (부대비용 분배용)
+      const totalQuantity = importExport.items.reduce((sum, item) => sum + item.quantity, 0)
+      
+      // 부대비용 합계 (관세 + 운송료 + 기타비용)
+      const totalAdditionalCosts = (importExport.dutyAmount || 0) + (importExport.shippingCost || 0) + (importExport.otherCost || 0)
+      
+      // 부대비용 단가 = 총 부대비용 / 총 수량
+      const additionalCostPerUnit = totalQuantity > 0 ? totalAdditionalCosts / totalQuantity : 0
+      
       // 각 품목별로 LOT 생성
-      const itemCount = importExport.items.length
       const lots = await Promise.all(
         importExport.items.map((item, index) => {
-          const goodsAmount = importExport.goodsAmount 
-            ? (importExport.goodsAmount * importExport.exchangeRate) / itemCount
-            : 0
-          const dutyAmount = importExport.dutyAmount 
-            ? importExport.dutyAmount / itemCount
-            : 0
-          const domesticFreight = importExport.shippingCost 
-            ? importExport.shippingCost / itemCount
-            : 0
-          const otherCost = importExport.otherCost 
-            ? importExport.otherCost / itemCount
-            : 0
+          // 품목별 외화 금액 (원화 환산)
+          const itemGoodsAmountKrw = item.unitPrice * importExport.exchangeRate * item.quantity
           
-          const totalCost = goodsAmount + dutyAmount + domesticFreight + otherCost
-          const unitCost = item.quantity > 0 ? totalCost / item.quantity : 0
+          // 품목별 입고 단가 = (외화 단가 × 환율) + (부대비용 / 총 수량)
+          const itemUnitCost = (item.unitPrice * importExport.exchangeRate) + additionalCostPerUnit
           
           return prisma.inventoryLot.create({
             data: {
@@ -84,11 +82,11 @@ export async function POST(
               receivedDate: importExport.date,
               quantityReceived: item.quantity,
               quantityRemaining: item.quantity,
-              goodsAmount,
-              dutyAmount,
-              domesticFreight,
-              otherCost,
-              unitCost,
+              goodsAmount: itemGoodsAmountKrw,
+              dutyAmount: (importExport.dutyAmount || 0) * (item.quantity / totalQuantity),
+              domesticFreight: (importExport.shippingCost || 0) * (item.quantity / totalQuantity),
+              otherCost: (importExport.otherCost || 0) * (item.quantity / totalQuantity),
+              unitCost: itemUnitCost,
               storageLocation,
               importExportId,
             },

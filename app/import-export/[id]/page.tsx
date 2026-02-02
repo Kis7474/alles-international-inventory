@@ -132,6 +132,9 @@ export default function ImportExportEditPage() {
     unitPrice: ''
   })
   
+  // Editable items from existing record
+  const [editableItems, setEditableItems] = useState<(ImportExportItem & { edited?: boolean })[]>([])
+  
   // Product registration modal state
   const [showProductModal, setShowProductModal] = useState(false)
   
@@ -185,6 +188,25 @@ export default function ImportExportEditPage() {
       return sum + amount
     }, 0)
   }, [items])
+  
+  // Helper function to get the current items to use
+  const getCurrentItems = (): ItemEntry[] => {
+    if (editableItems.length > 0) {
+      return editableItems.map(item => ({
+        productId: item.productId.toString(),
+        quantity: item.quantity.toString(),
+        unitPrice: item.unitPrice.toString()
+      }))
+    }
+    if (items.length > 0) {
+      return items
+    }
+    return (recordData?.items || []).map(item => ({
+      productId: item.productId.toString(),
+      quantity: item.quantity.toString(),
+      unitPrice: item.unitPrice.toString()
+    }))
+  }
 
   useEffect(() => {
     fetchMasterData()
@@ -202,6 +224,7 @@ export default function ImportExportEditPage() {
     formData.vatIncluded,
     totalForeignAmount,
     items,
+    editableItems,
   ])
 
   // Update available products when products or vendorId changes
@@ -264,6 +287,11 @@ export default function ImportExportEditPage() {
       
       // Store record data for displaying existing items
       setRecordData(data)
+      
+      // Initialize editable items from existing items
+      if (data.items && data.items.length > 0) {
+        setEditableItems(data.items.map(item => ({ ...item, edited: false })))
+      }
     } catch (error) {
       console.error('Error fetching record:', error)
       alert('데이터 로딩 중 오류가 발생했습니다.')
@@ -311,12 +339,8 @@ export default function ImportExportEditPage() {
   }
   
   const calculateValues = () => {
-    // Get items to calculate from either new items or existing items from recordData
-    const itemsToCalculate = items.length > 0 ? items : (recordData?.items || []).map(item => ({
-      productId: item.productId.toString(),
-      quantity: item.quantity.toString(),
-      unitPrice: item.unitPrice.toString()
-    }))
+    // Get items to calculate using the helper function
+    const itemsToCalculate = getCurrentItems()
     
     // Calculate total quantity from items
     const quantity = itemsToCalculate.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0)
@@ -426,6 +450,30 @@ export default function ImportExportEditPage() {
   const handleRemoveItem = (index: number) => {
     setItems(items.filter((_, i) => i !== index))
   }
+  
+  // Handler for editing existing items
+  const handleEditableItemChange = (index: number, field: 'quantity' | 'unitPrice', value: string) => {
+    const updatedItems = [...editableItems]
+    const item = updatedItems[index]
+    
+    if (field === 'quantity') {
+      item.quantity = parseFloat(value) || 0
+    } else if (field === 'unitPrice') {
+      item.unitPrice = parseFloat(value) || 0
+    }
+    
+    // Recalculate amount and krwAmount
+    item.amount = item.quantity * item.unitPrice
+    item.krwAmount = item.amount * parseFloat(formData.exchangeRate || '0')
+    item.edited = true
+    
+    setEditableItems(updatedItems)
+  }
+  
+  // Handler for removing existing items
+  const handleRemoveEditableItem = (index: number) => {
+    setEditableItems(editableItems.filter((_, i) => i !== index))
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -436,12 +484,8 @@ export default function ImportExportEditPage() {
       return
     }
     
-    // Allow using existing items from recordData if no new items are added
-    const itemsToSubmit = items.length > 0 ? items : (recordData?.items || []).map(item => ({
-      productId: item.productId.toString(),
-      quantity: item.quantity.toString(),
-      unitPrice: item.unitPrice.toString()
-    }))
+    // Use helper function to get current items
+    const itemsToSubmit = getCurrentItems()
     
     if (itemsToSubmit.length === 0) {
       alert('품목 목록이 없습니다. 품목을 추가해주세요.')
@@ -775,7 +819,7 @@ export default function ImportExportEditPage() {
         </div>
 
         {/* 등록된 품목 목록 (기존 데이터 표시) */}
-        {recordData && recordData.items && recordData.items.length > 0 && (
+        {editableItems.length > 0 && (
           <div className="mb-8">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">등록된 품목 목록</h2>
             <div className="overflow-x-auto">
@@ -787,27 +831,51 @@ export default function ImportExportEditPage() {
                     <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">단가</th>
                     <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">금액</th>
                     <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">원화 금액</th>
+                    <th className="px-4 py-2 text-center text-sm font-medium text-gray-700 border-b">삭제</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {recordData.items.map((item) => {
-                    const currencySymbol = recordData.currency === 'USD' ? '$' : recordData.currency === 'EUR' ? '€' : recordData.currency === 'JPY' ? '¥' : recordData.currency === 'CNY' ? '¥' : '₩'
+                  {editableItems.map((item, index) => {
+                    const currencySymbol = formData.currency === 'USD' ? '$' : formData.currency === 'EUR' ? '€' : formData.currency === 'JPY' ? '¥' : formData.currency === 'CNY' ? '¥' : '₩'
                     return (
                       <tr key={item.id} className="border-b">
                         <td className="px-4 py-2 text-sm text-gray-900">
                           [{item.product.code}] {item.product.name}
                         </td>
                         <td className="px-4 py-2 text-sm text-gray-900 text-right">
-                          {item.quantity.toLocaleString()} {item.product.unit}
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={item.quantity}
+                            onChange={(e) => handleEditableItemChange(index, 'quantity', e.target.value)}
+                            className="w-24 px-2 py-1 border border-gray-300 rounded text-right"
+                          />
+                          <span className="ml-1">{item.product.unit}</span>
                         </td>
                         <td className="px-4 py-2 text-sm text-gray-900 text-right">
-                          {currencySymbol}{item.unitPrice.toFixed(2)}
+                          <span className="mr-1">{currencySymbol}</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={item.unitPrice}
+                            onChange={(e) => handleEditableItemChange(index, 'unitPrice', e.target.value)}
+                            className="w-24 px-2 py-1 border border-gray-300 rounded text-right"
+                          />
                         </td>
                         <td className="px-4 py-2 text-sm text-gray-900 text-right font-semibold">
                           {currencySymbol}{item.amount.toFixed(2)}
                         </td>
                         <td className="px-4 py-2 text-sm text-gray-900 text-right font-semibold">
                           ₩{Math.round(item.krwAmount).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-2 text-center">
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveEditableItem(index)}
+                            className="text-red-600 hover:text-red-800 font-bold"
+                          >
+                            X
+                          </button>
                         </td>
                       </tr>
                     )
@@ -818,19 +886,20 @@ export default function ImportExportEditPage() {
                     </td>
                     <td className="px-4 py-2 text-sm text-gray-900 text-right">
                       {(() => {
-                        const currencySymbol = recordData.currency === 'USD' ? '$' : recordData.currency === 'EUR' ? '€' : recordData.currency === 'JPY' ? '¥' : recordData.currency === 'CNY' ? '¥' : '₩'
-                        return `${currencySymbol}${recordData.items.reduce((sum, item) => sum + item.amount, 0).toFixed(2)}`
+                        const currencySymbol = formData.currency === 'USD' ? '$' : formData.currency === 'EUR' ? '€' : formData.currency === 'JPY' ? '¥' : formData.currency === 'CNY' ? '¥' : '₩'
+                        return `${currencySymbol}${editableItems.reduce((sum, item) => sum + item.amount, 0).toFixed(2)}`
                       })()}
                     </td>
                     <td className="px-4 py-2 text-sm text-gray-900 text-right">
-                      ₩{Math.round(recordData.items.reduce((sum, item) => sum + item.krwAmount, 0)).toLocaleString()}
+                      ₩{Math.round(editableItems.reduce((sum, item) => sum + item.krwAmount, 0)).toLocaleString()}
                     </td>
+                    <td></td>
                   </tr>
                 </tbody>
               </table>
             </div>
             <p className="text-xs text-gray-500 mt-2">
-              * 기존 등록된 품목 목록입니다. 다른 필드만 수정하려면 품목 추가 없이 저장하면 기존 품목이 유지됩니다.
+              * 수량과 단가를 직접 수정할 수 있습니다. 변경 시 금액과 원화 금액이 자동으로 재계산됩니다.
             </p>
           </div>
         )}

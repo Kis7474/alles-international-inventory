@@ -24,6 +24,7 @@ interface Lot {
   domesticFreight: number
   otherCost: number
   unitCost: number
+  warehouseFee: number
   storageLocation: string
   product: Product | null
   item: {
@@ -736,7 +737,13 @@ export default function LotsPage() {
                 잔량
               </th>
               <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">
-                단가
+                수입단가
+              </th>
+              <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">
+                창고료
+              </th>
+              <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">
+                최종단가
               </th>
               <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">
                 총액
@@ -747,7 +754,13 @@ export default function LotsPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {lots.map((lot) => (
+            {lots.map((lot) => {
+              // Calculate final unit cost including warehouse fees
+              const finalUnitCost = lot.quantityRemaining > 0 
+                ? lot.unitCost + (lot.warehouseFee || 0) / lot.quantityRemaining 
+                : lot.unitCost
+              
+              return (
               <tr key={lot.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3">
                   <input
@@ -794,7 +807,13 @@ export default function LotsPage() {
                   ₩{formatNumber(lot.unitCost, 2)}
                 </td>
                 <td className="px-4 py-4 text-right">
-                  ₩{formatNumber(lot.quantityRemaining * lot.unitCost, 0)}
+                  ₩{formatNumber(lot.warehouseFee || 0, 0)}
+                </td>
+                <td className="px-4 py-4 text-right font-semibold">
+                  ₩{formatNumber(finalUnitCost, 2)}
+                </td>
+                <td className="px-4 py-4 text-right">
+                  ₩{formatNumber(lot.quantityRemaining * finalUnitCost, 0)}
                 </td>
                 <td className="px-4 py-4 text-center">
                   <button
@@ -805,11 +824,12 @@ export default function LotsPage() {
                   </button>
                 </td>
               </tr>
-            ))}
+              )
+            })}
             {lots.length === 0 && (
               <tr>
                 <td
-                  colSpan={10}
+                  colSpan={12}
                   className="px-6 py-8 text-center text-gray-500"
                 >
                   등록된 입고 내역이 없습니다.
