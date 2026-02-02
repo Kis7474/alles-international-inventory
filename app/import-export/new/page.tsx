@@ -52,9 +52,6 @@ export default function ImportExportNewPage() {
   // Filtered products based on vendor
   const [availableProducts, setAvailableProducts] = useState<Product[]>([])
   
-  // Search states
-  const [productSearch, setProductSearch] = useState('')
-  
   // Multi-item support
   interface ItemEntry {
     productId: string
@@ -75,11 +72,9 @@ export default function ImportExportNewPage() {
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     type: 'IMPORT',
-    productId: '',
     vendorId: '',
     salespersonId: '',
     categoryId: '',
-    quantity: '',
     currency: 'USD',
     exchangeRate: '',
     foreignAmount: '',
@@ -243,8 +238,7 @@ export default function ImportExportNewPage() {
   }
   
   const handleVendorChange = (vendorId: string) => {
-    setFormData({ ...formData, vendorId, productId: '' })
-    setProductSearch('')
+    setFormData({ ...formData, vendorId })
     
     if (vendorId) {
       // 수입/수출: 선택한 거래처가 매입처인 품목 필터링
@@ -274,8 +268,8 @@ export default function ImportExportNewPage() {
       setAvailableProducts(filtered)
     }
     
-    // Auto-select the newly registered product
-    setFormData({ ...formData, productId: productId.toString() })
+    // Auto-select the newly registered product in current item
+    setCurrentItem({ ...currentItem, productId: productId.toString() })
   }
 
   // 날짜 변경 핸들러
@@ -311,20 +305,16 @@ export default function ImportExportNewPage() {
       return
     }
     
-    // Check if using items or single product
+    // Check if items are added
     if (items.length === 0) {
-      if (!formData.productId || !formData.quantity) {
-        alert('품목과 수량을 입력하거나 품목 목록에 항목을 추가해주세요.')
-        return
-      }
+      alert('품목 목록에 최소 1개 이상의 항목을 추가해주세요.')
+      return
     }
     
     setSubmitting(true)
     
     try {
-      const payload = items.length > 0 
-        ? { ...formData, items } 
-        : formData
+      const payload = { ...formData, items }
       
       const res = await fetch('/api/import-export', {
         method: 'POST',
@@ -432,41 +422,6 @@ export default function ImportExportNewPage() {
               </select>
             </div>
             
-            <div className="flex gap-2 items-end">
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  품목 <span className="text-red-500">*</span> <span className="text-xs text-blue-600">(선택한 거래처의 품목)</span>
-                </label>
-                <select
-                  name="productId"
-                  value={formData.productId}
-                  onChange={handleChange}
-                  required
-                  disabled={!formData.vendorId}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                >
-                  <option value="">{formData.vendorId ? '품목을 선택하세요' : '거래처를 먼저 선택하세요'}</option>
-                  {availableProducts
-                    .filter(p => 
-                      p.name.toLowerCase().includes(productSearch.toLowerCase())
-                    )
-                    .map((product) => (
-                      <option key={product.id} value={product.id}>
-                        [{product.code}] {product.name} ({product.unit})
-                      </option>
-                    ))}
-                </select>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowProductModal(true)}
-                className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-bold text-lg"
-                title="새 품목 등록"
-              >
-                +
-              </button>
-            </div>
-            
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 담당자
@@ -504,25 +459,6 @@ export default function ImportExportNewPage() {
                 ))}
               </select>
             </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                수량 <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                name="quantity"
-                value={formData.quantity}
-                onChange={handleChange}
-                required={items.length === 0}
-                step="0.01"
-                disabled={items.length > 0}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 disabled:bg-gray-100"
-              />
-              {items.length > 0 && (
-                <p className="text-xs text-gray-500 mt-1">품목 목록 사용 중</p>
-              )}
-            </div>
           </div>
         </div>
 
@@ -530,7 +466,7 @@ export default function ImportExportNewPage() {
         <div className="mb-8">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">품목 목록</h2>
           <p className="text-sm text-gray-600 mb-4">
-            여러 품목을 한 번에 등록하려면 아래에서 품목을 추가하세요. 품목 목록을 사용하면 위의 단일 품목 및 수량 입력은 무시됩니다.
+            아래에서 품목을 추가하세요. 최소 1개 이상의 품목이 필요합니다.
           </p>
           
           {/* 품목 추가 폼 */}

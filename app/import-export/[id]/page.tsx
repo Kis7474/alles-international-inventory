@@ -49,6 +49,17 @@ interface ImportExportItem {
   krwAmount: number
 }
 
+interface InventoryLot {
+  id: number
+  lotCode: string | null
+  receivedDate: string
+  quantityReceived: number
+  quantityRemaining: number
+  unitCost: number
+  storageLocation: string
+  product: Product | null
+}
+
 interface ImportExportData {
   id: number
   date: string
@@ -76,6 +87,7 @@ interface ImportExportData {
   totalAmount: number | null
   memo: string | null
   items: ImportExportItem[]
+  inventoryLots?: InventoryLot[]
   pdfFileName: string | null
   pdfFilePath: string | null
   pdfUploadedAt: string | null
@@ -113,9 +125,6 @@ export default function ImportExportEditPage() {
   // Filtered products based on vendor
   const [availableProducts, setAvailableProducts] = useState<Product[]>([])
   
-  // Search states
-  const [productSearch, setProductSearch] = useState('')
-  
   // Multi-item support
   const [items, setItems] = useState<ItemEntry[]>([])
   const [currentItem, setCurrentItem] = useState<ItemEntry>({
@@ -141,11 +150,9 @@ export default function ImportExportEditPage() {
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     type: 'IMPORT',
-    productId: '',
     vendorId: '',
     salespersonId: '',
     categoryId: '',
-    quantity: '',
     currency: 'USD',
     exchangeRate: '',
     foreignAmount: '',
@@ -249,11 +256,9 @@ export default function ImportExportEditPage() {
       setFormData({
         date: new Date(data.date).toISOString().split('T')[0],
         type: data.type,
-        productId: data.productId?.toString() || '',
         vendorId: data.vendor.id.toString(),
         salespersonId: data.salesperson?.id.toString() || '',
         categoryId: data.category?.id.toString() || '',
-        quantity: data.quantity?.toString() || '',
         currency: data.currency,
         exchangeRate: data.exchangeRate.toString(),
         foreignAmount: data.foreignAmount.toString(),
@@ -359,8 +364,7 @@ export default function ImportExportEditPage() {
   }
   
   const handleVendorChange = (vendorId: string) => {
-    setFormData({ ...formData, vendorId, productId: '' })
-    setProductSearch('')
+    setFormData({ ...formData, vendorId })
     
     if (vendorId) {
       const filtered = products.filter(p => p.purchaseVendorId === parseInt(vendorId))
@@ -393,7 +397,8 @@ export default function ImportExportEditPage() {
       setAvailableProducts(filtered)
     }
     
-    setFormData({ ...formData, productId: productId.toString() })
+    // Auto-select the newly registered product in current item
+    setCurrentItem({ ...currentItem, productId: productId.toString() })
   }
 
   const handleAddItem = () => {
@@ -423,20 +428,16 @@ export default function ImportExportEditPage() {
       return
     }
     
-    // Check if using items or single product
+    // Check if items are added
     if (items.length === 0) {
-      if (!formData.productId || !formData.quantity) {
-        alert('품목과 수량을 입력하거나 품목 목록에 항목을 추가해주세요.')
-        return
-      }
+      alert('품목 목록에 최소 1개 이상의 항목을 추가해주세요.')
+      return
     }
     
     setSubmitting(true)
     
     try {
-      const payload = items.length > 0 
-        ? { ...formData, items, id: parseInt(id) } 
-        : { ...formData, id: parseInt(id) }
+      const payload = { ...formData, items, id: parseInt(id) }
       
       const res = await fetch('/api/import-export', {
         method: 'PUT',
@@ -608,41 +609,6 @@ export default function ImportExportEditPage() {
               </select>
             </div>
             
-            <div className="flex gap-2 items-end">
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  품목 <span className="text-red-500">*</span> <span className="text-xs text-blue-600">(선택한 거래처의 품목)</span>
-                </label>
-                <select
-                  name="productId"
-                  value={formData.productId}
-                  onChange={handleChange}
-                  required={items.length === 0}
-                  disabled={!formData.vendorId || items.length > 0}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 disabled:bg-gray-100"
-                >
-                  <option value="">{formData.vendorId ? '품목을 선택하세요' : '거래처를 먼저 선택하세요'}</option>
-                  {availableProducts
-                    .filter(p => 
-                      p.name.toLowerCase().includes(productSearch.toLowerCase())
-                    )
-                    .map((product) => (
-                      <option key={product.id} value={product.id}>
-                        [{product.code}] {product.name} ({product.unit})
-                      </option>
-                    ))}
-                </select>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowProductModal(true)}
-                className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-bold text-lg"
-                title="새 품목 등록"
-              >
-                +
-              </button>
-            </div>
-            
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 담당자
@@ -680,25 +646,6 @@ export default function ImportExportEditPage() {
                 ))}
               </select>
             </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                수량 <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                name="quantity"
-                value={formData.quantity}
-                onChange={handleChange}
-                required={items.length === 0}
-                step="0.01"
-                disabled={items.length > 0}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 disabled:bg-gray-100"
-              />
-              {items.length > 0 && (
-                <p className="text-xs text-gray-500 mt-1">품목 목록 사용 중</p>
-              )}
-            </div>
           </div>
         </div>
 
@@ -706,7 +653,7 @@ export default function ImportExportEditPage() {
         <div className="mb-8">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">품목 목록</h2>
           <p className="text-sm text-gray-600 mb-4">
-            여러 품목을 한 번에 등록하려면 아래에서 품목을 추가하세요. 품목 목록을 사용하면 위의 단일 품목 및 수량 입력은 무시됩니다.
+            아래에서 품목을 추가하세요. 최소 1개 이상의 품목이 필요합니다.
           </p>
           
           {/* 품목 추가 폼 */}
@@ -1182,6 +1129,59 @@ export default function ImportExportEditPage() {
             * PDF 파일을 선택한 후 &apos;PDF 업로드&apos; 버튼을 클릭하세요.
           </p>
         </div>
+
+        {/* 연결된 입고 내역 (LOT) */}
+        {recordData && recordData.type === 'IMPORT' && recordData.inventoryLots && recordData.inventoryLots.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">연결된 입고 내역 (LOT)</h2>
+            <div className="overflow-x-auto">
+              <table className="min-w-full bg-white border border-gray-200">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">LOT 코드</th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">품목</th>
+                    <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">입고 수량</th>
+                    <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">잔량</th>
+                    <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">단가</th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">보관 위치</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recordData.inventoryLots.map((lot) => (
+                    <tr key={lot.id} className="border-b">
+                      <td className="px-4 py-2 text-sm text-gray-900">
+                        {lot.lotCode || '-'}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-900">
+                        {lot.product ? `[${lot.product.code}] ${lot.product.name}` : '-'}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-900 text-right">
+                        {lot.quantityReceived.toLocaleString()}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-900 text-right">
+                        {lot.quantityRemaining.toLocaleString()}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-900 text-right">
+                        {formatCurrency(lot.unitCost)}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-900">
+                        {lot.storageLocation === 'WAREHOUSE' ? '창고' : '사무실'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-4">
+              <a
+                href="/warehouse/lots"
+                className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                입고관리에서 보기
+              </a>
+            </div>
+          </div>
+        )}
 
         {/* 버튼 */}
         <div className="flex justify-end gap-4">
