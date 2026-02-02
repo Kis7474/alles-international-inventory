@@ -409,7 +409,9 @@ export async function PUT(request: NextRequest) {
         // items가 변경되지 않았고 storageType만 변경된 경우 → storageLocation만 업데이트
         const itemsChanged = isMultiItem 
           ? checkItemsChanged(existingLots, items as ItemInput[])
-          : true // 단일 품목은 항상 재생성 (productId나 quantity 변경 가능성)
+          : (existingLots.length !== 1 || 
+             existingLots[0].productId !== parseInt(productId) || 
+             existingLots[0].quantityReceived !== parseFloat(quantity)) // 단일 품목도 최적화
         
         if (!itemsChanged) {
           // LOT의 보관위치만 변경
