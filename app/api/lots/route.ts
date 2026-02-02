@@ -47,6 +47,13 @@ export async function GET(request: NextRequest) {
             category: true,
           },
         },
+        importExport: {
+          select: {
+            id: true,
+            date: true,
+            type: true,
+          },
+        },
       },
       orderBy: [
         { receivedDate: 'desc' },

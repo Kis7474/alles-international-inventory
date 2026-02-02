@@ -31,6 +31,11 @@ interface Lot {
     name: string
     unit: string
   } | null
+  importExport: {
+    id: number
+    date: string
+    type: string
+  } | null
 }
 
 export default function LotsPage() {
@@ -585,6 +590,9 @@ export default function LotsPage() {
                 LOT 코드
               </th>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                수입/수출
+              </th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
                 입고일
               </th>
               <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">
@@ -620,6 +628,19 @@ export default function LotsPage() {
                 </td>
                 <td className="px-4 py-4">{lot.lotCode || '-'}</td>
                 <td className="px-4 py-4">
+                  {lot.importExport ? (
+                    <a
+                      href={`/import-export/${lot.importExport.id}`}
+                      className="text-blue-600 hover:text-blue-800 underline"
+                      title="수입/수출 상세 보기"
+                    >
+                      #{lot.importExport.id} ({lot.importExport.type === 'IMPORT' ? '수입' : '수출'})
+                    </a>
+                  ) : (
+                    <span className="text-gray-400">-</span>
+                  )}
+                </td>
+                <td className="px-4 py-4">
                   {new Date(lot.receivedDate).toLocaleDateString('ko-KR')}
                 </td>
                 <td className="px-4 py-4 text-right">
@@ -647,7 +668,7 @@ export default function LotsPage() {
             {lots.length === 0 && (
               <tr>
                 <td
-                  colSpan={9}
+                  colSpan={10}
                   className="px-6 py-8 text-center text-gray-500"
                 >
                   등록된 입고 내역이 없습니다.
