@@ -14,7 +14,7 @@ export async function POST(
       where: { id: importExportId },
       include: {
         items: true,
-        inventoryLot: true,
+        inventoryLots: true,
       },
     })
     
@@ -26,11 +26,11 @@ export async function POST(
     }
     
     // 이미 입고되었는지 확인
-    if (importExport.inventoryLot) {
+    if (importExport.inventoryLots && importExport.inventoryLots.length > 0) {
       return NextResponse.json({
         success: true,
         alreadyStored: true,
-        lotId: importExport.inventoryLot.id,
+        lotIds: importExport.inventoryLots.map(lot => lot.id),
         message: '이미 창고에 입고되었습니다.',
       })
     }
