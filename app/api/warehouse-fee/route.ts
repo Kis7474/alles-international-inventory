@@ -166,13 +166,13 @@ export async function PUT(request: NextRequest) {
       // 트랜잭션으로 배분 처리
       const result = await prisma.$transaction(async (tx) => {
         // 각 LOT에 창고료 배분
-        const distributions = await Promise.all(
+        await Promise.all(
           lots.map(async (lot) => {
             const ratio = lot.quantityRemaining / totalQuantity
             const distributedFee = fee.totalFee * ratio
             
             // 배분 내역 생성
-            const distribution = await tx.warehouseFeeDistribution.create({
+            await tx.warehouseFeeDistribution.create({
               data: {
                 warehouseFeeId: fee.id,
                 lotId: lot.id,
@@ -190,8 +190,6 @@ export async function PUT(request: NextRequest) {
                 },
               },
             })
-            
-            return distribution
           })
         )
         

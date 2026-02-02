@@ -55,9 +55,6 @@ export async function createLotsFromItems(
     // 품목별 외화 금액 (원화 환산)
     const itemGoodsAmountKrw = unitPrice * exchangeRate * quantity
     
-    // 품목별 부대비용 배분
-    const itemAdditionalCosts = additionalCostPerUnit * quantity
-    
     // 품목별 입고 단가 = (외화 단가 × 환율) + (부대비용 / 총 수량)
     const itemUnitCost = (unitPrice * exchangeRate) + additionalCostPerUnit
     
