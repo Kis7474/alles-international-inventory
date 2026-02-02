@@ -238,6 +238,38 @@ export default function CustomsTrackingPage() {
     }
   }
 
+  // 수동 연동 핸들러
+  const handleManualLink = async (id: string) => {
+    if (!confirm('이 통관 건을 수입 내역에 연동하시겠습니까?')) {
+      return
+    }
+
+    try {
+      const res = await fetch(`/api/customs/tracking/${id}/link`, {
+        method: 'POST',
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        alert(data.error || '연동 중 오류가 발생했습니다.')
+        return
+      }
+
+      alert(data.message || '수입 내역에 연동되었습니다.')
+      
+      // 연동 완료 후 수입/수출 페이지로 이동할지 물어보기
+      if (confirm('연동된 수입 내역을 수정하시겠습니까?')) {
+        window.location.href = `/import-export/${data.importId}`
+      } else {
+        await fetchTrackings()
+      }
+    } catch (error) {
+      console.error('Manual link failed:', error)
+      alert('연동 중 오류가 발생했습니다.')
+    }
+  }
+
   // 상세보기 열기
   const handleViewDetail = (tracking: CustomsTracking) => {
     setSelectedTracking(tracking)
@@ -660,6 +692,9 @@ export default function CustomsTrackingPage() {
                   <th className="w-24 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     진행상태
                   </th>
+                  <th className="w-24 px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    연동상태
+                  </th>
                   <th className="w-24 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     입항일
                   </th>
@@ -711,6 +746,22 @@ export default function CustomsTrackingPage() {
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
                       {getStatusBadge(tracking.status)}
+                    </td>
+                    <td className="px-4 py-4 text-center">
+                      {tracking.importId ? (
+                        <Link href={`/import-export/${tracking.importId}`} className="text-green-600 hover:underline text-sm">
+                          ✅ 연동됨
+                        </Link>
+                      ) : isCustomsCleared(tracking.status) ? (
+                        <button
+                          onClick={() => handleManualLink(tracking.id)}
+                          className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                        >
+                          수동 연동
+                        </button>
+                      ) : (
+                        <span className="text-gray-400 text-sm">대기중</span>
+                      )}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                       {tracking.arrivalDate

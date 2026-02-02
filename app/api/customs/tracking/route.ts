@@ -197,27 +197,22 @@ export async function POST(request: NextRequest) {
 }
 
 // 통관완료 시 자동으로 수입내역에 연동하는 함수
-async function autoLinkToImport(trackingId: string) {
+async function autoLinkToImport(trackingId: string): Promise<{ success: boolean; message: string; importId?: number }> {
   try {
     const tracking = await prisma.customsTracking.findUnique({
       where: { id: trackingId },
     })
     
     if (!tracking) {
-      console.error('Tracking not found:', trackingId)
-      return
+      return { success: false, message: '통관 정보를 찾을 수 없습니다.' }
     }
     
-    // 이미 연동되었으면 스킵
     if (tracking.importId) {
-      console.log('Already linked:', trackingId)
-      return
+      return { success: true, message: '이미 수입 내역에 연동되었습니다.', importId: tracking.importId }
     }
     
-    // 통관완료 상태 체크
     if (!isCustomsCleared(tracking.status)) {
-      console.log('Not cleared yet:', tracking.status)
-      return
+      return { success: false, message: `통관완료 상태가 아닙니다. (현재: ${tracking.status})` }
     }
     
     // 기본 거래처 찾기 (해외 매입 거래처 우선)
@@ -233,32 +228,37 @@ async function autoLinkToImport(trackingId: string) {
     }
     
     if (!vendor) {
-      console.error('No vendor found for auto-linking')
-      return
+      // 자동으로 기본 해외 매입 거래처 생성
+      vendor = await prisma.vendor.create({
+        data: {
+          code: 'DEFAULT_INTL_PURCHASE',
+          name: '기본 해외 매입처',
+          type: 'INTERNATIONAL_PURCHASE',
+          currency: 'USD',
+        },
+      })
     }
     
     // 메모 생성
     const memo = generateImportLinkMemo(tracking)
     
-    // 수입내역 생성 - 최소 정보만 채움
+    // 수입내역 생성
     const importRecord = await prisma.importExport.create({
       data: {
         type: 'IMPORT',
         date: tracking.clearanceDate || tracking.arrivalDate || new Date(),
         vendorId: vendor.id,
         currency: 'USD',
-        exchangeRate: 1300, // 기본값 - 사용자가 수정 필요
-        foreignAmount: 0, // 사용자가 직접 입력
-        krwAmount: 0, // 사용자가 직접 입력
+        exchangeRate: 1300,
+        foreignAmount: 0,
+        krwAmount: 0,
+        storageType: 'WAREHOUSE',  // 기본값으로 창고입고 설정
         memo,
-        // PDF 정보 연동
         pdfFileName: tracking.pdfFileName,
         pdfFilePath: tracking.pdfFilePath,
         pdfUploadedAt: tracking.pdfUploadedAt,
       },
     })
-    
-    console.log('Import record created:', importRecord.id)
     
     // 추적 데이터에 연동 ID 저장
     await prisma.customsTracking.update({
@@ -269,8 +269,9 @@ async function autoLinkToImport(trackingId: string) {
       },
     })
     
-    console.log('Tracking linked to import:', trackingId, '->', importRecord.id)
+    return { success: true, message: '수입 내역에 자동 연동되었습니다.', importId: importRecord.id }
   } catch (error) {
     console.error('Error auto-linking to import:', error)
+    return { success: false, message: `연동 중 오류: ${error instanceof Error ? error.message : '알 수 없는 오류'}` }
   }
 }

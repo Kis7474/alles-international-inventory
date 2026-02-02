@@ -806,7 +806,12 @@ export default function ImportExportNewPage() {
         {/* 보관 옵션 */}
         {formData.type === 'IMPORT' && (
           <div className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">보관 옵션</h2>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">
+              보관 방식 <span className="text-red-500">*</span>
+            </h2>
+            <p className="text-xs text-gray-500 mb-3">
+              창고 입고 또는 사무실 보관 선택 시 자동으로 입고 관리에 등록됩니다.
+            </p>
             <div className="space-y-2">
               <label className="flex items-center cursor-pointer">
                 <input
@@ -815,6 +820,7 @@ export default function ImportExportNewPage() {
                   value="WAREHOUSE"
                   checked={formData.storageType === 'WAREHOUSE'}
                   onChange={handleChange}
+                  required
                   className="mr-2"
                 />
                 <span className="text-gray-700">🏭 창고 입고 (입고 관리에 자동 등록)</span>
@@ -826,6 +832,7 @@ export default function ImportExportNewPage() {
                   value="OFFICE"
                   checked={formData.storageType === 'OFFICE'}
                   onChange={handleChange}
+                  required
                   className="mr-2"
                 />
                 <span className="text-gray-700">🏢 사무실 보관 (입고 관리에 자동 등록)</span>
@@ -837,6 +844,7 @@ export default function ImportExportNewPage() {
                   value="DIRECT_DELIVERY"
                   checked={formData.storageType === 'DIRECT_DELIVERY'}
                   onChange={handleChange}
+                  required
                   className="mr-2"
                 />
                 <span className="text-gray-700">🚚 직접 배송 (입고 안 함)</span>
@@ -845,12 +853,13 @@ export default function ImportExportNewPage() {
                 <input
                   type="radio"
                   name="storageType"
-                  value=""
-                  checked={formData.storageType === ''}
+                  value="OTHER"
+                  checked={formData.storageType === 'OTHER'}
                   onChange={handleChange}
+                  required
                   className="mr-2"
                 />
-                <span className="text-gray-700">선택 안함</span>
+                <span className="text-gray-700">📦 기타</span>
               </label>
             </div>
           </div>
