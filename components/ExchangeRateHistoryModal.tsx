@@ -31,7 +31,7 @@ export default function ExchangeRateHistoryModal({ isOpen, onClose, currency, on
       fetchRates()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, currency, page])
+  }, [isOpen, currency, page, startDate, endDate])
   
   const fetchRates = async () => {
     setLoading(true)
@@ -57,14 +57,14 @@ export default function ExchangeRateHistoryModal({ isOpen, onClose, currency, on
   
   const handleSearch = () => {
     setPage(1)
-    fetchRates()
+    // fetchRates will be called by useEffect when startDate/endDate change
   }
   
   const handleReset = () => {
     setStartDate('')
     setEndDate('')
     setPage(1)
-    fetchRates()
+    // fetchRates will be called by useEffect when startDate/endDate change
   }
   
   const handleDelete = async (id: number) => {
