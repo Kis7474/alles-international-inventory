@@ -175,6 +175,10 @@ export default function ImportExportEditPage() {
     totalAmount: 0,
   })
   
+  // Exchange rate source tracking
+  const [exchangeRateSource, setExchangeRateSource] = useState<string>('')
+  const [exchangeRateMessage, setExchangeRateMessage] = useState<string>('')
+  
   // Constants
   const KRW_EXCHANGE_RATE = '1'
   
@@ -292,6 +296,8 @@ export default function ImportExportEditPage() {
   const fetchExchangeRate = async (currency: string, date: string) => {
     if (!currency || currency === 'KRW' || !date) {
       setFormData(prev => ({ ...prev, exchangeRate: KRW_EXCHANGE_RATE }))
+      setExchangeRateSource('')
+      setExchangeRateMessage('')
       return
     }
     
@@ -302,13 +308,18 @@ export default function ImportExportEditPage() {
       
       if (result.success && result.rate) {
         setFormData(prev => ({ ...prev, exchangeRate: result.rate.toString() }))
+        setExchangeRateSource(result.source || '')
+        setExchangeRateMessage(result.message || '')
       } else {
         // 환율 데이터가 없으면 경고 표시
         console.warn(`${currency} 환율 데이터를 가져올 수 없습니다:`, result.error)
-        // 기존 환율 유지
+        setExchangeRateSource('')
+        setExchangeRateMessage(result.error || '')
       }
     } catch (error) {
       console.error('Error fetching exchange rate:', error)
+      setExchangeRateSource('')
+      setExchangeRateMessage('환율 조회 중 오류가 발생했습니다.')
     }
   }
   
@@ -861,7 +872,21 @@ export default function ImportExportEditPage() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 환율 (원/외화) <span className="text-red-500">*</span>
-                <span className="text-xs text-blue-600 ml-2">(자동 조회됨)</span>
+                {exchangeRateSource && (
+                  <span className={`text-xs ml-2 ${
+                    exchangeRateSource === 'database' || exchangeRateSource === 'KOREAEXIM' ? 'text-green-600' :
+                    exchangeRateSource === 'auto_fetch' ? 'text-blue-600' :
+                    'text-orange-600'
+                  }`}>
+                    ({exchangeRateSource === 'database' ? '✓ DB 조회' : 
+                      exchangeRateSource === 'KOREAEXIM' ? '✓ 자동 조회' :
+                      exchangeRateSource === 'auto_fetch' ? '✓ 자동 조회' : 
+                      '⚠ 기본값'})
+                  </span>
+                )}
+                {!exchangeRateSource && (
+                  <span className="text-xs text-blue-600 ml-2">(자동 조회됨)</span>
+                )}
               </label>
               <input
                 type="number"
@@ -873,9 +898,14 @@ export default function ImportExportEditPage() {
                 placeholder="환율이 자동으로 입력됩니다"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
               />
-              <p className="text-xs text-gray-500 mt-1">
-                환율 데이터가 없으면 환율 관리에서 먼저 등록하세요.
-              </p>
+              {exchangeRateMessage && (
+                <p className="text-xs text-orange-600 mt-1">{exchangeRateMessage}</p>
+              )}
+              {!exchangeRateMessage && (
+                <p className="text-xs text-gray-500 mt-1">
+                  환율 데이터가 없으면 환율 관리에서 먼저 등록하세요.
+                </p>
+              )}
             </div>
             
             <div>

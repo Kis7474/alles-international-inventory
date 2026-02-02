@@ -276,7 +276,7 @@ async function autoLinkToImport(trackingId: string): Promise<{ success: boolean;
         foreignAmount: 0,
         krwAmount: 0,
         dutyAmount,    // 통관 정보의 관세 반영
-        storageType: 'WAREHOUSE',  // 기본값으로 창고입고 설정
+        storageType: null,  // 사용자가 직접 선택하도록 null로 설정
         memo,
         pdfFileName: tracking.pdfFileName,
         pdfFilePath: tracking.pdfFilePath,

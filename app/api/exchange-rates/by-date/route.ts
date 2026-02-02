@@ -166,10 +166,23 @@ export async function GET(request: NextRequest) {
     }
     
     if (!apiKey) {
+      // API 키가 없으면 기본값 반환
+      const defaultRates: Record<string, number> = {
+        'USD': 1350,
+        'EUR': 1450,
+        'JPY': 9,
+        'CNY': 185,
+        'GBP': 1700,
+      }
+      
       return NextResponse.json({ 
-        success: false,
-        error: 'API 키가 설정되지 않았습니다. 환율 설정에서 한국수출입은행 API 키를 입력해주세요.' 
-      }, { status: 400 })
+        success: true,
+        rate: defaultRates[currency] || 1,
+        currency,
+        date,
+        source: 'default',
+        message: '환율 데이터가 없어 기본값을 사용합니다. 환율 관리에서 정확한 환율을 등록해주세요.'
+      })
     }
     
     // 한국수출입은행 API 호출 (최대 7일 전까지 시도)
@@ -202,10 +215,23 @@ export async function GET(request: NextRequest) {
     }
     
     if (!data || !Array.isArray(data) || data.length === 0) {
+      // API에서 데이터를 가져오지 못한 경우 기본값 반환
+      const defaultRates: Record<string, number> = {
+        'USD': 1350,
+        'EUR': 1450,
+        'JPY': 9,
+        'CNY': 185,
+        'GBP': 1700,
+      }
+      
       return NextResponse.json({ 
-        success: false,
-        error: '환율 데이터를 가져올 수 없습니다. 주말이나 공휴일이거나 API 서버에 문제가 있을 수 있습니다.' 
-      }, { status: 404 })
+        success: true,
+        rate: defaultRates[currency] || 1,
+        currency,
+        date,
+        source: 'default',
+        message: '환율 데이터를 가져올 수 없어 기본값을 사용합니다. 환율 관리에서 정확한 환율을 등록해주세요.'
+      })
     }
     
     // 요청한 통화 찾기
@@ -213,19 +239,45 @@ export async function GET(request: NextRequest) {
     const rateData = data.find(item => item.cur_unit === targetCurrency)
     
     if (!rateData) {
+      // 해당 통화를 찾지 못한 경우 기본값 반환
+      const defaultRates: Record<string, number> = {
+        'USD': 1350,
+        'EUR': 1450,
+        'JPY': 9,
+        'CNY': 185,
+        'GBP': 1700,
+      }
+      
       return NextResponse.json({ 
-        success: false,
-        error: `${currency} 통화의 환율 정보를 찾을 수 없습니다.` 
-      }, { status: 404 })
+        success: true,
+        rate: defaultRates[currency] || 1,
+        currency,
+        date,
+        source: 'default',
+        message: `${currency} 통화의 환율 정보를 찾을 수 없어 기본값을 사용합니다.`
+      })
     }
     
     // 매매기준율 파싱 (쉼표 제거)
     const rate = parseFloat(rateData.deal_bas_r?.replace(/,/g, '')) || 0
     if (rate <= 0) {
+      // 유효하지 않은 환율인 경우 기본값 반환
+      const defaultRates: Record<string, number> = {
+        'USD': 1350,
+        'EUR': 1450,
+        'JPY': 9,
+        'CNY': 185,
+        'GBP': 1700,
+      }
+      
       return NextResponse.json({ 
-        success: false,
-        error: '유효한 환율 정보를 찾을 수 없습니다.' 
-      }, { status: 404 })
+        success: true,
+        rate: defaultRates[currency] || 1,
+        currency,
+        date,
+        source: 'default',
+        message: '유효한 환율 정보를 찾을 수 없어 기본값을 사용합니다.'
+      })
     }
     
     // JPY는 100엔 기준이므로 1엔 단위로 변환
@@ -261,6 +313,30 @@ export async function GET(request: NextRequest) {
     
   } catch (error) {
     console.error('Exchange rate by-date error:', error)
+    
+    // 에러 발생 시에도 기본값 제공
+    const searchParams = request.nextUrl.searchParams
+    const currency = searchParams.get('currency')
+    const date = searchParams.get('date')
+    
+    if (currency && date) {
+      const defaultRates: Record<string, number> = {
+        'USD': 1350,
+        'EUR': 1450,
+        'JPY': 9,
+        'CNY': 185,
+        'GBP': 1700,
+      }
+      
+      return NextResponse.json({ 
+        success: true,
+        rate: defaultRates[currency] || 1,
+        currency,
+        date,
+        source: 'default',
+        message: '환율 조회 중 오류가 발생하여 기본값을 사용합니다. 환율 관리에서 정확한 환율을 등록해주세요.'
+      })
+    }
     
     // 에러 메시지를 더 자세히 제공
     let errorMessage = '환율 조회 중 오류가 발생했습니다.'

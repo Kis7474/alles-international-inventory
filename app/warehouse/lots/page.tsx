@@ -57,6 +57,19 @@ export default function LotsPage() {
   const [filterProductId, setFilterProductId] = useState('')
   const [filterImportExportId, setFilterImportExportId] = useState('')
   
+  // 대시보드 상태
+  const [dashboardData, setDashboardData] = useState({
+    totalLots: 0,
+    warehouseLots: 0,
+    officeLots: 0,
+    totalQuantity: 0,
+    warehouseQuantity: 0,
+    officeQuantity: 0,
+    totalValue: 0,
+    warehouseValue: 0,
+    officeValue: 0,
+  })
+  
   const [formData, setFormData] = useState({
     productId: '',
     lotCode: '',
@@ -90,12 +103,31 @@ export default function LotsPage() {
       ])
       setLots(lotsData)
       setProducts(productsData)
+      calculateDashboard(lotsData)
     } catch (error) {
       console.error('Error fetching data:', error)
       alert('데이터 조회 중 오류가 발생했습니다.')
     } finally {
       setLoading(false)
     }
+  }
+  
+  // 대시보드 데이터 계산 함수
+  const calculateDashboard = (lotsData: Lot[]) => {
+    const warehouseLots = lotsData.filter(l => l.storageLocation === 'WAREHOUSE')
+    const officeLots = lotsData.filter(l => l.storageLocation === 'OFFICE')
+    
+    setDashboardData({
+      totalLots: lotsData.length,
+      warehouseLots: warehouseLots.length,
+      officeLots: officeLots.length,
+      totalQuantity: lotsData.reduce((sum, l) => sum + l.quantityRemaining, 0),
+      warehouseQuantity: warehouseLots.reduce((sum, l) => sum + l.quantityRemaining, 0),
+      officeQuantity: officeLots.reduce((sum, l) => sum + l.quantityRemaining, 0),
+      totalValue: lotsData.reduce((sum, l) => sum + (l.quantityRemaining * l.unitCost), 0),
+      warehouseValue: warehouseLots.reduce((sum, l) => sum + (l.quantityRemaining * l.unitCost), 0),
+      officeValue: officeLots.reduce((sum, l) => sum + (l.quantityRemaining * l.unitCost), 0),
+    })
   }
 
   const handleFilter = async () => {
@@ -111,6 +143,7 @@ export default function LotsPage() {
       const res = await fetch(`/api/lots?${params.toString()}`)
       const data = await res.json()
       setLots(data)
+      calculateDashboard(data)
       setSelectedIds([])
       setSelectAll(false)
     } catch (error) {
@@ -302,6 +335,66 @@ export default function LotsPage() {
           >
             + 입고 등록
           </button>
+        </div>
+      </div>
+
+      {/* 대시보드 카드 */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        {/* 전체 현황 */}
+        <div className="bg-white p-6 rounded-lg shadow border-l-4 border-blue-500">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-500">📊 전체</p>
+              <p className="text-2xl font-bold text-gray-900">{dashboardData.totalLots}개 LOT</p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-gray-500">잔량</p>
+              <p className="text-lg font-semibold text-gray-700">{formatNumber(dashboardData.totalQuantity, 0)}</p>
+            </div>
+          </div>
+          <div className="mt-2 pt-2 border-t">
+            <p className="text-sm text-gray-600">
+              총 가치: <span className="font-semibold">₩{formatNumber(dashboardData.totalValue, 0)}</span>
+            </p>
+          </div>
+        </div>
+        
+        {/* 창고 현황 */}
+        <div className="bg-white p-6 rounded-lg shadow border-l-4 border-green-500">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-500">🏭 창고</p>
+              <p className="text-2xl font-bold text-gray-900">{dashboardData.warehouseLots}개 LOT</p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-gray-500">잔량</p>
+              <p className="text-lg font-semibold text-gray-700">{formatNumber(dashboardData.warehouseQuantity, 0)}</p>
+            </div>
+          </div>
+          <div className="mt-2 pt-2 border-t">
+            <p className="text-sm text-gray-600">
+              총 가치: <span className="font-semibold">₩{formatNumber(dashboardData.warehouseValue, 0)}</span>
+            </p>
+          </div>
+        </div>
+        
+        {/* 사무실 현황 */}
+        <div className="bg-white p-6 rounded-lg shadow border-l-4 border-purple-500">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-500">🏢 사무실</p>
+              <p className="text-2xl font-bold text-gray-900">{dashboardData.officeLots}개 LOT</p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-gray-500">잔량</p>
+              <p className="text-lg font-semibold text-gray-700">{formatNumber(dashboardData.officeQuantity, 0)}</p>
+            </div>
+          </div>
+          <div className="mt-2 pt-2 border-t">
+            <p className="text-sm text-gray-600">
+              총 가치: <span className="font-semibold">₩{formatNumber(dashboardData.officeValue, 0)}</span>
+            </p>
+          </div>
         </div>
       </div>
 
