@@ -24,6 +24,7 @@ interface Lot {
   domesticFreight: number
   otherCost: number
   unitCost: number
+  storageLocation: string
   product: Product | null
   item: {
     id: number
@@ -240,6 +241,29 @@ export default function LotsPage() {
     } catch (error) {
       console.error('Error bulk deleting lots:', error)
       alert('삭제 중 오류가 발생했습니다.')
+    }
+  }
+
+  const handleStorageLocationChange = async (lotId: number, newLocation: string) => {
+    try {
+      const res = await fetch('/api/lots', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: lotId, storageLocation: newLocation })
+      })
+      
+      if (!res.ok) {
+        const error = await res.json()
+        alert(error.error || '보관위치 변경 중 오류가 발생했습니다.')
+        return
+      }
+      
+      // 목록 새로고침
+      handleFilter()
+      alert('보관위치가 변경되었습니다.')
+    } catch (error) {
+      console.error('Error changing storage location:', error)
+      alert('보관위치 변경 중 오류가 발생했습니다.')
     }
   }
 
@@ -609,6 +633,9 @@ export default function LotsPage() {
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
                 입고일
               </th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                보관위치
+              </th>
               <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">
                 입고수량
               </th>
@@ -654,6 +681,16 @@ export default function LotsPage() {
                 <td className="px-4 py-4">
                   {new Date(lot.receivedDate).toLocaleDateString('ko-KR')}
                 </td>
+                <td className="px-4 py-4">
+                  <select
+                    value={lot.storageLocation || 'WAREHOUSE'}
+                    onChange={(e) => handleStorageLocationChange(lot.id, e.target.value)}
+                    className="px-2 py-1 border rounded text-sm"
+                  >
+                    <option value="WAREHOUSE">🏭 창고</option>
+                    <option value="OFFICE">🏢 사무실</option>
+                  </select>
+                </td>
                 <td className="px-4 py-4 text-right">
                   {formatNumber(lot.quantityReceived, 0)}
                 </td>
@@ -679,7 +716,7 @@ export default function LotsPage() {
             {lots.length === 0 && (
               <tr>
                 <td
-                  colSpan={9}
+                  colSpan={10}
                   className="px-6 py-8 text-center text-gray-500"
                 >
                   등록된 입고 내역이 없습니다.
