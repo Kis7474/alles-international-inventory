@@ -153,37 +153,6 @@ export default function ExchangeRatesPage() {
     }
   }
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('정말 삭제하시겠습니까?')) return
-
-    try {
-      const res = await fetch(`/api/exchange-rates?id=${id}`, {
-        method: 'DELETE',
-      })
-
-      if (res.ok) {
-        await fetchRates()
-      } else {
-        const error = await res.json()
-        alert(error.error || '삭제 중 오류가 발생했습니다.')
-      }
-    } catch (error) {
-      console.error('Error deleting rate:', error)
-      alert('삭제 중 오류가 발생했습니다.')
-    }
-  }
-
-  const handleEdit = (rate: ExchangeRate) => {
-    setEditingRate(rate)
-    setFormData({
-      date: new Date(rate.date).toISOString().split('T')[0],
-      currency: rate.currency,
-      rate: rate.rate.toString(),
-      source: rate.source || '',
-    })
-    setShowModal(true)
-  }
-
   const handleCloseModal = () => {
     setShowModal(false)
     setEditingRate(null)
@@ -280,44 +249,15 @@ export default function ExchangeRatesPage() {
               </div>
               
               <div className="border-t pt-4">
-                <div className="flex justify-between items-center mb-2">
-                  <div className="text-sm font-medium text-gray-700">이력</div>
-                  <button
-                    onClick={() => {
-                      setSelectedCurrency(currency)
-                      setShowHistoryModal(true)
-                    }}
-                    className="text-sm text-blue-600 hover:text-blue-900"
-                  >
-                    전체 이력 보기 →
-                  </button>
-                </div>
-                <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {currencyRates.slice(0, 3).map((rate) => (
-                    <div key={rate.id} className="flex justify-between items-center text-sm">
-                      <span className="text-gray-600">
-                        {new Date(rate.date).toLocaleDateString('ko-KR')}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-gray-900">
-                          ₩{rate.rate.toLocaleString('ko-KR')}
-                        </span>
-                        <button
-                          onClick={() => handleEdit(rate)}
-                          className="text-blue-600 hover:text-blue-900"
-                        >
-                          수정
-                        </button>
-                        <button
-                          onClick={() => handleDelete(rate.id)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          삭제
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <button
+                  onClick={() => {
+                    setSelectedCurrency(currency)
+                    setShowHistoryModal(true)
+                  }}
+                  className="text-sm text-blue-600 hover:text-blue-900"
+                >
+                  전체 이력 보기 →
+                </button>
               </div>
             </div>
           )
