@@ -160,9 +160,11 @@ export async function PUT(request: NextRequest) {
         )
       }
       
-      // 배분 기준일 (해당 월의 마지막 날 자정 또는 현재 날짜 자정)
+      // 배분 기준일 계산
+      // new Date(year, month, 0)은 해당 월의 마지막 날을 반환
+      // 예: new Date(2026, 1, 0) = 2026년 1월 31일 00:00:00
       const [year, month] = yearMonth.split('-').map(Number)
-      const distributionDate = new Date(year, month, 0) // 해당 월의 마지막 날 00:00:00
+      const distributionDate = new Date(year, month, 0) // 해당 월의 마지막 날 자정
       const now = new Date()
       const baseDate = distributionDate > now ? now : distributionDate
       
@@ -177,6 +179,7 @@ export async function PUT(request: NextRequest) {
         })
         .map(lot => {
           const receivedDate = new Date(lot.receivedDate)
+          // 최소 1일로 계산 (당일 입고도 1일 창고료 부과)
           const storageDays = Math.max(1, Math.ceil((baseDate.getTime() - receivedDate.getTime()) / MILLISECONDS_PER_DAY))
           const weight = lot.quantityRemaining * storageDays
           return { ...lot, storageDays, weight }
@@ -184,7 +187,7 @@ export async function PUT(request: NextRequest) {
       
       if (lotsWithWeight.length === 0) {
         return NextResponse.json(
-          { error: '배분 대상 LOT이 없습니다. (배분 기준일 이전에 입고된 LOT 없음)' },
+          { error: '배분 대상 LOT이 없습니다. (배분 기준일 이전 또는 당일에 입고된 LOT 없음)' },
           { status: 400 }
         )
       }
