@@ -160,15 +160,47 @@ export async function PUT(request: NextRequest) {
         )
       }
       
-      // 총 잔량 계산
-      const totalQuantity = lots.reduce((sum, lot) => sum + lot.quantityRemaining, 0)
+      // 배분 기준일 계산
+      // new Date(year, month, 0)은 해당 월의 마지막 날을 반환
+      // 예: new Date(2026, 1, 0) = 2026년 1월 31일 00:00:00
+      const [year, month] = yearMonth.split('-').map(Number)
+      const distributionDate = new Date(year, month, 0) // 해당 월의 마지막 날 자정
+      const now = new Date()
+      const baseDate = distributionDate > now ? now : distributionDate
+      
+      // 밀리초를 일수로 변환하기 위한 상수
+      const MILLISECONDS_PER_DAY = 1000 * 60 * 60 * 24
+      
+      // 배분 기준일 이전에 입고된 LOT만 필터링하고 가중치 계산 (잔량 × 보관일수)
+      const lotsWithWeight = lots
+        .filter(lot => {
+          const receivedDate = new Date(lot.receivedDate)
+          return receivedDate <= baseDate
+        })
+        .map(lot => {
+          const receivedDate = new Date(lot.receivedDate)
+          // 최소 1일로 계산 (당일 입고도 1일 창고료 부과)
+          const storageDays = Math.max(1, Math.ceil((baseDate.getTime() - receivedDate.getTime()) / MILLISECONDS_PER_DAY))
+          const weight = lot.quantityRemaining * storageDays
+          return { ...lot, storageDays, weight }
+        })
+      
+      if (lotsWithWeight.length === 0) {
+        return NextResponse.json(
+          { error: '배분 대상 LOT이 없습니다. (배분 기준일 이전 또는 당일에 입고된 LOT 없음)' },
+          { status: 400 }
+        )
+      }
+      
+      // 전체 가중치 합계
+      const totalWeight = lotsWithWeight.reduce((sum, lot) => sum + lot.weight, 0)
       
       // 트랜잭션으로 배분 처리
       const result = await prisma.$transaction(async (tx) => {
         // 각 LOT에 창고료 배분
         await Promise.all(
-          lots.map(async (lot) => {
-            const ratio = lot.quantityRemaining / totalQuantity
+          lotsWithWeight.map(async (lot) => {
+            const ratio = lot.weight / totalWeight
             const distributedFee = fee.totalFee * ratio
             
             // 배분 내역 생성
