@@ -120,7 +120,6 @@ export default function ImportExportEditPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [salespeople, setSalespeople] = useState<Salesperson[]>([])
-  const [categories, setCategories] = useState<Category[]>([])
   
   // Filtered products based on vendor
   const [availableProducts, setAvailableProducts] = useState<Product[]>([])
@@ -152,11 +151,8 @@ export default function ImportExportEditPage() {
     type: 'IMPORT',
     vendorId: '',
     salespersonId: '',
-    categoryId: '',
     currency: 'USD',
     exchangeRate: '',
-    foreignAmount: '',
-    goodsAmount: '',
     dutyAmount: '',
     shippingCost: '',
     otherCost: '',
@@ -199,10 +195,7 @@ export default function ImportExportEditPage() {
     calculateValues()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    formData.type,
     formData.exchangeRate,
-    formData.foreignAmount,
-    formData.goodsAmount,
     formData.dutyAmount,
     formData.shippingCost,
     formData.otherCost,
@@ -221,18 +214,16 @@ export default function ImportExportEditPage() {
 
   const fetchMasterData = async () => {
     try {
-      const [productsRes, vendorsRes, salespeopleRes, categoriesRes] = await Promise.all([
+      const [productsRes, vendorsRes, salespeopleRes] = await Promise.all([
         fetch('/api/products'),
         fetch('/api/vendors'),
         fetch('/api/salesperson'),
-        fetch('/api/categories'),
       ])
       
-      const [productsData, vendorsData, salespeopleData, categoriesData] = await Promise.all([
+      const [productsData, vendorsData, salespeopleData] = await Promise.all([
         productsRes.json(),
         vendorsRes.json(),
         salespeopleRes.json(),
-        categoriesRes.json(),
       ])
       
       setProducts(productsData)
@@ -240,7 +231,6 @@ export default function ImportExportEditPage() {
         v.type === 'INTERNATIONAL_PURCHASE' || v.type === 'INTERNATIONAL_SALES'
       ))
       setSalespeople(salespeopleData)
-      setCategories(categoriesData)
     } catch (error) {
       console.error('Error fetching master data:', error)
       alert('마스터 데이터 로딩 중 오류가 발생했습니다.')
@@ -262,11 +252,8 @@ export default function ImportExportEditPage() {
         type: data.type,
         vendorId: data.vendor.id.toString(),
         salespersonId: data.salesperson?.id.toString() || '',
-        categoryId: data.category?.id.toString() || '',
         currency: data.currency,
         exchangeRate: data.exchangeRate.toString(),
-        foreignAmount: data.foreignAmount.toString(),
-        goodsAmount: data.goodsAmount?.toString() || '',
         dutyAmount: data.dutyAmount?.toString() || '',
         shippingCost: data.shippingCost?.toString() || '',
         otherCost: data.otherCost?.toString() || '',
@@ -324,13 +311,23 @@ export default function ImportExportEditPage() {
   }
   
   const calculateValues = () => {
-    // Calculate total quantity from items
-    const quantity = items.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0)
-    const exchangeRate = parseFloat(formData.exchangeRate) || 0
-    // Use totalForeignAmount for items, otherwise use formData.foreignAmount
-    const foreignAmount = items.length > 0 ? totalForeignAmount : (parseFloat(formData.foreignAmount) || 0)
+    // Get items to calculate from either new items or existing items from recordData
+    const itemsToCalculate = items.length > 0 ? items : (recordData?.items || []).map(item => ({
+      productId: item.productId.toString(),
+      quantity: item.quantity.toString(),
+      unitPrice: item.unitPrice.toString()
+    }))
     
-    const goodsAmount = parseFloat(formData.goodsAmount) || 0
+    // Calculate total quantity from items
+    const quantity = itemsToCalculate.reduce((sum, item) => sum + (parseFloat(item.quantity) || 0), 0)
+    const exchangeRate = parseFloat(formData.exchangeRate) || 0
+    
+    // Calculate foreign amount from items
+    const foreignAmount = itemsToCalculate.reduce((sum, item) => {
+      const itemAmount = (parseFloat(item.quantity) || 0) * (parseFloat(item.unitPrice) || 0)
+      return sum + itemAmount
+    }, 0)
+    
     const dutyAmount = parseFloat(formData.dutyAmount) || 0
     const shippingCost = parseFloat(formData.shippingCost) || 0
     const otherCost = parseFloat(formData.otherCost) || 0
@@ -338,13 +335,12 @@ export default function ImportExportEditPage() {
     // 원화 환산 금액
     const krwAmount = foreignAmount * exchangeRate
     
-    // 수입 원가 계산 (수입인 경우에만)
+    // 수입 원가 계산 - Use krwAmount as the goods amount
     let totalCost = 0
     let unitCost = 0
     
-    if (formData.type === 'IMPORT' && goodsAmount > 0) {
-      const krwGoodsAmount = goodsAmount * exchangeRate
-      totalCost = krwGoodsAmount + dutyAmount + shippingCost + otherCost
+    if (krwAmount > 0) {
+      totalCost = krwAmount + dutyAmount + shippingCost + otherCost
       unitCost = quantity > 0 ? totalCost / quantity : 0
     }
     
@@ -440,16 +436,22 @@ export default function ImportExportEditPage() {
       return
     }
     
-    // Check if using items - must have at least one
-    if (items.length === 0) {
-      alert('품목 목록에 최소 1개 이상의 항목을 추가해주세요.')
+    // Allow using existing items from recordData if no new items are added
+    const itemsToSubmit = items.length > 0 ? items : (recordData?.items || []).map(item => ({
+      productId: item.productId.toString(),
+      quantity: item.quantity.toString(),
+      unitPrice: item.unitPrice.toString()
+    }))
+    
+    if (itemsToSubmit.length === 0) {
+      alert('품목 목록이 없습니다. 품목을 추가해주세요.')
       return
     }
     
     setSubmitting(true)
     
     try {
-      const payload = { ...formData, items, id: parseInt(id) }
+      const payload = { ...formData, items: itemsToSubmit, id: parseInt(id) }
       
       const res = await fetch('/api/import-export', {
         method: 'PUT',
@@ -557,7 +559,7 @@ export default function ImportExportEditPage() {
   return (
     <div>
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">수입/수출 수정</h1>
+        <h1 className="text-3xl font-bold text-gray-900">수입 수정</h1>
         <button
           onClick={() => router.push('/import-export')}
           className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
@@ -570,7 +572,7 @@ export default function ImportExportEditPage() {
         {/* 기본 정보 */}
         <div className="mb-8">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">기본 정보</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 거래일자 <span className="text-red-500">*</span>
@@ -583,22 +585,6 @@ export default function ImportExportEditPage() {
                 required
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
               />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                거래유형 <span className="text-red-500">*</span>
-              </label>
-              <select
-                name="type"
-                value={formData.type}
-                onChange={handleChange}
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-              >
-                <option value="IMPORT">수입</option>
-                <option value="EXPORT">수출</option>
-              </select>
             </div>
             
             <div>
@@ -635,25 +621,6 @@ export default function ImportExportEditPage() {
                 {salespeople.map((salesperson) => (
                   <option key={salesperson.id} value={salesperson.id}>
                     [{salesperson.code}] {salesperson.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                카테고리
-              </label>
-              <select
-                name="categoryId"
-                value={formData.categoryId}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-              >
-                <option value="">선택하세요</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.nameKo} ({category.name})
                   </option>
                 ))}
               </select>
@@ -741,6 +708,7 @@ export default function ImportExportEditPage() {
                     <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">수량</th>
                     <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">단가</th>
                     <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">금액</th>
+                    <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">원화 금액</th>
                     <th className="px-4 py-2 text-center text-sm font-medium text-gray-700 border-b">삭제</th>
                   </tr>
                 </thead>
@@ -748,21 +716,24 @@ export default function ImportExportEditPage() {
                   {items.map((item, index) => {
                     const product = products.find(p => p.id === parseInt(item.productId))
                     const amount = (parseFloat(item.quantity) || 0) * (parseFloat(item.unitPrice) || 0)
-                    const qty = parseFloat(item.quantity) || 0
-                    const price = parseFloat(item.unitPrice) || 0
+                    const krwAmount = amount * (parseFloat(formData.exchangeRate) || 0)
+                    const currencySymbol = formData.currency === 'USD' ? '$' : formData.currency === 'EUR' ? '€' : formData.currency === 'JPY' ? '¥' : formData.currency === 'CNY' ? '¥' : '₩'
                     return (
                       <tr key={index} className="border-b">
                         <td className="px-4 py-2 text-sm text-gray-900">
                           {product ? `[${product.code}] ${product.name}` : '-'}
                         </td>
                         <td className="px-4 py-2 text-sm text-gray-900 text-right">
-                          {qty.toLocaleString()}
+                          {parseFloat(item.quantity).toLocaleString()}
                         </td>
                         <td className="px-4 py-2 text-sm text-gray-900 text-right">
-                          {price.toLocaleString()}
+                          {currencySymbol}{parseFloat(item.unitPrice).toFixed(2)}
                         </td>
                         <td className="px-4 py-2 text-sm text-gray-900 text-right font-semibold">
-                          {amount.toLocaleString()}
+                          {currencySymbol}{amount.toFixed(2)}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-900 text-right font-semibold">
+                          ₩{Math.round(krwAmount).toLocaleString()}
                         </td>
                         <td className="px-4 py-2 text-center">
                           <button
@@ -778,10 +749,22 @@ export default function ImportExportEditPage() {
                   })}
                   <tr className="bg-gray-50 font-semibold">
                     <td colSpan={3} className="px-4 py-2 text-sm text-gray-900 text-right">
-                      총 외화 금액:
+                      합계:
                     </td>
                     <td className="px-4 py-2 text-sm text-gray-900 text-right">
-                      {totalForeignAmount.toLocaleString()} {formData.currency}
+                      {(() => {
+                        const currencySymbol = formData.currency === 'USD' ? '$' : formData.currency === 'EUR' ? '€' : formData.currency === 'JPY' ? '¥' : formData.currency === 'CNY' ? '¥' : '₩'
+                        return `${currencySymbol}${totalForeignAmount.toFixed(2)}`
+                      })()}
+                    </td>
+                    <td className="px-4 py-2 text-sm text-gray-900 text-right">
+                      {(() => {
+                        const totalKrw = items.reduce((sum, item) => {
+                          const amount = (parseFloat(item.quantity) || 0) * (parseFloat(item.unitPrice) || 0)
+                          return sum + (amount * (parseFloat(formData.exchangeRate) || 0))
+                        }, 0)
+                        return `₩${Math.round(totalKrw).toLocaleString()}`
+                      })()}
                     </td>
                     <td></td>
                   </tr>
@@ -791,7 +774,7 @@ export default function ImportExportEditPage() {
           )}
         </div>
 
-        {/* 품목 목록 (다중 품목인 경우 표시) */}
+        {/* 등록된 품목 목록 (기존 데이터 표시) */}
         {recordData && recordData.items && recordData.items.length > 0 && (
           <div className="mb-8">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">등록된 품목 목록</h2>
@@ -801,47 +784,53 @@ export default function ImportExportEditPage() {
                   <tr className="bg-gray-50">
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">품목</th>
                     <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">수량</th>
-                    <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">단가 ({recordData.currency})</th>
-                    <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">금액 ({recordData.currency})</th>
+                    <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">단가</th>
+                    <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">금액</th>
                     <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">원화 금액</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {recordData.items.map((item) => (
-                    <tr key={item.id} className="border-b">
-                      <td className="px-4 py-2 text-sm text-gray-900">
-                        [{item.product.code}] {item.product.name}
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-900 text-right">
-                        {item.quantity.toLocaleString()} {item.product.unit}
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-900 text-right">
-                        {formatCurrency(item.unitPrice)}
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-900 text-right font-semibold">
-                        {formatCurrency(item.amount)}
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-900 text-right">
-                        {formatCurrency(item.krwAmount)}
-                      </td>
-                    </tr>
-                  ))}
+                  {recordData.items.map((item) => {
+                    const currencySymbol = recordData.currency === 'USD' ? '$' : recordData.currency === 'EUR' ? '€' : recordData.currency === 'JPY' ? '¥' : recordData.currency === 'CNY' ? '¥' : '₩'
+                    return (
+                      <tr key={item.id} className="border-b">
+                        <td className="px-4 py-2 text-sm text-gray-900">
+                          [{item.product.code}] {item.product.name}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-900 text-right">
+                          {item.quantity.toLocaleString()} {item.product.unit}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-900 text-right">
+                          {currencySymbol}{item.unitPrice.toFixed(2)}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-900 text-right font-semibold">
+                          {currencySymbol}{item.amount.toFixed(2)}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-900 text-right font-semibold">
+                          ₩{Math.round(item.krwAmount).toLocaleString()}
+                        </td>
+                      </tr>
+                    )
+                  })}
                   <tr className="bg-gray-50 font-semibold">
                     <td colSpan={3} className="px-4 py-2 text-sm text-gray-900 text-right">
                       합계:
                     </td>
                     <td className="px-4 py-2 text-sm text-gray-900 text-right">
-                      {formatCurrency(recordData.items.reduce((sum, item) => sum + item.amount, 0))} {recordData.currency}
+                      {(() => {
+                        const currencySymbol = recordData.currency === 'USD' ? '$' : recordData.currency === 'EUR' ? '€' : recordData.currency === 'JPY' ? '¥' : recordData.currency === 'CNY' ? '¥' : '₩'
+                        return `${currencySymbol}${recordData.items.reduce((sum, item) => sum + item.amount, 0).toFixed(2)}`
+                      })()}
                     </td>
                     <td className="px-4 py-2 text-sm text-gray-900 text-right">
-                      {formatCurrency(recordData.items.reduce((sum, item) => sum + item.krwAmount, 0))}
+                      ₩{Math.round(recordData.items.reduce((sum, item) => sum + item.krwAmount, 0)).toLocaleString()}
                     </td>
                   </tr>
                 </tbody>
               </table>
             </div>
             <p className="text-xs text-gray-500 mt-2">
-              * 다중 품목으로 등록된 거래입니다. 수정이 필요한 경우 해당 거래를 삭제하고 다시 등록하세요.
+              * 기존 등록된 품목 목록입니다. 다른 필드만 수정하려면 품목 추가 없이 저장하면 기존 품목이 유지됩니다.
             </p>
           </div>
         )}
@@ -910,19 +899,23 @@ export default function ImportExportEditPage() {
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                외화 금액 <span className="text-red-500">*</span>
-                {items.length > 0 && <span className="text-xs text-green-600 ml-2">(품목 목록에서 자동 계산됨)</span>}
+                외화 금액 <span className="text-xs text-green-600">(품목 합계로 자동 계산)</span>
               </label>
-              <input
-                type="number"
-                name="foreignAmount"
-                value={items.length > 0 ? totalForeignAmount : formData.foreignAmount}
-                onChange={handleChange}
-                required={items.length === 0}
-                step="0.01"
-                disabled={items.length > 0}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 disabled:bg-gray-100"
-              />
+              <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-900 font-semibold">
+                {(() => {
+                  const itemsToCalculate = items.length > 0 ? items : (recordData?.items || []).map(item => ({
+                    productId: item.productId.toString(),
+                    quantity: item.quantity.toString(),
+                    unitPrice: item.unitPrice.toString()
+                  }))
+                  const total = itemsToCalculate.reduce((sum, item) => {
+                    const amount = (parseFloat(item.quantity) || 0) * (parseFloat(item.unitPrice) || 0)
+                    return sum + amount
+                  }, 0)
+                  const currencySymbol = formData.currency === 'USD' ? '$' : formData.currency === 'EUR' ? '€' : formData.currency === 'JPY' ? '¥' : formData.currency === 'CNY' ? '¥' : '₩'
+                  return total > 0 ? `${currencySymbol}${total.toFixed(2)}` : '-'
+                })()}
+              </div>
             </div>
           </div>
           
@@ -933,133 +926,122 @@ export default function ImportExportEditPage() {
           </div>
         </div>
 
-        {/* 수입 원가 구성 (수입인 경우에만) */}
-        {formData.type === 'IMPORT' && (
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">수입 원가 구성</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  물품대금 (외화)
-                </label>
-                <input
-                  type="number"
-                  name="goodsAmount"
-                  value={formData.goodsAmount}
-                  onChange={handleChange}
-                  step="0.01"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  관세 (원화)
-                </label>
-                <input
-                  type="number"
-                  name="dutyAmount"
-                  value={formData.dutyAmount}
-                  onChange={handleChange}
-                  step="0.01"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  운송료 (원화)
-                </label>
-                <input
-                  type="number"
-                  name="shippingCost"
-                  value={formData.shippingCost}
-                  onChange={handleChange}
-                  step="0.01"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  기타비용 (원화)
-                </label>
-                <input
-                  type="number"
-                  name="otherCost"
-                  value={formData.otherCost}
-                  onChange={handleChange}
-                  step="0.01"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                />
-              </div>
+        {/* 수입 원가 구성 */}
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">수입 원가 구성</h2>
+          
+          {/* Display total goods amount in KRW (auto-calculated from items) */}
+          <div className="mb-4 p-4 bg-blue-50 rounded-md">
+            <div className="text-sm text-gray-700">
+              총 물품대금(원화): <span className="font-semibold text-blue-600">
+                {formatCurrency(calculated.krwAmount)} <span className="text-xs text-gray-600">(품목 합계 × 환율)</span>
+              </span>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                관세 (원화)
+              </label>
+              <input
+                type="number"
+                name="dutyAmount"
+                value={formData.dutyAmount}
+                onChange={handleChange}
+                step="0.01"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+              />
             </div>
             
-            {calculated.totalCost > 0 && (
-              <div className="mt-4 p-4 bg-green-50 rounded-md space-y-2">
-                <div className="text-sm text-gray-700">
-                  총 원가: <span className="font-semibold text-green-600">{formatCurrency(calculated.totalCost)}</span>
-                </div>
-                <div className="text-sm text-gray-700">
-                  단위 원가: <span className="font-semibold text-green-600">{formatCurrency(calculated.unitCost)}</span>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* 보관 옵션 */}
-        {formData.type === 'IMPORT' && (
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">보관 옵션</h2>
-            <div className="space-y-2">
-              <label className="flex items-center cursor-pointer">
-                <input
-                  type="radio"
-                  name="storageType"
-                  value="WAREHOUSE"
-                  checked={formData.storageType === 'WAREHOUSE'}
-                  onChange={handleChange}
-                  className="mr-2"
-                />
-                <span className="text-gray-700">🏭 창고 입고 (입고 관리에 자동 등록)</span>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                운송료 (원화)
               </label>
-              <label className="flex items-center cursor-pointer">
-                <input
-                  type="radio"
-                  name="storageType"
-                  value="OFFICE"
-                  checked={formData.storageType === 'OFFICE'}
-                  onChange={handleChange}
-                  className="mr-2"
-                />
-                <span className="text-gray-700">🏢 사무실 보관 (입고 관리에 자동 등록)</span>
+              <input
+                type="number"
+                name="shippingCost"
+                value={formData.shippingCost}
+                onChange={handleChange}
+                step="0.01"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                기타비용 (원화)
               </label>
-              <label className="flex items-center cursor-pointer">
-                <input
-                  type="radio"
-                  name="storageType"
-                  value="DIRECT_DELIVERY"
-                  checked={formData.storageType === 'DIRECT_DELIVERY'}
-                  onChange={handleChange}
-                  className="mr-2"
-                />
-                <span className="text-gray-700">🚚 직접 배송 (입고 안 함)</span>
-              </label>
-              <label className="flex items-center cursor-pointer">
-                <input
-                  type="radio"
-                  name="storageType"
-                  value=""
-                  checked={formData.storageType === ''}
-                  onChange={handleChange}
-                  className="mr-2"
-                />
-                <span className="text-gray-700">선택 안함</span>
-              </label>
+              <input
+                type="number"
+                name="otherCost"
+                value={formData.otherCost}
+                onChange={handleChange}
+                step="0.01"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+              />
             </div>
           </div>
-        )}
+          
+          {calculated.totalCost > 0 && (
+            <div className="mt-4 p-4 bg-green-50 rounded-md">
+              <div className="text-sm text-gray-700">
+                총 원가: <span className="font-semibold text-green-600">{formatCurrency(calculated.totalCost)}</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 보관 옵션 */}
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">보관 옵션</h2>
+          <div className="space-y-2">
+            <label className="flex items-center cursor-pointer">
+              <input
+                type="radio"
+                name="storageType"
+                value="WAREHOUSE"
+                checked={formData.storageType === 'WAREHOUSE'}
+                onChange={handleChange}
+                className="mr-2"
+              />
+              <span className="text-gray-700">🏭 창고 입고 (입고 관리에 자동 등록)</span>
+            </label>
+            <label className="flex items-center cursor-pointer">
+              <input
+                type="radio"
+                name="storageType"
+                value="OFFICE"
+                checked={formData.storageType === 'OFFICE'}
+                onChange={handleChange}
+                className="mr-2"
+              />
+              <span className="text-gray-700">🏢 사무실 보관 (입고 관리에 자동 등록)</span>
+            </label>
+            <label className="flex items-center cursor-pointer">
+              <input
+                type="radio"
+                name="storageType"
+                value="DIRECT_DELIVERY"
+                checked={formData.storageType === 'DIRECT_DELIVERY'}
+                onChange={handleChange}
+                className="mr-2"
+              />
+              <span className="text-gray-700">🚚 직접 배송 (입고 안 함)</span>
+            </label>
+            <label className="flex items-center cursor-pointer">
+              <input
+                type="radio"
+                name="storageType"
+                value=""
+                checked={formData.storageType === ''}
+                onChange={handleChange}
+                className="mr-2"
+              />
+              <span className="text-gray-700">선택 안함</span>
+            </label>
+          </div>
+        </div>
 
         {/* 부가세 */}
         <div className="mb-8">
