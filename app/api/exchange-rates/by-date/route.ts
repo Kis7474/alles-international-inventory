@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import https from 'https'
+import { isProxyEnabled, fetchThroughProxy } from '@/lib/api-proxy'
 
 // 한국수출입은행 환율 API
 const KOREAEXIM_API_URL = 'https://www.koreaexim.go.kr/site/program/financial/exchangeJSON'
@@ -20,7 +21,32 @@ interface KoreaEximRate {
 }
 
 // 리다이렉트를 처리하는 HTTPS 요청 함수 (15초 타임아웃 적용)
-function fetchWithSSLBypass(url: string, maxRedirects = 5): Promise<KoreaEximRate[]> {
+// 프록시 서버가 설정되어 있으면 프록시를 통해 요청, 아니면 직접 요청 (폴백)
+async function fetchWithSSLBypass(url: string, maxRedirects = 5): Promise<KoreaEximRate[]> {
+  // 프록시 서버를 통한 요청 (Railway 프록시)
+  if (isProxyEnabled()) {
+    try {
+      const data = await fetchThroughProxy(url)
+      const parsed = JSON.parse(data)
+      
+      // API 응답 검증
+      if (!Array.isArray(parsed)) {
+        throw new Error('API 응답 형식이 올바르지 않습니다')
+      }
+      
+      return parsed
+    } catch (error) {
+      if (error instanceof Error) {
+        if (error.message.includes('JSON')) {
+          throw new Error('JSON 파싱 실패 - API 응답이 올바른 JSON 형식이 아닙니다')
+        }
+        throw error
+      }
+      throw new Error('프록시를 통한 API 호출 중 오류가 발생했습니다')
+    }
+  }
+  
+  // 폴백: 기존 직접 호출 방식 (프록시 미설정 시)
   return new Promise((resolve, reject) => {
     if (maxRedirects <= 0) {
       reject(new Error('너무 많은 리다이렉트'))
