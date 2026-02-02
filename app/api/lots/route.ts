@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get('endDate')
     const productId = searchParams.get('productId')
     const storageLocation = searchParams.get('storageLocation')
+    const importExportId = searchParams.get('importExportId')
 
     interface WhereClause {
       receivedDate?: {
@@ -18,6 +19,7 @@ export async function GET(request: NextRequest) {
       }
       productId?: number
       storageLocation?: string
+      importExportId?: number
     }
 
     const where: WhereClause = {}
@@ -37,6 +39,9 @@ export async function GET(request: NextRequest) {
     if (storageLocation) {
       where.storageLocation = storageLocation
     }
+    if (importExportId) {
+      where.importExportId = parseInt(importExportId)
+    }
 
     const lots = await prisma.inventoryLot.findMany({
       where,
@@ -45,6 +50,13 @@ export async function GET(request: NextRequest) {
         product: {
           include: {
             category: true,
+          },
+        },
+        importExport: {
+          select: {
+            id: true,
+            date: true,
+            type: true,
           },
         },
       },

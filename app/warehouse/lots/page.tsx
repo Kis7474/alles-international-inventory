@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { formatNumber, calculateUnitCost } from '@/lib/utils'
 
 interface Product {
@@ -31,9 +32,15 @@ interface Lot {
     name: string
     unit: string
   } | null
+  importExport: {
+    id: number
+    date: string
+    type: string
+  } | null
 }
 
 export default function LotsPage() {
+  const searchParams = useSearchParams()
   const [lots, setLots] = useState<Lot[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
@@ -49,6 +56,7 @@ export default function LotsPage() {
   const [filterStartDate, setFilterStartDate] = useState('')
   const [filterEndDate, setFilterEndDate] = useState('')
   const [filterProductId, setFilterProductId] = useState('')
+  const [filterImportExportId, setFilterImportExportId] = useState(searchParams?.get('importExportId') || '')
   
   const [formData, setFormData] = useState({
     productId: '',
@@ -69,7 +77,7 @@ export default function LotsPage() {
   useEffect(() => {
     handleFilter()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab])
+  }, [activeTab, filterImportExportId])
 
   const fetchData = async () => {
     try {
@@ -98,6 +106,7 @@ export default function LotsPage() {
       if (filterStartDate) params.append('startDate', filterStartDate)
       if (filterEndDate) params.append('endDate', filterEndDate)
       if (filterProductId) params.append('productId', filterProductId)
+      if (filterImportExportId) params.append('importExportId', filterImportExportId)
       if (activeTab !== 'ALL') params.append('storageLocation', activeTab)
 
       const res = await fetch(`/api/lots?${params.toString()}`)
@@ -585,6 +594,9 @@ export default function LotsPage() {
                 LOT 코드
               </th>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                수입/수출
+              </th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
                 입고일
               </th>
               <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">
@@ -619,6 +631,16 @@ export default function LotsPage() {
                   {lot.product ? `[${lot.product.code}] ${lot.product.name}` : lot.item ? `[${lot.item.code}] ${lot.item.name}` : '-'}
                 </td>
                 <td className="px-4 py-4">{lot.lotCode || '-'}</td>
+                <td className="px-4 py-4">
+                  {lot.importExport ? (
+                    <a
+                      href={`/import-export/${lot.importExport.id}`}
+                      className="text-blue-600 hover:text-blue-800 underline"
+                    >
+                      #{lot.importExport.id} ({lot.importExport.type === 'IMPORT' ? '수입' : '수출'})
+                    </a>
+                  ) : '-'}
+                </td>
                 <td className="px-4 py-4">
                   {new Date(lot.receivedDate).toLocaleDateString('ko-KR')}
                 </td>
