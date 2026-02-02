@@ -1174,7 +1174,7 @@ export default function ImportExportEditPage() {
             </div>
             <div className="mt-4">
               <a
-                href="/warehouse/lots"
+                href={`/warehouse/lots?importExportId=${id}`}
                 className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 입고관리에서 보기
