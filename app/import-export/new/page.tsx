@@ -31,13 +31,6 @@ interface Salesperson {
   name: string
 }
 
-interface Category {
-  id: number
-  code: string
-  name: string
-  nameKo: string
-}
-
 export default function ImportExportNewPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)

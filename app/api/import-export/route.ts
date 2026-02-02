@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { calculateImportCost } from '@/lib/utils'
 import { 
   createLotsFromItems, 
   createSingleLot, 
@@ -105,12 +104,10 @@ export async function POST(request: NextRequest) {
       productId,
       vendorId,
       salespersonId,
-      categoryId,
       quantity,
       currency,
       exchangeRate,
       foreignAmount,
-      goodsAmount,
       dutyAmount,
       shippingCost,
       otherCost,
@@ -276,12 +273,10 @@ export async function PUT(request: NextRequest) {
       productId,
       vendorId,
       salespersonId,
-      categoryId,
       quantity,
       currency,
       exchangeRate,
       foreignAmount,
-      goodsAmount,
       dutyAmount,
       shippingCost,
       otherCost,
