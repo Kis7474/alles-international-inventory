@@ -72,7 +72,9 @@ export default function LotsPage() {
   })
   
   const [formData, setFormData] = useState({
+    sourceType: 'IMPORT', // 'IMPORT' | 'DOMESTIC' | 'MANUAL'
     productId: '',
+    vendorName: '', // For domestic purchase
     lotCode: '',
     receivedDate: new Date().toISOString().split('T')[0],
     quantityReceived: '',
@@ -81,6 +83,7 @@ export default function LotsPage() {
     domesticFreight: '',
     otherCost: '0',
     storageLocation: 'WAREHOUSE',
+    memo: '',
   })
 
   useEffect(() => {
@@ -159,6 +162,7 @@ export default function LotsPage() {
     e.preventDefault()
 
     const data = {
+      sourceType: formData.sourceType,
       productId: parseInt(formData.productId),
       lotCode: formData.lotCode || null,
       receivedDate: formData.receivedDate,
@@ -187,7 +191,9 @@ export default function LotsPage() {
       alert('입고가 등록되었습니다.')
       setShowForm(false)
       setFormData({
+        sourceType: 'IMPORT',
         productId: '',
+        vendorName: '',
         lotCode: '',
         receivedDate: new Date().toISOString().split('T')[0],
         quantityReceived: '',
@@ -196,6 +202,7 @@ export default function LotsPage() {
         domesticFreight: '',
         otherCost: '0',
         storageLocation: 'WAREHOUSE',
+        memo: '',
       })
       fetchData()
       setSelectedIds([])
@@ -521,6 +528,60 @@ export default function LotsPage() {
         <div className="bg-white p-6 rounded-lg shadow mb-6">
           <h2 className="text-xl font-bold mb-4">입고 등록</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* 입고 유형 선택 */}
+            <div className="bg-gray-50 p-4 rounded-lg mb-4">
+              <label className="block text-sm font-medium mb-2">
+                입고 유형 *
+              </label>
+              <div className="flex gap-4">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    value="IMPORT"
+                    checked={formData.sourceType === 'IMPORT'}
+                    onChange={(e) =>
+                      setFormData({ ...formData, sourceType: e.target.value as any })
+                    }
+                    className="mr-2"
+                  />
+                  <span>수입 연동 (자동)</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    value="DOMESTIC"
+                    checked={formData.sourceType === 'DOMESTIC'}
+                    onChange={(e) =>
+                      setFormData({ 
+                        ...formData, 
+                        sourceType: e.target.value as any,
+                        storageLocation: 'OFFICE', // 국내매입은 사무실 보관 기본
+                      })
+                    }
+                    className="mr-2"
+                  />
+                  <span>국내 매입</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    value="MANUAL"
+                    checked={formData.sourceType === 'MANUAL'}
+                    onChange={(e) =>
+                      setFormData({ ...formData, sourceType: e.target.value as any })
+                    }
+                    className="mr-2"
+                  />
+                  <span>기타</span>
+                </label>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                {formData.sourceType === 'IMPORT' && '• 수입 내역과 연동하여 자동으로 입고됩니다.'}
+                {formData.sourceType === 'DOMESTIC' && '• 국내 매입은 사무실 보관이 기본입니다. (창고료 X)'}
+                {formData.sourceType === 'MANUAL' && '• 직접 입력하여 등록합니다.'}
+              </p>
+            </div>
+            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">

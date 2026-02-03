@@ -30,6 +30,11 @@ interface OutboundDetail {
   quantity: number
   unitCost: number
   totalCost: number
+  warehouseFee: number
+  warehouseFeeApplied: number
+  shippingCostPerUnit: number
+  finalUnitCost: number
+  finalTotalCost: number
 }
 
 interface OutboundHistory {
@@ -69,6 +74,9 @@ export default function OutboundPage() {
   const [outboundResult, setOutboundResult] = useState<{
     totalQuantity: number
     totalCost: number
+    totalWarehouseFee: number
+    totalShippingCost: number
+    totalFinalCost: number
     details: OutboundDetail[]
   } | null>(null)
   const [formData, setFormData] = useState({
@@ -76,6 +84,7 @@ export default function OutboundPage() {
     itemId: '',
     quantity: '',
     outboundDate: new Date().toISOString().split('T')[0],
+    shippingCost: '0', // 출고 운송비
   })
 
   useEffect(() => {
@@ -159,6 +168,7 @@ export default function OutboundPage() {
       itemId: formData.itemId ? parseInt(formData.itemId) : null,
       quantity: parseFloat(formData.quantity),
       outboundDate: formData.outboundDate,
+      shippingCost: parseFloat(formData.shippingCost) || 0,
     }
 
     try {
@@ -183,6 +193,7 @@ export default function OutboundPage() {
         itemId: '',
         quantity: '',
         outboundDate: new Date().toISOString().split('T')[0],
+        shippingCost: '0',
       })
       fetchData()
       setSelectedIds([])
@@ -393,7 +404,7 @@ export default function OutboundPage() {
               </div>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">
                   품목 * <span className="text-xs text-blue-600">
@@ -454,6 +465,23 @@ export default function OutboundPage() {
                   className="w-full px-3 py-3 md:py-2 border rounded-lg"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  출고 운송비 (₩)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.shippingCost}
+                  onChange={(e) =>
+                    setFormData({ ...formData, shippingCost: e.target.value })
+                  }
+                  className="w-full px-3 py-3 md:py-2 border rounded-lg"
+                  placeholder="0"
+                />
+                <p className="text-xs text-gray-500 mt-1">선택사항</p>
+              </div>
             </div>
 
             <div className="bg-yellow-50 p-4 rounded-lg">
@@ -496,7 +524,7 @@ export default function OutboundPage() {
             </button>
           </div>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
                 <div className="text-sm text-gray-600">총 출고 수량</div>
                 <div className="text-2xl font-bold">
@@ -504,9 +532,30 @@ export default function OutboundPage() {
                 </div>
               </div>
               <div>
-                <div className="text-sm text-gray-600">총 출고 원가</div>
-                <div className="text-2xl font-bold text-green-600">
+                <div className="text-sm text-gray-600">입고 원가</div>
+                <div className="text-xl font-bold">
                   ₩{formatNumber(outboundResult.totalCost, 0)}
+                </div>
+              </div>
+              <div>
+                <div className="text-sm text-gray-600">창고료</div>
+                <div className="text-xl font-bold text-orange-600">
+                  ₩{formatNumber(outboundResult.totalWarehouseFee || 0, 0)}
+                </div>
+              </div>
+              <div>
+                <div className="text-sm text-gray-600">운송비</div>
+                <div className="text-xl font-bold text-blue-600">
+                  ₩{formatNumber(outboundResult.totalShippingCost || 0, 0)}
+                </div>
+              </div>
+            </div>
+            
+            <div className="border-t pt-4">
+              <div className="flex justify-between items-center">
+                <div className="text-lg font-medium text-gray-700">최종 출고 원가</div>
+                <div className="text-3xl font-bold text-green-600">
+                  ₩{formatNumber(outboundResult.totalFinalCost || outboundResult.totalCost, 0)}
                 </div>
               </div>
             </div>
@@ -519,7 +568,7 @@ export default function OutboundPage() {
                     key={index}
                     className="bg-white p-3 rounded border border-green-200"
                   >
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-start mb-2">
                       <div>
                         <span className="font-medium">
                           LOT: {detail.lotCode || `#${detail.lotId}`}
@@ -532,14 +581,34 @@ export default function OutboundPage() {
                           )
                         </span>
                       </div>
-                      <div className="text-right">
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <span className="text-gray-600">수량:</span> {formatNumber(detail.quantity, 0)}
+                      </div>
+                      <div>
+                        <span className="text-gray-600">입고단가:</span> ₩{formatNumber(detail.unitCost, 2)}
+                      </div>
+                      <div>
+                        <span className="text-gray-600">입고원가:</span> ₩{formatNumber(detail.totalCost, 0)}
+                      </div>
+                      {detail.warehouseFeeApplied > 0 && (
                         <div>
-                          수량: {formatNumber(detail.quantity, 0)} × 단가: ₩
-                          {formatNumber(detail.unitCost, 2)}
+                          <span className="text-gray-600">창고료:</span> ₩{formatNumber(detail.warehouseFeeApplied, 0)}
                         </div>
-                        <div className="font-bold text-green-600">
-                          = ₩{formatNumber(detail.totalCost, 0)}
+                      )}
+                      {detail.shippingCostPerUnit > 0 && (
+                        <div>
+                          <span className="text-gray-600">운송비:</span> ₩{formatNumber(detail.shippingCostPerUnit * detail.quantity, 0)}
                         </div>
+                      )}
+                      <div className="col-span-2 pt-2 border-t">
+                        <span className="text-gray-700 font-medium">최종 원가:</span>{' '}
+                        <span className="text-green-600 font-bold">₩{formatNumber(detail.finalTotalCost || detail.totalCost, 0)}</span>
+                        {' '}
+                        <span className="text-gray-500 text-xs">
+                          (단가: ₩{formatNumber(detail.finalUnitCost || detail.unitCost, 2)})
+                        </span>
                       </div>
                     </div>
                   </div>

@@ -7,6 +7,8 @@ interface WarehouseFeeDistribution {
   id: number
   distributedFee: number
   quantityAtTime: number
+  valueAtTime: number
+  valueRatio: number
   lot: {
     id: number
     lotCode: string | null
@@ -23,6 +25,8 @@ interface WarehouseFee {
   yearMonth: string
   totalFee: number
   distributedAt: string | null
+  totalValueAtDistribution: number | null
+  lotCountAtDistribution: number | null
   memo: string | null
   createdAt: string
   updatedAt: string
@@ -379,6 +383,16 @@ export default function WarehouseFeesPage() {
                       {selectedFee.distributedAt ? new Date(selectedFee.distributedAt).toLocaleString('ko-KR') : '-'}
                     </span>
                   </p>
+                  {selectedFee.totalValueAtDistribution && (
+                    <p className="text-sm text-gray-600">
+                      배분 시점 총 재고가치: <span className="font-semibold text-gray-900">₩{formatNumber(selectedFee.totalValueAtDistribution, 0)}</span>
+                    </p>
+                  )}
+                  {selectedFee.lotCountAtDistribution && (
+                    <p className="text-sm text-gray-600">
+                      배분 시점 LOT 수: <span className="font-semibold text-gray-900">{selectedFee.lotCountAtDistribution}개</span>
+                    </p>
+                  )}
                   {selectedFee.memo && (
                     <p className="text-sm text-gray-600">
                       메모: <span className="font-semibold text-gray-900">{selectedFee.memo}</span>
@@ -392,21 +406,28 @@ export default function WarehouseFeesPage() {
                         <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">LOT 코드</th>
                         <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">품목</th>
                         <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">배분잔량</th>
-                        <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">배분비율</th>
+                        <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">단가</th>
+                        <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">가치</th>
+                        <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">가치비율</th>
                         <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">배분 창고료</th>
                       </tr>
                     </thead>
                     <tbody>
                       {selectedFee.distributions.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                          <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
                             배분 내역이 없습니다.
                           </td>
                         </tr>
                       ) : (
                         selectedFee.distributions.map((dist) => {
-                          const totalQuantity = selectedFee.distributions.reduce((sum, d) => sum + d.quantityAtTime, 0)
-                          const ratio = (dist.quantityAtTime / totalQuantity) * 100
+                          // valueRatio가 있으면 사용, 없으면 계산
+                          const ratio = dist.valueRatio || 0
+                          // valueAtTime이 있으면 사용, 없으면 계산
+                          const value = dist.valueAtTime || 0
+                          // 단가 계산
+                          const unitCost = dist.quantityAtTime > 0 ? value / dist.quantityAtTime : 0
+                          
                           return (
                             <tr key={dist.id} className="border-b hover:bg-gray-50">
                               <td className="px-4 py-2 text-sm text-gray-900">{dist.lot.lotCode || '-'}</td>
@@ -415,6 +436,12 @@ export default function WarehouseFeesPage() {
                               </td>
                               <td className="px-4 py-2 text-sm text-gray-900 text-right">
                                 {formatNumber(dist.quantityAtTime, 0)} {dist.lot.product?.unit || ''}
+                              </td>
+                              <td className="px-4 py-2 text-sm text-gray-900 text-right">
+                                ₩{formatNumber(unitCost, 0)}
+                              </td>
+                              <td className="px-4 py-2 text-sm text-gray-900 text-right">
+                                ₩{formatNumber(value, 0)}
                               </td>
                               <td className="px-4 py-2 text-sm text-gray-900 text-right">
                                 {ratio.toFixed(1)}%
@@ -431,6 +458,10 @@ export default function WarehouseFeesPage() {
                           <td colSpan={2} className="px-4 py-2 text-sm text-gray-900 text-right">합계:</td>
                           <td className="px-4 py-2 text-sm text-gray-900 text-right">
                             {formatNumber(selectedFee.distributions.reduce((sum, d) => sum + d.quantityAtTime, 0), 0)}
+                          </td>
+                          <td className="px-4 py-2 text-sm text-gray-900 text-right">-</td>
+                          <td className="px-4 py-2 text-sm text-gray-900 text-right">
+                            ₩{formatNumber(selectedFee.distributions.reduce((sum, d) => sum + (d.valueAtTime || 0), 0), 0)}
                           </td>
                           <td className="px-4 py-2 text-sm text-gray-900 text-right">100%</td>
                           <td className="px-4 py-2 text-sm text-gray-900 text-right">
