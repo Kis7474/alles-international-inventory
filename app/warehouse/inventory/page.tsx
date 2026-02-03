@@ -319,7 +319,7 @@ export default function InventoryPage() {
                   <tbody className="divide-y divide-gray-200">
                     {selectedItem.lots.map((lot) => {
                       const currentUnitCost = lot.quantityRemaining > 0 
-                        ? (lot.unitCost * lot.quantityRemaining + lot.accumulatedWarehouseFee) / lot.quantityRemaining
+                        ? lot.unitCost + (lot.accumulatedWarehouseFee / lot.quantityRemaining)
                         : lot.unitCost
                       return (
                         <tr key={lot.id} className="hover:bg-gray-50">
@@ -355,7 +355,7 @@ export default function InventoryPage() {
               <div className="md:hidden divide-y divide-gray-200">
                 {selectedItem.lots.map((lot) => {
                   const currentUnitCost = lot.quantityRemaining > 0 
-                    ? (lot.unitCost * lot.quantityRemaining + lot.accumulatedWarehouseFee) / lot.quantityRemaining
+                    ? lot.unitCost + (lot.accumulatedWarehouseFee / lot.quantityRemaining)
                     : lot.unitCost
                   return (
                     <div key={lot.id} className="p-4">

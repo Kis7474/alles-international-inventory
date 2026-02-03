@@ -77,8 +77,8 @@ export async function POST(request: NextRequest) {
         const totalCost = quantityToDeduct * lot.unitCost
         
         // 창고료 계산 (LOT의 누적 창고료를 비례 배분)
-        const warehouseFeeRatio = lot.quantityReceived > 0 
-          ? quantityToDeduct / lot.quantityReceived 
+        const warehouseFeeRatio = lot.quantityRemaining > 0 
+          ? quantityToDeduct / lot.quantityRemaining 
           : 0
         const warehouseFeeApplied = lot.accumulatedWarehouseFee * warehouseFeeRatio
         

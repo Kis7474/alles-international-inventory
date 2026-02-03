@@ -540,7 +540,7 @@ export default function LotsPage() {
                     value="IMPORT"
                     checked={formData.sourceType === 'IMPORT'}
                     onChange={(e) =>
-                      setFormData({ ...formData, sourceType: e.target.value as any })
+                      setFormData({ ...formData, sourceType: e.target.value as 'IMPORT' | 'DOMESTIC' | 'MANUAL' })
                     }
                     className="mr-2"
                   />
@@ -554,7 +554,7 @@ export default function LotsPage() {
                     onChange={(e) =>
                       setFormData({ 
                         ...formData, 
-                        sourceType: e.target.value as any,
+                        sourceType: e.target.value as 'IMPORT' | 'DOMESTIC' | 'MANUAL',
                         storageLocation: 'OFFICE', // 국내매입은 사무실 보관 기본
                       })
                     }
@@ -568,7 +568,7 @@ export default function LotsPage() {
                     value="MANUAL"
                     checked={formData.sourceType === 'MANUAL'}
                     onChange={(e) =>
-                      setFormData({ ...formData, sourceType: e.target.value as any })
+                      setFormData({ ...formData, sourceType: e.target.value as 'IMPORT' | 'DOMESTIC' | 'MANUAL' })
                     }
                     className="mr-2"
                   />
