@@ -46,10 +46,17 @@ export async function GET(request: NextRequest) {
         (sum, lot) => sum + lot.quantityRemaining,
         0
       )
+      
+      // 누적 창고료 합계
+      const totalAccumulatedWarehouseFee = lots.reduce(
+        (sum, lot) => sum + lot.accumulatedWarehouseFee,
+        0
+      )
 
       return NextResponse.json({
         productId: parseInt(productId),
         totalQuantity,
+        totalAccumulatedWarehouseFee,
         lots,
       })
     } else if (itemId) {
@@ -106,31 +113,6 @@ export async function GET(request: NextRequest) {
         },
       })
 
-      // 창고료 조회 (현재 월)
-      const now = new Date()
-      const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-      
-      const storageExpenses = await prisma.storageExpense.findMany({
-        where: {
-          period: currentPeriod,
-        },
-      })
-      
-      // 총 창고료
-      const totalStorageExpense = storageExpenses.reduce(
-        (sum, expense) => sum + expense.amount, 0
-      )
-      
-      // 총 재고 수량 계산
-      const totalInventoryQuantity = inventory.reduce(
-        (sum, item) => sum + (item._sum.quantityRemaining || 0), 0
-      )
-      
-      // 단위당 창고료 배분 (수량 기준)
-      const storageExpensePerUnit = totalInventoryQuantity > 0 
-        ? totalStorageExpense / totalInventoryQuantity 
-        : 0
-
       const result = await Promise.all(
         inventory.map(async (item) => {
           const product = await prisma.product.findUnique({
@@ -166,17 +148,22 @@ export async function GET(request: NextRequest) {
             0
           )
           
+          // 누적 창고료 합계
+          const totalAccumulatedWarehouseFee = lots.reduce(
+            (sum, lot) => sum + lot.accumulatedWarehouseFee,
+            0
+          )
+          
           const totalQuantity = item._sum.quantityRemaining || 0
-          const avgUnitCostWithoutStorage = totalQuantity > 0 ? Math.round((totalValue / totalQuantity) * 100) / 100 : 0
+          const avgUnitCost = totalQuantity > 0 ? Math.round((totalValue / totalQuantity) * 100) / 100 : 0
           
-          // 창고료 반영된 평균 단가
-          const avgUnitCost = avgUnitCostWithoutStorage + storageExpensePerUnit
+          // 창고료 포함 현재 가치 (입고원가 + 누적창고료)
+          const currentValue = totalValue + totalAccumulatedWarehouseFee
           
-          // 배분된 창고료
-          const allocatedStorageExpense = storageExpensePerUnit * totalQuantity
-          
-          // 창고료 포함 총 가치
-          const totalValueWithStorage = avgUnitCost * totalQuantity
+          // 창고료 포함 평균 단가
+          const avgUnitCostWithWarehouseFee = totalQuantity > 0 
+            ? Math.round((currentValue / totalQuantity) * 100) / 100 
+            : 0
 
           return {
             productId: item.productId,
@@ -186,16 +173,13 @@ export async function GET(request: NextRequest) {
             purchaseVendor: product?.purchaseVendor?.name,
             category: product?.category?.nameKo,
             totalQuantity,
-            avgUnitCost: Math.round(avgUnitCost * 100) / 100,
-            avgUnitCostWithoutStorage: avgUnitCostWithoutStorage,
-            allocatedStorageExpense: Math.round(allocatedStorageExpense * 100) / 100,
+            avgUnitCost,
             totalValue: Math.round(totalValue * 100) / 100,
-            totalValueWithStorage: Math.round(totalValueWithStorage * 100) / 100,
+            totalAccumulatedWarehouseFee: Math.round(totalAccumulatedWarehouseFee * 100) / 100,
+            currentValue: Math.round(currentValue * 100) / 100,
+            avgUnitCostWithWarehouseFee,
             lotCount: item._count.id,
             lots,
-            // 창고료 정보
-            storageExpensePerUnit: Math.round(storageExpensePerUnit * 100) / 100,
-            totalStorageExpense: totalStorageExpense,
           }
         })
       )

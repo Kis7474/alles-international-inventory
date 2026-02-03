@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { itemId, quantity, outboundDate } = body
+    const { itemId, quantity, outboundDate, shippingCost = 0 } = body
 
     // 유효성 검사
     if (!itemId || !quantity || !outboundDate) {
@@ -18,6 +18,13 @@ export async function POST(request: NextRequest) {
     if (quantity <= 0) {
       return NextResponse.json(
         { error: '출고수량은 0보다 커야 합니다.' },
+        { status: 400 }
+      )
+    }
+
+    if (shippingCost < 0) {
+      return NextResponse.json(
+        { error: '운송비는 음수가 될 수 없습니다.' },
         { status: 400 }
       )
     }
@@ -56,6 +63,11 @@ export async function POST(request: NextRequest) {
         quantity: number
         unitCost: number
         totalCost: number
+        warehouseFee: number
+        warehouseFeeApplied: number
+        shippingCostPerUnit: number
+        finalUnitCost: number
+        finalTotalCost: number
       }> = []
 
       for (const lot of availableLots) {
@@ -63,6 +75,20 @@ export async function POST(request: NextRequest) {
 
         const quantityToDeduct = Math.min(remainingQuantity, lot.quantityRemaining)
         const totalCost = quantityToDeduct * lot.unitCost
+        
+        // 창고료 계산 (LOT의 누적 창고료를 비례 배분)
+        const warehouseFeeRatio = lot.quantityReceived > 0 
+          ? quantityToDeduct / lot.quantityReceived 
+          : 0
+        const warehouseFeeApplied = lot.accumulatedWarehouseFee * warehouseFeeRatio
+        
+        // 운송비 계산 (전체 운송비를 전체 수량으로 배분)
+        const shippingCostPerUnit = shippingCost / quantity
+        const totalShippingCost = shippingCostPerUnit * quantityToDeduct
+        
+        // 최종 원가 계산
+        const finalTotalCost = totalCost + warehouseFeeApplied + totalShippingCost
+        const finalUnitCost = finalTotalCost / quantityToDeduct
 
         // LOT 잔량 감소
         await tx.inventoryLot.update({
@@ -72,7 +98,7 @@ export async function POST(request: NextRequest) {
           },
         })
 
-        // 출고 이력 생성
+        // 출고 이력 생성 (추가 비용 정보 포함)
         await tx.inventoryMovement.create({
           data: {
             movementDate: new Date(outboundDate),
@@ -82,6 +108,10 @@ export async function POST(request: NextRequest) {
             quantity: quantityToDeduct,
             unitCost: lot.unitCost,
             totalCost,
+            shippingCost: totalShippingCost,
+            warehouseFeeApplied,
+            finalUnitCost,
+            finalTotalCost,
           },
         })
 
@@ -92,6 +122,11 @@ export async function POST(request: NextRequest) {
           quantity: quantityToDeduct,
           unitCost: lot.unitCost,
           totalCost,
+          warehouseFee: lot.accumulatedWarehouseFee,
+          warehouseFeeApplied,
+          shippingCostPerUnit,
+          finalUnitCost,
+          finalTotalCost,
         })
 
         remainingQuantity -= quantityToDeduct
@@ -105,11 +140,24 @@ export async function POST(request: NextRequest) {
       (sum, detail) => sum + detail.totalCost,
       0
     )
+    
+    const totalWarehouseFee = result.reduce(
+      (sum, detail) => sum + detail.warehouseFeeApplied,
+      0
+    )
+    
+    const totalFinalCost = result.reduce(
+      (sum, detail) => sum + detail.finalTotalCost,
+      0
+    )
 
     return NextResponse.json({
       success: true,
       totalQuantity: quantity,
       totalCost: totalOutboundCost,
+      totalWarehouseFee,
+      totalShippingCost: shippingCost,
+      totalFinalCost,
       details: result,
     })
   } catch (error) {

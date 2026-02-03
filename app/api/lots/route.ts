@@ -82,6 +82,8 @@ export async function POST(request: NextRequest) {
     const {
       itemId,
       productId,
+      vendorId,
+      salespersonId,
       lotCode,
       receivedDate,
       quantityReceived,
@@ -90,6 +92,7 @@ export async function POST(request: NextRequest) {
       domesticFreight,
       otherCost = 0,
       storageLocation = 'WAREHOUSE',
+      sourceType = 'IMPORT', // "IMPORT" | "DOMESTIC" | "MANUAL"
     } = body
 
     // 유효성 검사 - itemId 또는 productId 중 하나는 필수
@@ -136,6 +139,8 @@ export async function POST(request: NextRequest) {
         data: {
           itemId: itemId || null,
           productId: productId || null,
+          vendorId: vendorId || null,
+          salespersonId: salespersonId || null,
           lotCode: lotCode || null,
           receivedDate: new Date(receivedDate),
           quantityReceived,
@@ -146,6 +151,7 @@ export async function POST(request: NextRequest) {
           otherCost: otherCost || 0,
           unitCost,
           storageLocation,
+          sourceType,
         },
         include: {
           item: true,
@@ -154,6 +160,8 @@ export async function POST(request: NextRequest) {
               category: true,
             },
           },
+          vendor: true,
+          salesperson: true,
         },
       })
 

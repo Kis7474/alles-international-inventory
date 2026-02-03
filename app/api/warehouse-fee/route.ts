@@ -160,48 +160,30 @@ export async function PUT(request: NextRequest) {
         )
       }
       
-      // 배분 기준일 계산
-      // new Date(year, month, 0)은 해당 월의 마지막 날을 반환
-      // 예: new Date(2026, 1, 0) = 2026년 1월 31일 00:00:00
-      const [year, month] = yearMonth.split('-').map(Number)
-      const distributionDate = new Date(year, month, 0) // 해당 월의 마지막 날 자정
-      const now = new Date()
-      const baseDate = distributionDate > now ? now : distributionDate
+      // 배분 기준: 가치 기준 (잔량 × 단가)
+      // LOT별 가치 계산
+      const lotsWithValue = lots.map(lot => {
+        const value = lot.quantityRemaining * lot.unitCost
+        return { ...lot, value }
+      })
       
-      // 밀리초를 일수로 변환하기 위한 상수
-      const MILLISECONDS_PER_DAY = 1000 * 60 * 60 * 24
+      // 전체 가치 합계
+      const totalValue = lotsWithValue.reduce((sum, lot) => sum + lot.value, 0)
       
-      // 배분 기준일 이전에 입고된 LOT만 필터링하고 가중치 계산 (잔량 × 보관일수)
-      const lotsWithWeight = lots
-        .filter(lot => {
-          const receivedDate = new Date(lot.receivedDate)
-          return receivedDate <= baseDate
-        })
-        .map(lot => {
-          const receivedDate = new Date(lot.receivedDate)
-          // 최소 1일로 계산 (당일 입고도 1일 창고료 부과)
-          const storageDays = Math.max(1, Math.ceil((baseDate.getTime() - receivedDate.getTime()) / MILLISECONDS_PER_DAY))
-          const weight = lot.quantityRemaining * storageDays
-          return { ...lot, storageDays, weight }
-        })
-      
-      if (lotsWithWeight.length === 0) {
+      if (totalValue === 0) {
         return NextResponse.json(
-          { error: '배분 대상 LOT이 없습니다. (배분 기준일 이전 또는 당일에 입고된 LOT 없음)' },
+          { error: '배분 대상 LOT의 총 가치가 0입니다.' },
           { status: 400 }
         )
       }
-      
-      // 전체 가중치 합계
-      const totalWeight = lotsWithWeight.reduce((sum, lot) => sum + lot.weight, 0)
       
       // 트랜잭션으로 배분 처리
       const result = await prisma.$transaction(async (tx) => {
         // 각 LOT에 창고료 배분
         await Promise.all(
-          lotsWithWeight.map(async (lot) => {
-            const ratio = lot.weight / totalWeight
-            const distributedFee = fee.totalFee * ratio
+          lotsWithValue.map(async (lot) => {
+            const valueRatio = (lot.value / totalValue) * 100 // 백분율
+            const distributedFee = fee.totalFee * (lot.value / totalValue)
             
             // 배분 내역 생성
             await tx.warehouseFeeDistribution.create({
@@ -210,13 +192,19 @@ export async function PUT(request: NextRequest) {
                 lotId: lot.id,
                 distributedFee,
                 quantityAtTime: lot.quantityRemaining,
+                valueAtTime: lot.value,
+                valueRatio: valueRatio,
               },
             })
             
-            // LOT의 warehouseFee 필드 업데이트 (누적)
+            // LOT의 accumulatedWarehouseFee 필드 업데이트 (누적)
             await tx.inventoryLot.update({
               where: { id: lot.id },
               data: {
+                accumulatedWarehouseFee: {
+                  increment: distributedFee,
+                },
+                // 하위 호환성을 위해 warehouseFee도 업데이트
                 warehouseFee: {
                   increment: distributedFee,
                 },
@@ -225,11 +213,13 @@ export async function PUT(request: NextRequest) {
           })
         )
         
-        // 창고료 배분 완료 시각 업데이트
+        // 창고료 배분 완료 시각 및 배분 시점 정보 업데이트
         const updatedFee = await tx.warehouseFee.update({
           where: { id: fee.id },
           data: {
             distributedAt: new Date(),
+            totalValueAtDistribution: totalValue,
+            lotCountAtDistribution: lotsWithValue.length,
           },
           include: {
             distributions: {
