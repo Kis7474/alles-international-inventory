@@ -305,8 +305,12 @@ model InventoryLot {
   importExportId    Int?         // @unique 제거 - 1:N 관계 지원
   importExport      ImportExport? @relation(fields: [importExportId], references: [id])
   
-  // 창고료 누적
-  warehouseFee              Float    @default(0)  // 누적 창고료
+  // 입고 유형 (수입 연동 vs 직접 입력 구분)
+  sourceType        String       @default("IMPORT")  // "IMPORT" | "DOMESTIC" | "MANUAL"
+  
+  // 창고료 누적 (배분될 때마다 합산)
+  accumulatedWarehouseFee Float   @default(0)  // 누적 창고료
+  warehouseFee              Float    @default(0)  // 누적 창고료 (하위 호환성)
   
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
@@ -327,6 +331,12 @@ model InventoryMovement {
   quantity     Float
   unitCost     Float
   totalCost    Float    // quantity * unitCost
+  
+  // 출고 시 추가 비용
+  shippingCost        Float?   // 출고 운송비
+  warehouseFeeApplied Float?   // 적용된 창고료 (출고 시점 누적)
+  finalUnitCost       Float?   // 최종 단가 (입고원가 + 창고료/수량 + 운송비/수량)
+  finalTotalCost      Float?   // 최종 총액
   
   refType      String?  // 참조 타입
   refId        String?  // 참조 ID
@@ -349,13 +359,15 @@ model StorageExpense {
 
 // 창고료 관리
 model WarehouseFee {
-  id            Int       @id @default(autoincrement())
-  yearMonth     String    @unique // "2026-01" 형식
-  totalFee      Float     // 해당 월 총 창고료
-  distributedAt DateTime? // 배분 완료 시각
-  memo          String?   // 메모
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                       Int       @id @default(autoincrement())
+  yearMonth                String    @unique // "2026-01" 형식
+  totalFee                 Float     // 해당 월 총 창고료
+  distributedAt            DateTime? // 배분 완료 시각
+  totalValueAtDistribution Float?    // 배분 시점 총 재고가치
+  lotCountAtDistribution   Int?      // 배분 시점 LOT 수
+  memo                     String?   // 메모
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
   
   distributions WarehouseFeeDistribution[]
 }
@@ -369,6 +381,8 @@ model WarehouseFeeDistribution {
   lot             InventoryLot @relation(fields: [lotId], references: [id], onDelete: Cascade)
   distributedFee  Float        // 배분된 창고료
   quantityAtTime  Float        // 배분 시점의 잔량
+  valueAtTime     Float        // 배분 시점 가치 (잔량 × 단가)
+  valueRatio      Float        // 가치 비율 (%)
   createdAt       DateTime     @default(now())
   
   @@unique([warehouseFeeId, lotId])
