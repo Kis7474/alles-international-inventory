@@ -577,7 +577,7 @@ export async function DELETE(request: NextRequest) {
         },
       })
 
-      // Delete in proper order for each record
+      // Delete in proper order to respect FK constraints
       await prisma.$transaction(async (tx) => {
         // 1. Delete all related InventoryLots FIRST
         await tx.inventoryLot.deleteMany({
@@ -596,15 +596,10 @@ export async function DELETE(request: NextRequest) {
       })
 
       // 4. Recalculate affected product costs
-      const affectedProductIds: number[] = []
-      for (const importExport of importExports) {
-        if (importExport.productId) {
-          affectedProductIds.push(importExport.productId)
-        }
-        for (const item of importExport.items) {
-          affectedProductIds.push(item.productId)
-        }
-      }
+      const affectedProductIds = importExports.flatMap(importExport => [
+        ...(importExport.productId ? [importExport.productId] : []),
+        ...importExport.items.map(item => item.productId),
+      ])
 
       // Remove duplicates and recalculate
       const uniqueProductIds = Array.from(new Set(affectedProductIds))
