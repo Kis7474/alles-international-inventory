@@ -72,10 +72,6 @@ export default function ProductDetailModal({ productId, onClose }: ProductDetail
   const [showPriceHistory, setShowPriceHistory] = useState(false)
   const [showMonthlyCosts, setShowMonthlyCosts] = useState(false)
 
-  useEffect(() => {
-    fetchProductDetail()
-  }, [productId])
-
   const fetchProductDetail = async () => {
     try {
       const res = await fetch(`/api/products/${productId}`)
@@ -88,6 +84,11 @@ export default function ProductDetailModal({ productId, onClose }: ProductDetail
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    fetchProductDetail()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productId])
 
   if (loading) {
     return (

@@ -15,6 +15,54 @@ interface ItemInput {
   unitPrice: string
 }
 
+/**
+ * Helper function to update product costs after import registration/modification
+ */
+async function updateProductCostsAfterImport(
+  type: string,
+  isMultiItem: boolean,
+  items: ItemInput[] | null,
+  productId: string | null,
+  unitCost: number | null,
+  storageType: string | null,
+  date: string,
+  exchangeRate: string,
+  dutyAmount: string | null,
+  shippingCost: string | null,
+  otherCost: string | null
+) {
+  if (type !== 'IMPORT' || !unitCost || unitCost <= 0) {
+    return
+  }
+
+  const effectiveDate = new Date(date)
+  
+  if (isMultiItem && items) {
+    // Multi-item: update each product
+    const totalQuantity = items.reduce((sum, item) => sum + parseFloat(item.quantity), 0)
+    const totalAdditionalCosts = (parseFloat(dutyAmount || '0')) + (parseFloat(shippingCost || '0')) + (parseFloat(otherCost || '0'))
+    const additionalCostPerUnit = totalQuantity > 0 ? totalAdditionalCosts / totalQuantity : 0
+    
+    for (const item of items) {
+      const itemUnitCost = (parseFloat(item.unitPrice) * parseFloat(exchangeRate)) + additionalCostPerUnit
+      await updateProductPurchasePrice(parseInt(item.productId), itemUnitCost, effectiveDate)
+      
+      // Update currentCost for WAREHOUSE storage
+      if (storageType === 'WAREHOUSE') {
+        await updateProductCurrentCost(parseInt(item.productId))
+      }
+    }
+  } else if (productId) {
+    // Single item
+    await updateProductPurchasePrice(parseInt(productId), unitCost, effectiveDate)
+    
+    // Update currentCost for WAREHOUSE storage
+    if (storageType === 'WAREHOUSE') {
+      await updateProductCurrentCost(parseInt(productId))
+    }
+  }
+}
+
 // GET /api/import-export - 수입/수출 목록 조회 또는 단일 조회
 export async function GET(request: NextRequest) {
   try {
@@ -253,34 +301,19 @@ export async function POST(request: NextRequest) {
     }
 
     // ★★★ 수입등록 후 품목 원가 업데이트 ★★★
-    if (type === 'IMPORT' && unitCost && unitCost > 0) {
-      const effectiveDate = new Date(date)
-      
-      if (isMultiItem) {
-        // Multi-item: update each product
-        const totalQuantity = (items as ItemInput[]).reduce((sum, item) => sum + parseFloat(item.quantity), 0)
-        const totalAdditionalCosts = (parseFloat(dutyAmount) || 0) + (parseFloat(shippingCost) || 0) + (parseFloat(otherCost) || 0)
-        const additionalCostPerUnit = totalQuantity > 0 ? totalAdditionalCosts / totalQuantity : 0
-        
-        for (const item of items as ItemInput[]) {
-          const itemUnitCost = (parseFloat(item.unitPrice) * parseFloat(exchangeRate)) + additionalCostPerUnit
-          await updateProductPurchasePrice(parseInt(item.productId), itemUnitCost, effectiveDate)
-          
-          // Update currentCost for WAREHOUSE storage
-          if (storageType === 'WAREHOUSE') {
-            await updateProductCurrentCost(parseInt(item.productId))
-          }
-        }
-      } else {
-        // Single item
-        await updateProductPurchasePrice(parseInt(productId), unitCost, effectiveDate)
-        
-        // Update currentCost for WAREHOUSE storage
-        if (storageType === 'WAREHOUSE') {
-          await updateProductCurrentCost(parseInt(productId))
-        }
-      }
-    }
+    await updateProductCostsAfterImport(
+      type,
+      isMultiItem,
+      items as ItemInput[] | null,
+      productId,
+      unitCost,
+      storageType,
+      date,
+      exchangeRate,
+      dutyAmount,
+      shippingCost,
+      otherCost
+    )
 
     return NextResponse.json(record, { status: 201 })
   } catch (error) {
@@ -501,34 +534,19 @@ export async function PUT(request: NextRequest) {
     }
 
     // ★★★ 수입수정 후 품목 원가 재계산 ★★★
-    if (type === 'IMPORT' && unitCost && unitCost > 0) {
-      const effectiveDate = new Date(date)
-      
-      if (isMultiItem) {
-        // Multi-item: update each product
-        const totalQuantity = (items as ItemInput[]).reduce((sum, item) => sum + parseFloat(item.quantity), 0)
-        const totalAdditionalCosts = (parseFloat(dutyAmount) || 0) + (parseFloat(shippingCost) || 0) + (parseFloat(otherCost) || 0)
-        const additionalCostPerUnit = totalQuantity > 0 ? totalAdditionalCosts / totalQuantity : 0
-        
-        for (const item of items as ItemInput[]) {
-          const itemUnitCost = (parseFloat(item.unitPrice) * parseFloat(exchangeRate)) + additionalCostPerUnit
-          await updateProductPurchasePrice(parseInt(item.productId), itemUnitCost, effectiveDate)
-          
-          // Update currentCost for WAREHOUSE storage
-          if (storageType === 'WAREHOUSE') {
-            await updateProductCurrentCost(parseInt(item.productId))
-          }
-        }
-      } else if (productId) {
-        // Single item
-        await updateProductPurchasePrice(parseInt(productId), unitCost, effectiveDate)
-        
-        // Update currentCost for WAREHOUSE storage
-        if (storageType === 'WAREHOUSE') {
-          await updateProductCurrentCost(parseInt(productId))
-        }
-      }
-    }
+    await updateProductCostsAfterImport(
+      type,
+      isMultiItem,
+      items as ItemInput[] | null,
+      productId,
+      unitCost,
+      storageType,
+      date,
+      exchangeRate,
+      dutyAmount,
+      shippingCost,
+      otherCost
+    )
 
     return NextResponse.json(record)
   } catch (error) {

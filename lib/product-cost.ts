@@ -55,6 +55,7 @@ export async function updateProductCurrentCost(productId: number): Promise<numbe
   }
 
   // Calculate weighted average: Σ(remaining × unitCost + warehouseFee) / Σ(remaining)
+  // Note: warehouseFee is the TOTAL accumulated fee for the entire lot, not per-unit
   let totalCost = 0
   let totalQuantity = 0
 
