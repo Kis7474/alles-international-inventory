@@ -42,14 +42,6 @@ export default function SalesPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   
-  // 페이지네이션 상태
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 20,
-    total: 0,
-    totalPages: 0,
-  })
-  
   // 필터 상태
   const [filterType, setFilterType] = useState('')
   const [filterSalesperson, setFilterSalesperson] = useState('')
@@ -82,9 +74,7 @@ export default function SalesPage() {
         setSales(salesResponse)
       } else {
         setSales(salesResponse.data || [])
-        if (salesResponse.pagination) {
-          setPagination(salesResponse.pagination)
-        }
+        // pagination 정보는 받지만 현재는 UI에 표시하지 않음 (향후 기능 추가 가능)
       }
       
       setSalespersons(salespersonsData)
@@ -115,9 +105,7 @@ export default function SalesPage() {
         setSales(response)
       } else {
         setSales(response.data || [])
-        if (response.pagination) {
-          setPagination(response.pagination)
-        }
+        // pagination 정보는 받지만 현재는 UI에 표시하지 않음 (향후 기능 추가 가능)
       }
       
       setSelectedIds([])

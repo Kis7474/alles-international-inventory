@@ -43,14 +43,6 @@ export default function MasterMaterialsPage() {
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [selectAll, setSelectAll] = useState(false)
   
-  // 페이지네이션 상태
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 20,
-    total: 0,
-    totalPages: 0,
-  })
-  
   const [filterCategoryId, setFilterCategoryId] = useState('')
   const [filterSearchName, setFilterSearchName] = useState('')
   
@@ -86,9 +78,7 @@ export default function MasterMaterialsPage() {
         setMaterials(materialsResponse)
       } else {
         setMaterials(materialsResponse.data || [])
-        if (materialsResponse.pagination) {
-          setPagination(materialsResponse.pagination)
-        }
+        // pagination 정보는 받지만 현재는 UI에 표시하지 않음 (향후 기능 추가 가능)
       }
       
       setCategories(categoriesData)
@@ -115,9 +105,7 @@ export default function MasterMaterialsPage() {
         setMaterials(response)
       } else {
         setMaterials(response.data || [])
-        if (response.pagination) {
-          setPagination(response.pagination)
-        }
+        // pagination 정보는 받지만 현재는 UI에 표시하지 않음 (향후 기능 추가 가능)
       }
       
       setSelectedIds([])

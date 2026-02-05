@@ -37,14 +37,6 @@ export default function ImportExportPage() {
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [selectAll, setSelectAll] = useState(false)
   
-  // 페이지네이션 상태
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 20,
-    total: 0,
-    totalPages: 0,
-  })
-  
   // PDF modal state
   const [showPdfModal, setShowPdfModal] = useState(false)
   const [currentPdfUrl, setCurrentPdfUrl] = useState('')
@@ -70,9 +62,7 @@ export default function ImportExportPage() {
         setRecords(response)
       } else {
         setRecords(response.data || [])
-        if (response.pagination) {
-          setPagination(response.pagination)
-        }
+        // pagination 정보는 받지만 현재는 UI에 표시하지 않음 (향후 기능 추가 가능)
       }
     } catch (error) {
       console.error('Error fetching records:', error)

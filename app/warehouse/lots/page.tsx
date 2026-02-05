@@ -49,14 +49,6 @@ export default function LotsPage() {
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [selectAll, setSelectAll] = useState(false)
   
-  // 페이지네이션 상태
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 20,
-    total: 0,
-    totalPages: 0,
-  })
-  
   // 탭 상태
   const [activeTab, setActiveTab] = useState<'ALL' | 'WAREHOUSE' | 'OFFICE'>('ALL')
   
@@ -117,9 +109,7 @@ export default function LotsPage() {
         lotsData = lotsResponse
       } else {
         lotsData = lotsResponse.data || []
-        if (lotsResponse.pagination) {
-          setPagination(lotsResponse.pagination)
-        }
+        // pagination 정보는 받지만 현재는 UI에 표시하지 않음 (향후 기능 추가 가능)
       }
       
       setLots(lotsData)
@@ -170,9 +160,7 @@ export default function LotsPage() {
         lotsData = response
       } else {
         lotsData = response.data || []
-        if (response.pagination) {
-          setPagination(response.pagination)
-        }
+        // pagination 정보는 받지만 현재는 UI에 표시하지 않음 (향후 기능 추가 가능)
       }
       
       setLots(lotsData)
