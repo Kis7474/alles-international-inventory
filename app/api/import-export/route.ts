@@ -664,7 +664,9 @@ export async function DELETE(request: NextRequest) {
       ...importExport.items.map(item => item.productId),
     ]
 
-    for (const productId of affectedProductIds) {
+    // Remove duplicates and recalculate
+    const uniqueProductIds = Array.from(new Set(affectedProductIds))
+    for (const productId of uniqueProductIds) {
       await updateProductCurrentCost(productId)
     }
 
