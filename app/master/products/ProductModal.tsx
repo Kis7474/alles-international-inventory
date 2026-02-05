@@ -86,6 +86,7 @@ export default function ProductModal({ productId, isOpen, onClose, onSave }: Pro
     unit: '',
     categoryId: '',
     purchaseVendorId: '',
+    currentCost: '',
   })
   
   // 매출거래처별 가격 관리
@@ -112,6 +113,7 @@ export default function ProductModal({ productId, isOpen, onClose, onSave }: Pro
       unit: data.unit || '',
       categoryId: data.categoryId?.toString() || '',
       purchaseVendorId: data.purchaseVendorId?.toString() || '',
+      currentCost: data.currentCost?.toString() || '',
     })
     // 매출거래처별 가격 로드
     if (data.vendorPrices) {
@@ -157,7 +159,7 @@ export default function ProductModal({ productId, isOpen, onClose, onSave }: Pro
       } else {
         // 신규 등록
         setProduct(null)
-        setFormData({ code: '', name: '', unit: '', categoryId: '', purchaseVendorId: '' })
+        setFormData({ code: '', name: '', unit: '', categoryId: '', purchaseVendorId: '', currentCost: '' })
         setSalesVendorPrices([])
         setIsEditMode(true)
       }
@@ -171,6 +173,7 @@ export default function ProductModal({ productId, isOpen, onClose, onSave }: Pro
         ...formData,
         categoryId: formData.categoryId ? parseInt(formData.categoryId) : null,
         purchaseVendorId: formData.purchaseVendorId ? parseInt(formData.purchaseVendorId) : null,
+        currentCost: formData.currentCost ? parseFloat(formData.currentCost) : null,
         salesVendors: salesVendorPrices.map(sv => ({
           vendorId: sv.vendorId,
           salesPrice: sv.salesPrice,
@@ -381,11 +384,21 @@ export default function ProductModal({ productId, isOpen, onClose, onSave }: Pro
                 )}
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">현재 원가 (창고료 포함)</label>
-                <p className="px-3 py-2 bg-gray-100 rounded text-gray-600">
-                  {product?.currentCost ? `₩${product.currentCost.toLocaleString()}` : '-'}
-                  <span className="text-xs text-gray-400 ml-2">(자동계산, 읽기전용)</span>
-                </p>
+                <label className="block text-sm font-medium mb-1">현재 원가</label>
+                {isEditMode ? (
+                  <input
+                    type="number"
+                    value={formData.currentCost}
+                    onChange={(e) => setFormData({ ...formData, currentCost: e.target.value })}
+                    className="w-full border rounded px-3 py-2"
+                    placeholder="수입등록 시 자동 업데이트됨"
+                  />
+                ) : (
+                  <p className="px-3 py-2 bg-gray-100 rounded text-gray-600">
+                    {product?.currentCost ? `₩${product.currentCost.toLocaleString()}` : '-'}
+                  </p>
+                )}
+                <span className="text-xs text-gray-400">수입등록 또는 창고료 배분 시 자동 재계산됩니다</span>
               </div>
             </div>
 

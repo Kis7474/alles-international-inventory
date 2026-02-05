@@ -116,6 +116,7 @@ export async function POST(request: Request) {
       purchaseVendorId,
       salesVendorIds,
       salesVendors,
+      currentCost,
     } = body
     
     // Validate required fields
@@ -151,6 +152,7 @@ export async function POST(request: Request) {
         description,
         defaultPurchasePrice: defaultPurchasePrice ? parseFloat(defaultPurchasePrice) : null,
         defaultSalesPrice: defaultSalesPrice ? parseFloat(defaultSalesPrice) : null,
+        currentCost: currentCost ? parseFloat(currentCost) : null,
         purchaseVendorId: parsedPurchaseVendorId,
         salesVendors: parsedSalesVendorIds ? {
           create: parsedSalesVendorIds.map((vendorId) => ({
@@ -207,6 +209,7 @@ export async function PUT(request: Request) {
       purchaseVendorId,
       salesVendorIds,
       salesVendors,
+      currentCost,
     } = body
     
     // Validate required fields
@@ -258,6 +261,7 @@ export async function PUT(request: Request) {
         description,
         defaultPurchasePrice: defaultPurchasePrice ? parseFloat(defaultPurchasePrice) : null,
         defaultSalesPrice: defaultSalesPrice ? parseFloat(defaultSalesPrice) : null,
+        currentCost: currentCost ? parseFloat(currentCost) : null,
         purchaseVendorId: parsedPurchaseVendorId,
         salesVendors: parsedSalesVendorIds ? {
           create: parsedSalesVendorIds.map((vendorId) => ({
