@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatCurrency } from '@/lib/utils'
-import ProductRegistrationModal from '@/components/ProductRegistrationModal'
+import ProductModal from '@/app/master/products/ProductModal'
 
 interface Product {
   id: number
@@ -59,6 +59,26 @@ export default function ImportExportNewPage() {
   
   // Product registration modal state
   const [showProductModal, setShowProductModal] = useState(false)
+  
+  // 새 품목 생성 후 콜백
+  const handleProductCreated = async () => {
+    // 품목 목록 새로고침
+    const res = await fetch('/api/products')
+    const updatedProducts = await res.json()
+    setProducts(updatedProducts)
+    
+    // If a vendor is selected, update available products
+    if (formData.vendorId) {
+      const filtered = updatedProducts.filter((p: Product) => p.purchaseVendorId === parseInt(formData.vendorId))
+      setAvailableProducts(filtered)
+      
+      // 방금 생성된 품목 자동 선택 (가장 최근 품목)
+      if (filtered.length > 0) {
+        const latestProduct = filtered[filtered.length - 1]
+        setCurrentItem({ ...currentItem, productId: latestProduct.id.toString() })
+      }
+    }
+  }
   
   // Form data
   const [formData, setFormData] = useState({
@@ -243,23 +263,6 @@ export default function ImportExportNewPage() {
     setFormData(prev => ({ ...prev, currency }))
     fetchExchangeRate(currency, formData.date)
   }
-  
-  // 품목 등록 성공 핸들러
-  const handleProductRegistrationSuccess = async (productId: number) => {
-    // Refresh products list
-    const res = await fetch('/api/products')
-    const updatedProducts = await res.json()
-    setProducts(updatedProducts)
-    
-    // If a vendor is selected, update available products
-    if (formData.vendorId) {
-      const filtered = updatedProducts.filter((p: Product) => p.purchaseVendorId === parseInt(formData.vendorId))
-      setAvailableProducts(filtered)
-    }
-    
-    // Set the newly registered product in currentItem for adding to items
-    setCurrentItem({ ...currentItem, productId: productId.toString() })
-  }
 
   // 날짜 변경 핸들러
   const handleDateChange = (date: string) => {
@@ -429,19 +432,28 @@ export default function ImportExportNewPage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 품목
               </label>
-              <select
-                value={currentItem.productId}
-                onChange={(e) => setCurrentItem({ ...currentItem, productId: e.target.value })}
-                disabled={!formData.vendorId}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-              >
-                <option value="">{formData.vendorId ? '품목 선택' : '거래처 먼저 선택'}</option>
-                {availableProducts.map((product) => (
-                  <option key={product.id} value={product.id}>
-                    [{product.code}] {product.name}
-                  </option>
-                ))}
-              </select>
+              <div className="flex gap-2">
+                <select
+                  value={currentItem.productId}
+                  onChange={(e) => setCurrentItem({ ...currentItem, productId: e.target.value })}
+                  disabled={!formData.vendorId}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                >
+                  <option value="">{formData.vendorId ? '품목 선택' : '거래처 먼저 선택'}</option>
+                  {availableProducts.map((product) => (
+                    <option key={product.id} value={product.id}>
+                      [{product.code}] {product.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setShowProductModal(true)}
+                  className="px-3 py-2 text-sm bg-green-500 text-white rounded hover:bg-green-600 whitespace-nowrap"
+                >
+                  + 새 품목
+                </button>
+              </div>
             </div>
             
             <div>
@@ -841,12 +853,12 @@ export default function ImportExportNewPage() {
         </div>
       </form>
       
-      {/* Product Registration Modal */}
-      <ProductRegistrationModal
+      {/* 품목 등록 모달 */}
+      <ProductModal
+        productId={null}
         isOpen={showProductModal}
         onClose={() => setShowProductModal(false)}
-        onSuccess={handleProductRegistrationSuccess}
-        vendors={vendors}
+        onSave={handleProductCreated}
       />
     </div>
   )
