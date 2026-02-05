@@ -174,3 +174,25 @@ export function isCustomsCleared(status: string | null | undefined): boolean {
   if (!status) return false
   return status === '통관완료' || status === '수입신고수리' || status === '반출완료'
 }
+
+/**
+ * API 응답에서 데이터 추출 (페이지네이션 응답 처리)
+ * 배열 응답과 페이지네이션 객체 응답을 모두 처리하여 하위 호환성 유지
+ */
+export function extractDataFromResponse<T>(
+  response: T[] | { data: T[]; pagination?: { page: number; limit: number; total: number; totalPages: number } }
+): {
+  data: T[]
+  pagination?: { page: number; limit: number; total: number; totalPages: number }
+} {
+  if (Array.isArray(response)) {
+    // 기존 배열 형식 응답 (하위 호환성)
+    return { data: response }
+  } else {
+    // 새로운 페이지네이션 객체 응답
+    return {
+      data: response.data || [],
+      pagination: response.pagination
+    }
+  }
+}

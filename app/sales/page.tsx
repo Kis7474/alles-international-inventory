@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { formatNumber } from '@/lib/utils'
+import { formatNumber, extractDataFromResponse } from '@/lib/utils'
 import Link from 'next/link'
 
 interface Salesperson {
@@ -69,13 +69,8 @@ export default function SalesPage() {
       const salespersonsData = await salespersonsRes.json()
       const categoriesData = await categoriesRes.json()
 
-      // 하위 호환성: 배열이면 그대로 사용, 객체면 data 속성 사용
-      if (Array.isArray(salesResponse)) {
-        setSales(salesResponse)
-      } else {
-        setSales(salesResponse.data || [])
-        // pagination 정보는 받지만 현재는 UI에 표시하지 않음 (향후 기능 추가 가능)
-      }
+      const { data } = extractDataFromResponse<SalesRecord>(salesResponse)
+      setSales(data)
       
       setSalespersons(salespersonsData)
       setCategories(categoriesData)
@@ -100,13 +95,8 @@ export default function SalesPage() {
       const res = await fetch(`/api/sales?${params.toString()}`)
       const response = await res.json()
       
-      // 하위 호환성: 배열이면 그대로 사용, 객체면 data 속성 사용
-      if (Array.isArray(response)) {
-        setSales(response)
-      } else {
-        setSales(response.data || [])
-        // pagination 정보는 받지만 현재는 UI에 표시하지 않음 (향후 기능 추가 가능)
-      }
+      const { data } = extractDataFromResponse<SalesRecord>(response)
+      setSales(data)
       
       setSelectedIds([])
       setSelectAll(false)

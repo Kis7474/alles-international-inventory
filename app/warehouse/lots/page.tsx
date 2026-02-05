@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { formatNumber, calculateUnitCost } from '@/lib/utils'
+import { formatNumber, calculateUnitCost, extractDataFromResponse } from '@/lib/utils'
 
 interface Product {
   id: number
@@ -103,14 +103,7 @@ export default function LotsPage() {
         productsRes.json(),
       ])
       
-      // 하위 호환성: 배열이면 그대로 사용, 객체면 data 속성 사용
-      let lotsData: Lot[] = []
-      if (Array.isArray(lotsResponse)) {
-        lotsData = lotsResponse
-      } else {
-        lotsData = lotsResponse.data || []
-        // pagination 정보는 받지만 현재는 UI에 표시하지 않음 (향후 기능 추가 가능)
-      }
+      const { data: lotsData } = extractDataFromResponse<Lot>(lotsResponse)
       
       setLots(lotsData)
       setProducts(productsData)
@@ -154,14 +147,7 @@ export default function LotsPage() {
       const res = await fetch(`/api/lots?${params.toString()}`)
       const response = await res.json()
       
-      // 하위 호환성: 배열이면 그대로 사용, 객체면 data 속성 사용
-      let lotsData: Lot[] = []
-      if (Array.isArray(response)) {
-        lotsData = response
-      } else {
-        lotsData = response.data || []
-        // pagination 정보는 받지만 현재는 UI에 표시하지 않음 (향후 기능 추가 가능)
-      }
+      const { data: lotsData } = extractDataFromResponse<Lot>(response)
       
       setLots(lotsData)
       calculateDashboard(lotsData)

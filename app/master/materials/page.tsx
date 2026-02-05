@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, extractDataFromResponse } from '@/lib/utils'
 
 interface Category {
   id: number
@@ -73,13 +73,8 @@ export default function MasterMaterialsPage() {
       const categoriesData = await categoriesRes.json()
       const vendorsData = await vendorsRes.json()
       
-      // 하위 호환성: 배열이면 그대로 사용, 객체면 data 속성 사용
-      if (Array.isArray(materialsResponse)) {
-        setMaterials(materialsResponse)
-      } else {
-        setMaterials(materialsResponse.data || [])
-        // pagination 정보는 받지만 현재는 UI에 표시하지 않음 (향후 기능 추가 가능)
-      }
+      const { data } = extractDataFromResponse<Material>(materialsResponse)
+      setMaterials(data)
       
       setCategories(categoriesData)
       setVendors(vendorsData)
@@ -100,13 +95,8 @@ export default function MasterMaterialsPage() {
       const res = await fetch(`/api/materials?${params.toString()}`)
       const response = await res.json()
       
-      // 하위 호환성: 배열이면 그대로 사용, 객체면 data 속성 사용
-      if (Array.isArray(response)) {
-        setMaterials(response)
-      } else {
-        setMaterials(response.data || [])
-        // pagination 정보는 받지만 현재는 UI에 표시하지 않음 (향후 기능 추가 가능)
-      }
+      const { data } = extractDataFromResponse<Material>(response)
+      setMaterials(data)
       
       setSelectedIds([])
       setSelectAll(false)
