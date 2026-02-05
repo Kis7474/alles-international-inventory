@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { formatCurrency } from '@/lib/utils'
-import ProductRegistrationModal from '@/components/ProductRegistrationModal'
+import ProductModal from '@/app/master/products/ProductModal'
 import PdfPreviewModal from '@/components/PdfPreviewModal'
 
 interface Product {
@@ -418,8 +418,8 @@ export default function ImportExportEditPage() {
     fetchExchangeRate(formData.currency, date)
   }
   
-  // Product registration success handler
-  const handleProductRegistrationSuccess = async (productId: number) => {
+  // Product save handler
+  const handleProductSave = async (product: {id: number}) => {
     const res = await fetch('/api/products')
     const updatedProducts = await res.json()
     setProducts(updatedProducts)
@@ -430,7 +430,10 @@ export default function ImportExportEditPage() {
     }
     
     // Set the newly registered product in currentItem for adding to items
-    setCurrentItem({ ...currentItem, productId: productId.toString() })
+    setCurrentItem({ ...currentItem, productId: product.id.toString() })
+    
+    // Close modal
+    setShowProductModal(false)
   }
 
   const handleAddItem = () => {
@@ -685,19 +688,29 @@ export default function ImportExportEditPage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 품목
               </label>
-              <select
-                value={currentItem.productId}
-                onChange={(e) => setCurrentItem({ ...currentItem, productId: e.target.value })}
-                disabled={!formData.vendorId}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-              >
-                <option value="">{formData.vendorId ? '품목 선택' : '거래처 먼저 선택'}</option>
-                {availableProducts.map((product) => (
-                  <option key={product.id} value={product.id}>
-                    [{product.code}] {product.name}
-                  </option>
-                ))}
-              </select>
+              <div className="flex gap-2">
+                <select
+                  value={currentItem.productId}
+                  onChange={(e) => setCurrentItem({ ...currentItem, productId: e.target.value })}
+                  disabled={!formData.vendorId}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                >
+                  <option value="">{formData.vendorId ? '품목 선택' : '거래처 먼저 선택'}</option>
+                  {availableProducts.map((product) => (
+                    <option key={product.id} value={product.id}>
+                      [{product.code}] {product.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setShowProductModal(true)}
+                  className="px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 whitespace-nowrap"
+                  title="새 품목 등록"
+                >
+                  + 새 품목
+                </button>
+              </div>
             </div>
             
             <div>
@@ -1282,13 +1295,14 @@ export default function ImportExportEditPage() {
         </div>
       </form>
       
-      {/* Product Registration Modal */}
-      <ProductRegistrationModal
-        isOpen={showProductModal}
-        onClose={() => setShowProductModal(false)}
-        onSuccess={handleProductRegistrationSuccess}
-        vendors={vendors}
-      />
+      {/* Product Modal - 신규 품목 등록 */}
+      {showProductModal && (
+        <ProductModal
+          productId={null}
+          onClose={() => setShowProductModal(false)}
+          onSave={handleProductSave}
+        />
+      )}
       
       {/* PDF Preview Modal */}
       <PdfPreviewModal
