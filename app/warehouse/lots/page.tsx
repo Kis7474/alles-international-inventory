@@ -98,12 +98,12 @@ export default function LotsPage() {
         fetch('/api/lots'),
         fetch('/api/products'),
       ])
-      const [lotsResponse, productsData] = await Promise.all([
+      const [lotsResponse, productsResponse] = await Promise.all([
         lotsRes.json(),
         productsRes.json(),
       ])
       
-      // 하위 호환성: 배열이면 그대로 사용, 객체면 data 속성 사용
+      // lots 처리 - 하위 호환성: 배열이면 그대로 사용, 객체면 data 속성 사용
       let lotsData: Lot[] = []
       if (Array.isArray(lotsResponse)) {
         lotsData = lotsResponse
@@ -111,6 +111,18 @@ export default function LotsPage() {
         lotsData = lotsResponse.data || []
         // pagination 정보는 받지만 현재는 UI에 표시하지 않음 (향후 기능 추가 가능)
       }
+      
+      // products 처리 - 방어적 코딩 추가
+      let productsData: Product[] = []
+      if (Array.isArray(productsResponse)) {
+        productsData = productsResponse
+      } else if (productsResponse.data && Array.isArray(productsResponse.data)) {
+        productsData = productsResponse.data
+      } else if (productsResponse.error) {
+        // productsResponse가 { error: ... } 객체인 경우
+        console.error('Error fetching products:', productsResponse.error)
+      }
+      // 빈 배열로 유지하여 .map() 에러 방지
       
       setLots(lotsData)
       setProducts(productsData)
