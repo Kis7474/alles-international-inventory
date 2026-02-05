@@ -21,11 +21,6 @@ export async function GET(
       include: {
         category: true,
         purchaseVendor: true,
-        salesVendors: {
-          include: {
-            vendor: true,
-          },
-        },
         priceHistory: {
           orderBy: { effectiveDate: 'desc' },
         },
@@ -48,30 +43,7 @@ export async function GET(
       )
     }
 
-    // Get current prices for sales vendors
-    const salesVendorsWithPrices = await Promise.all(
-      product.salesVendors.map(async (sv) => {
-        // Get latest vendor-specific price
-        const latestVendorPrice = await prisma.vendorProductPrice.findFirst({
-          where: {
-            vendorId: sv.vendorId,
-            productId: productId,
-          },
-          orderBy: { effectiveDate: 'desc' },
-        })
-
-        return {
-          ...sv,
-          currentPrice: latestVendorPrice?.salesPrice || product.defaultSalesPrice || null,
-          effectiveDate: latestVendorPrice?.effectiveDate || null,
-        }
-      })
-    )
-
-    return NextResponse.json({
-      ...product,
-      salesVendorsWithPrices,
-    })
+    return NextResponse.json(product)
   } catch (error) {
     console.error('Error fetching product details:', error)
     return NextResponse.json(

@@ -285,7 +285,7 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
         // Prepare sales records for bulk insert
         const salesRecordsToCreate = []
         const productUpdates = []
-        const productSalesVendorsToCreate = []
+        const vendorProductPricesToCreate = []
         
         for (let i = 0; i < chunk.length; i++) {
           const row = chunk[i]
@@ -360,11 +360,13 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
               }
             }
             
-            // Queue ProductSalesVendor entries
+            // Queue VendorProductPrice entries for sales vendors
             if (product && salesVendor) {
-              productSalesVendorsToCreate.push({
+              vendorProductPricesToCreate.push({
                 productId: product.id,
                 vendorId: salesVendor.id,
+                salesPrice: row.unitPrice || 0,
+                effectiveDate: new Date(),
               })
             }
             
@@ -441,44 +443,45 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
           ))
         }
         
-        // Deduplicate ProductSalesVendor entries within the batch
-        const psvSet = new Set<string>()
-        const uniqueProductSalesVendors = productSalesVendorsToCreate.filter(psv => {
-          const key = `${psv.productId}-${psv.vendorId}`
-          if (psvSet.has(key)) {
+        // Deduplicate VendorProductPrice entries within the batch
+        const vppSet = new Set<string>()
+        const uniqueVendorProductPrices = vendorProductPricesToCreate.filter(vpp => {
+          const key = `${vpp.productId}-${vpp.vendorId}`
+          if (vppSet.has(key)) {
             return false
           }
-          psvSet.add(key)
+          vppSet.add(key)
           return true
         })
         
-        // Bulk upsert ProductSalesVendor relationships - optimized
-        if (uniqueProductSalesVendors.length > 0) {
+        // Bulk upsert VendorProductPrice relationships - optimized
+        if (uniqueVendorProductPrices.length > 0) {
           // First, find existing relationships
-          const existingPsvs = await tx.productSalesVendor.findMany({
+          const existingVpps = await tx.vendorProductPrice.findMany({
             where: {
-              OR: uniqueProductSalesVendors.map(psv => ({
-                productId: psv.productId,
-                vendorId: psv.vendorId,
+              OR: uniqueVendorProductPrices.map(vpp => ({
+                productId: vpp.productId,
+                vendorId: vpp.vendorId,
+                salesPrice: { not: null },
               })),
             },
             select: { productId: true, vendorId: true },
           })
 
           // Create a Set for fast lookup
-          const existingPsvSet = new Set(
-            existingPsvs.map(p => `${p.productId}-${p.vendorId}`)
+          const existingVppSet = new Set(
+            existingVpps.map(p => `${p.productId}-${p.vendorId}`)
           )
 
           // Filter out existing ones to get only new relationships
-          const newPsvs = uniqueProductSalesVendors.filter(
-            psv => !existingPsvSet.has(`${psv.productId}-${psv.vendorId}`)
+          const newVpps = uniqueVendorProductPrices.filter(
+            vpp => !existingVppSet.has(`${vpp.productId}-${vpp.vendorId}`)
           )
 
           // Bulk create new relationships
-          if (newPsvs.length > 0) {
-            await tx.productSalesVendor.createMany({ 
-              data: newPsvs, 
+          if (newVpps.length > 0) {
+            await tx.vendorProductPrice.createMany({ 
+              data: newVpps, 
               skipDuplicates: true 
             })
           }

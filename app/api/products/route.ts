@@ -19,9 +19,10 @@ export async function GET(request: Request) {
         name?: { contains: string }
         code?: { contains: string }
       }>
-      salesVendors?: {
+      vendorPrices?: {
         some: {
           vendorId: number
+          salesPrice: { not: null }
         }
       }
     }
@@ -38,10 +39,11 @@ export async function GET(request: Request) {
       ]
     }
     if (salesVendorId) {
-      // 해당 거래처에 판매하는 품목만 조회
-      where.salesVendors = {
+      // 해당 거래처에 판매하는 품목만 조회 (VendorProductPrice 사용)
+      where.vendorPrices = {
         some: {
           vendorId: parseInt(salesVendorId),
+          salesPrice: { not: null },
         },
       }
     }
@@ -60,11 +62,6 @@ export async function GET(request: Request) {
       include: {
         category: true,
         purchaseVendor: true,
-        salesVendors: {
-          include: {
-            vendor: true,
-          },
-        },
         vendorPrices: {
           include: {
             vendor: true,
@@ -116,6 +113,7 @@ export async function POST(request: Request) {
       purchaseVendorId,
       salesVendorIds,
       salesVendors,
+      currentCost,
     } = body
     
     // Validate required fields
@@ -151,36 +149,25 @@ export async function POST(request: Request) {
         description,
         defaultPurchasePrice: defaultPurchasePrice ? parseFloat(defaultPurchasePrice) : null,
         defaultSalesPrice: defaultSalesPrice ? parseFloat(defaultSalesPrice) : null,
+        currentCost: currentCost ? parseFloat(currentCost) : null,
         purchaseVendorId: parsedPurchaseVendorId,
-        salesVendors: parsedSalesVendorIds ? {
-          create: parsedSalesVendorIds.map((vendorId) => ({
-            vendorId,
-          })),
-        } : undefined,
       },
       include: {
         category: true,
         purchaseVendor: true,
-        salesVendors: {
-          include: {
-            vendor: true,
-          },
-        },
       },
     })
     
-    // salesVendors 배열로 거래처별 가격 저장 (새 방식)
-    if (salesVendors && Array.isArray(salesVendors)) {
-      await Promise.all(salesVendors.map((sv: { vendorId: number; salesPrice: number }) =>
-        prisma.vendorProductPrice.create({
-          data: {
-            vendorId: sv.vendorId,
-            productId: product.id,
-            salesPrice: sv.salesPrice,
-            effectiveDate: new Date(),
-          },
-        })
-      ))
+    // salesVendors 배열로 거래처별 가격 저장 (VendorProductPrice에 저장)
+    if (salesVendors && Array.isArray(salesVendors) && salesVendors.length > 0) {
+      await prisma.vendorProductPrice.createMany({
+        data: salesVendors.map((sv: { vendorId: number; salesPrice: number }) => ({
+          vendorId: sv.vendorId,
+          productId: product.id,
+          salesPrice: sv.salesPrice,
+          effectiveDate: new Date(),
+        })),
+      })
     }
     
     return NextResponse.json(product)
@@ -207,6 +194,7 @@ export async function PUT(request: Request) {
       purchaseVendorId,
       salesVendorIds,
       salesVendors,
+      currentCost,
     } = body
     
     // Validate required fields
@@ -243,9 +231,7 @@ export async function PUT(request: Request) {
     }
     
     // First, delete existing sales vendor relationships
-    await prisma.productSalesVendor.deleteMany({
-      where: { productId: parsedId },
-    })
+    // (removed as we no longer use ProductSalesVendor)
     
     const product = await prisma.product.update({
       where: { id: parsedId },
@@ -258,41 +244,36 @@ export async function PUT(request: Request) {
         description,
         defaultPurchasePrice: defaultPurchasePrice ? parseFloat(defaultPurchasePrice) : null,
         defaultSalesPrice: defaultSalesPrice ? parseFloat(defaultSalesPrice) : null,
+        currentCost: currentCost ? parseFloat(currentCost) : null,
         purchaseVendorId: parsedPurchaseVendorId,
-        salesVendors: parsedSalesVendorIds ? {
-          create: parsedSalesVendorIds.map((vendorId) => ({
-            vendorId,
-          })),
-        } : undefined,
       },
       include: {
         category: true,
         purchaseVendor: true,
-        salesVendors: {
-          include: {
-            vendor: true,
-          },
-        },
       },
     })
     
-    // salesVendors 배열로 거래처별 가격 저장 (새 방식)
+    // salesVendors 배열로 거래처별 가격 저장 (VendorProductPrice 업데이트)
     if (salesVendors && Array.isArray(salesVendors)) {
-      // 기존 가격 삭제
+      // 기존 VendorProductPrice에서 해당 품목의 매출가 삭제 후 재생성
       await prisma.vendorProductPrice.deleteMany({
-        where: { productId: parsedId }
+        where: { 
+          productId: parsedId,
+          salesPrice: { not: null }  // 매출가가 있는 것만
+        }
       })
-      // 새로 생성
-      await Promise.all(salesVendors.map((sv: { vendorId: number; salesPrice: number }) =>
-        prisma.vendorProductPrice.create({
-          data: {
+      
+      // 새로운 매출거래처별 가격 생성
+      if (salesVendors.length > 0) {
+        await prisma.vendorProductPrice.createMany({
+          data: salesVendors.map((sv: { vendorId: number; salesPrice: number }) => ({
             vendorId: sv.vendorId,
             productId: parsedId,
             salesPrice: sv.salesPrice,
             effectiveDate: new Date(),
-          },
+          })),
         })
-      ))
+      }
     }
     
     return NextResponse.json(product)

@@ -33,9 +33,6 @@ model Product {
   purchaseVendorId Int? // Int -> Int? (optional)
   purchaseVendor   Vendor? @relation("PurchaseVendor", fields: [purchaseVendorId], references: [id])
 
-  // 매출 거래처 (다대다 관계)
-  salesVendors ProductSalesVendor[]
-
   // 기본 단가 (거래처별 특별가가 없을 때 사용)
   defaultPurchasePrice Float? // 기본 매입가
   defaultSalesPrice    Float? // 기본 매출가
@@ -56,18 +53,6 @@ model Product {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-}
-
-// 품목-매출거래처 다대다 관계 테이블
-model ProductSalesVendor {
-  id        Int      @id @default(autoincrement())
-  productId Int
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  vendorId  Int
-  vendor    Vendor   @relation("SalesVendor", fields: [vendorId], references: [id])
-  addedAt   DateTime @default(now())
-
-  @@unique([productId, vendorId])
 }
 
 // 품목 가격 이력
@@ -121,7 +106,6 @@ model Vendor {
 
   // 관계
   purchaseProducts Product[]            @relation("PurchaseVendor") // 이 거래처가 매입처인 품목들
-  salesProducts    ProductSalesVendor[] @relation("SalesVendor") // 이 거래처가 매출처인 품목들
   vendorPrices     VendorProductPrice[]
   salesRecords     SalesRecord[]
   importExports    ImportExport[]
