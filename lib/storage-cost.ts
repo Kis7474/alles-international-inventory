@@ -7,20 +7,13 @@ import { prisma } from './prisma'
 export async function calculateStorageCostRate(): Promise<number> {
   // 현재 월 기준 창고료율 계산
   const now = new Date()
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+  const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   
-  // 이번 달 창고료 합계
-  const storageExpenses = await prisma.storageExpense.aggregate({
-    _sum: { amount: true },
-    where: {
-      dateFrom: {
-        gte: startOfMonth,
-        lte: endOfMonth,
-      },
-    },
+  // 이번 달 창고료 조회
+  const warehouseFee = await prisma.warehouseFee.findUnique({
+    where: { yearMonth: currentPeriod },
   })
-  const totalStorageExpense = storageExpenses._sum.amount || 0
+  const totalStorageExpense = warehouseFee?.totalFee || 0
   
   // 창고 재고의 총 가치
   const warehouseInventory = await prisma.inventoryLot.findMany({

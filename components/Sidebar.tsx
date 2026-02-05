@@ -45,7 +45,7 @@ const menuItems: MenuItem[] = [
       { href: '/warehouse/lots', label: '입고 관리', icon: '📥' },
       { href: '/warehouse/outbound', label: '출고 관리', icon: '📤' },
       { href: '/warehouse/inventory', label: '재고 조회', icon: '📊' },
-      { href: '/warehouse/storage-expenses', label: '창고료 관리', icon: '💰' },
+      { href: '/warehouse/warehouse-fee', label: '창고료 관리', icon: '💰' },
     ],
   },
   {

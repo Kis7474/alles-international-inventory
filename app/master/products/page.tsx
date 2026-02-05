@@ -28,6 +28,7 @@ interface Product {
   description: string | null
   defaultPurchasePrice: number | null
   currentCost: number | null
+  lastCostUpdatedAt: string | null
   purchaseVendorId: number
   purchaseVendor: Vendor
 }
@@ -281,6 +282,9 @@ export default function MasterProductsPage() {
                   현재 원가
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">
+                  원가 업데이트
+                </th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">
                   관리
                 </th>
               </tr>
@@ -318,6 +322,18 @@ export default function MasterProductsPage() {
                       </span>
                     ) : '-'}
                   </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
+                    {product.lastCostUpdatedAt ? (
+                      <span className="text-xs">
+                        {new Date(product.lastCostUpdatedAt).toLocaleDateString('ko-KR')}
+                        <br />
+                        {new Date(product.lastCostUpdatedAt).toLocaleTimeString('ko-KR', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    ) : '-'}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
                     <button
                       onClick={() => openProductModal(product.id)}
@@ -336,7 +352,7 @@ export default function MasterProductsPage() {
               ))}
               {products.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={9} className="px-6 py-4 text-center text-gray-500">
                     등록된 품목이 없습니다.
                   </td>
                 </tr>
