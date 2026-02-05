@@ -1,6 +1,71 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+
+interface Category {
+  id: number
+  code: string
+  name: string
+  nameKo: string
+}
+
+interface Vendor {
+  id: number
+  code: string
+  name: string
+  type: string
+}
+
+interface ProductPriceHistory {
+  id: number
+  effectiveDate: string
+  purchasePrice: number | null
+  salesPrice: number | null
+  notes: string | null
+}
+
+interface ProductMonthlyCost {
+  id: number
+  yearMonth: string
+  baseCost: number
+  storageCost: number
+  totalCost: number
+  quantity: number
+}
+
+interface VendorProductPrice {
+  id: number
+  vendorId: number
+  vendor: Vendor
+  salesPrice: number | null
+  purchasePrice: number | null
+  effectiveDate: string
+}
+
+interface ProductDetail {
+  id: number
+  code: string | null
+  name: string
+  unit: string
+  type: string
+  categoryId: number | null
+  category: Category | null
+  description: string | null
+  defaultPurchasePrice: number | null
+  defaultSalesPrice: number | null
+  currentCost: number | null
+  purchaseVendorId: number | null
+  purchaseVendor: Vendor | null
+  priceHistory: ProductPriceHistory[]
+  monthlyCosts: ProductMonthlyCost[]
+  vendorPrices: VendorProductPrice[]
+}
+
+interface SalesVendorPrice {
+  vendorId: number
+  vendorName: string
+  salesPrice: number
+}
 
 interface ProductModalProps {
   productId: number | null  // null이면 신규 등록
@@ -11,7 +76,7 @@ interface ProductModalProps {
 
 export default function ProductModal({ productId, isOpen, onClose, onSave }: ProductModalProps) {
   const [isEditMode, setIsEditMode] = useState(productId === null)
-  const [product, setProduct] = useState<any>(null)
+  const [product, setProduct] = useState<ProductDetail | null>(null)
   const [loading, setLoading] = useState(false)
   
   // 폼 데이터
@@ -24,19 +89,63 @@ export default function ProductModal({ productId, isOpen, onClose, onSave }: Pro
   })
   
   // 매출거래처별 가격 관리
-  const [salesVendorPrices, setSalesVendorPrices] = useState<Array<{
-    vendorId: number
-    vendorName: string
-    salesPrice: number
-  }>>([])
+  const [salesVendorPrices, setSalesVendorPrices] = useState<SalesVendorPrice[]>([])
   
   // 새 매출거래처 추가용
   const [newVendorId, setNewVendorId] = useState('')
   const [newSalesPrice, setNewSalesPrice] = useState('')
   
   // 거래처 목록, 카테고리 목록 fetch
-  const [vendors, setVendors] = useState<any[]>([])
-  const [categories, setCategories] = useState<any[]>([])
+  const [vendors, setVendors] = useState<Vendor[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
+
+  const fetchProduct = useCallback(async () => {
+    if (!productId) return
+    
+    setLoading(true)
+    const res = await fetch(`/api/products/${productId}`)
+    const data: ProductDetail = await res.json()
+    setProduct(data)
+    setFormData({
+      code: data.code || '',
+      name: data.name || '',
+      unit: data.unit || '',
+      categoryId: data.categoryId?.toString() || '',
+      purchaseVendorId: data.purchaseVendorId?.toString() || '',
+    })
+    // 매출거래처별 가격 로드
+    if (data.vendorPrices) {
+      // Group by vendor and get the latest price for each
+      const pricesByVendor = new Map<number, VendorProductPrice>()
+      data.vendorPrices.forEach((vp: VendorProductPrice) => {
+        if (vp.salesPrice !== null && vp.salesPrice !== undefined) {
+          // Only keep the latest entry per vendor (they are already sorted by effectiveDate desc)
+          if (!pricesByVendor.has(vp.vendorId)) {
+            pricesByVendor.set(vp.vendorId, vp)
+          }
+        }
+      })
+      
+      setSalesVendorPrices(Array.from(pricesByVendor.values()).map((vp: VendorProductPrice) => ({
+        vendorId: vp.vendorId,
+        vendorName: vp.vendor?.name || '',
+        salesPrice: vp.salesPrice || 0,
+      })))
+    }
+    setLoading(false)
+  }, [productId])
+
+  const fetchVendors = useCallback(async () => {
+    const res = await fetch('/api/vendors')
+    const data: Vendor[] = await res.json()
+    setVendors(data)
+  }, [])
+
+  const fetchCategories = useCallback(async () => {
+    const res = await fetch('/api/categories')
+    const data: Category[] = await res.json()
+    setCategories(data)
+  }, [])
 
   useEffect(() => {
     if (isOpen) {
@@ -53,53 +162,7 @@ export default function ProductModal({ productId, isOpen, onClose, onSave }: Pro
         setIsEditMode(true)
       }
     }
-  }, [isOpen, productId])
-
-  const fetchProduct = async () => {
-    setLoading(true)
-    const res = await fetch(`/api/products/${productId}`)
-    const data = await res.json()
-    setProduct(data)
-    setFormData({
-      code: data.code || '',
-      name: data.name || '',
-      unit: data.unit || '',
-      categoryId: data.categoryId?.toString() || '',
-      purchaseVendorId: data.purchaseVendorId?.toString() || '',
-    })
-    // 매출거래처별 가격 로드
-    if (data.vendorPrices) {
-      // Group by vendor and get the latest price for each
-      const pricesByVendor = new Map<number, any>()
-      data.vendorPrices.forEach((vp: any) => {
-        if (vp.salesPrice !== null && vp.salesPrice !== undefined) {
-          // Only keep the latest entry per vendor (they are already sorted by effectiveDate desc)
-          if (!pricesByVendor.has(vp.vendorId)) {
-            pricesByVendor.set(vp.vendorId, vp)
-          }
-        }
-      })
-      
-      setSalesVendorPrices(Array.from(pricesByVendor.values()).map((vp: any) => ({
-        vendorId: vp.vendorId,
-        vendorName: vp.vendor?.name || '',
-        salesPrice: vp.salesPrice,
-      })))
-    }
-    setLoading(false)
-  }
-
-  const fetchVendors = async () => {
-    const res = await fetch('/api/vendors')
-    const data = await res.json()
-    setVendors(data)
-  }
-
-  const fetchCategories = async () => {
-    const res = await fetch('/api/categories')
-    const data = await res.json()
-    setCategories(data)
-  }
+  }, [isOpen, productId, fetchProduct, fetchVendors, fetchCategories])
 
   const handleSave = async () => {
     setLoading(true)
@@ -285,7 +348,7 @@ export default function ProductModal({ productId, isOpen, onClose, onSave }: Pro
                     className="w-full border rounded px-3 py-2"
                   >
                     <option value="">선택안함</option>
-                    {categories.map((cat: any) => (
+                    {categories.map((cat: Category) => (
                       <option key={cat.id} value={cat.id}>{cat.nameKo}</option>
                     ))}
                   </select>
@@ -309,7 +372,7 @@ export default function ProductModal({ productId, isOpen, onClose, onSave }: Pro
                     className="w-full border rounded px-3 py-2"
                   >
                     <option value="">선택안함</option>
-                    {purchaseVendors.map((vendor: any) => (
+                    {purchaseVendors.map((vendor: Vendor) => (
                       <option key={vendor.id} value={vendor.id}>{vendor.name}</option>
                     ))}
                   </select>
@@ -340,7 +403,7 @@ export default function ProductModal({ productId, isOpen, onClose, onSave }: Pro
                     </tr>
                   </thead>
                   <tbody>
-                    {product.priceHistory.map((ph: any, idx: number) => (
+                    {product.priceHistory.map((ph: ProductPriceHistory, idx: number) => (
                       <tr key={idx} className="border-t">
                         <td className="px-3 py-2">{new Date(ph.effectiveDate).toLocaleDateString()}</td>
                         <td className="px-3 py-2 text-right">₩{ph.purchasePrice?.toLocaleString()}</td>
@@ -417,7 +480,7 @@ export default function ProductModal({ productId, isOpen, onClose, onSave }: Pro
                     <option value="">선택...</option>
                     {salesVendors
                       .filter(v => !salesVendorPrices.some(sv => sv.vendorId === v.id))
-                      .map((vendor: any) => (
+                      .map((vendor: Vendor) => (
                         <option key={vendor.id} value={vendor.id}>{vendor.name}</option>
                       ))}
                   </select>
@@ -457,7 +520,7 @@ export default function ProductModal({ productId, isOpen, onClose, onSave }: Pro
                     </tr>
                   </thead>
                   <tbody>
-                    {product.monthlyCosts.map((mc: any, idx: number) => (
+                    {product.monthlyCosts.map((mc: ProductMonthlyCost, idx: number) => (
                       <tr key={idx} className="border-t">
                         <td className="px-3 py-2">{mc.yearMonth}</td>
                         <td className="px-3 py-2 text-right">₩{mc.totalCost?.toLocaleString()}</td>
