@@ -112,23 +112,23 @@ export async function GET(request: NextRequest) {
       const now = new Date()
       const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
       
-      const storageExpenses = await prisma.storageExpense.findMany({
-        where: {
-          period: currentPeriod,
+      // WarehouseFee에서 해당 월의 창고료 조회
+      const warehouseFee = await prisma.warehouseFee.findUnique({
+        where: { yearMonth: currentPeriod },
+        include: {
+          distributions: true,
         },
       })
       
-      // 총 창고료
-      const totalStorageExpense = storageExpenses.reduce(
-        (sum, expense) => sum + expense.amount, 0
-      )
+      const totalStorageExpense = warehouseFee?.totalFee || 0
+      const isDistributed = warehouseFee?.distributedAt != null
       
       // 총 재고 수량 계산
       const totalInventoryQuantity = inventory.reduce(
         (sum, item) => sum + (item._sum.quantityRemaining || 0), 0
       )
       
-      // 단위당 창고료 배분 (수량 기준)
+      // 단위당 창고료 배분 (수량 기준) - 미배분 시 예상치 계산용
       const storageExpensePerUnit = totalInventoryQuantity > 0 
         ? totalStorageExpense / totalInventoryQuantity 
         : 0
@@ -176,11 +176,22 @@ export async function GET(request: NextRequest) {
           const totalQuantity = item._sum.quantityRemaining || 0
           const avgUnitCostWithoutStorage = totalQuantity > 0 ? Math.round((totalValue / totalQuantity) * 100) / 100 : 0
           
-          // 창고료 반영된 평균 단가
-          const avgUnitCost = avgUnitCostWithoutStorage + storageExpensePerUnit
+          // 창고료 반영된 평균 단가 계산
+          let allocatedStorageExpense = 0
+          let avgUnitCost = avgUnitCostWithoutStorage
           
-          // 배분된 창고료
-          const allocatedStorageExpense = storageExpensePerUnit * totalQuantity
+          if (isDistributed) {
+            // 배분 완료: LOT별 실제 배분된 창고료 합산
+            allocatedStorageExpense = lots.reduce(
+              (sum, lot) => sum + (lot.warehouseFee || 0),
+              0
+            )
+            avgUnitCost = totalQuantity > 0 ? avgUnitCostWithoutStorage + (allocatedStorageExpense / totalQuantity) : avgUnitCostWithoutStorage
+          } else {
+            // 미배분: 수량 기준 예상 배분
+            allocatedStorageExpense = storageExpensePerUnit * totalQuantity
+            avgUnitCost = avgUnitCostWithoutStorage + storageExpensePerUnit
+          }
           
           // 창고료 포함 총 가치
           const totalValueWithStorage = avgUnitCost * totalQuantity
