@@ -567,12 +567,52 @@ export async function DELETE(request: NextRequest) {
 
     // Bulk delete
     if (body && body.ids && Array.isArray(body.ids)) {
-      await prisma.importExport.deleteMany({
-        where: {
-          id: { in: body.ids.map((id: string | number) => parseInt(id.toString())) }
-        }
+      const ids = body.ids.map((id: string | number) => parseInt(id.toString()))
+      
+      // Get all import exports to be deleted for cost recalculation
+      const importExports = await prisma.importExport.findMany({
+        where: { id: { in: ids } },
+        include: {
+          items: true,
+        },
       })
-      return NextResponse.json({ success: true, count: body.ids.length })
+
+      // Delete in proper order for each record
+      await prisma.$transaction(async (tx) => {
+        // 1. Delete all related InventoryLots FIRST
+        await tx.inventoryLot.deleteMany({
+          where: { importExportId: { in: ids } },
+        })
+
+        // 2. Delete all related ImportExportItems
+        await tx.importExportItem.deleteMany({
+          where: { importExportId: { in: ids } },
+        })
+
+        // 3. Delete ImportExport records
+        await tx.importExport.deleteMany({
+          where: { id: { in: ids } },
+        })
+      })
+
+      // 4. Recalculate affected product costs
+      const affectedProductIds: number[] = []
+      for (const importExport of importExports) {
+        if (importExport.productId) {
+          affectedProductIds.push(importExport.productId)
+        }
+        for (const item of importExport.items) {
+          affectedProductIds.push(item.productId)
+        }
+      }
+
+      // Remove duplicates and recalculate
+      const uniqueProductIds = Array.from(new Set(affectedProductIds))
+      for (const productId of uniqueProductIds) {
+        await updateProductCurrentCost(productId)
+      }
+
+      return NextResponse.json({ success: true, count: ids.length })
     }
 
     // Single delete
@@ -583,9 +623,50 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    await prisma.importExport.delete({
-      where: { id: parseInt(id) },
+    const parsedId = parseInt(id)
+
+    // 1. Get the import export record with its related data
+    const importExport = await prisma.importExport.findUnique({
+      where: { id: parsedId },
+      include: {
+        items: true,
+      },
     })
+
+    if (!importExport) {
+      return NextResponse.json(
+        { error: '해당 데이터를 찾을 수 없습니다.' },
+        { status: 404 }
+      )
+    }
+
+    // Delete in transaction with proper order
+    await prisma.$transaction(async (tx) => {
+      // 2. Delete related InventoryLots FIRST
+      await tx.inventoryLot.deleteMany({
+        where: { importExportId: parsedId },
+      })
+
+      // 3. Delete related ImportExportItems
+      await tx.importExportItem.deleteMany({
+        where: { importExportId: parsedId },
+      })
+
+      // 4. Delete the ImportExport record
+      await tx.importExport.delete({
+        where: { id: parsedId },
+      })
+    })
+
+    // 5. Recalculate affected product costs
+    const affectedProductIds: number[] = [
+      ...(importExport.productId ? [importExport.productId] : []),
+      ...importExport.items.map(item => item.productId),
+    ]
+
+    for (const productId of affectedProductIds) {
+      await updateProductCurrentCost(productId)
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {
