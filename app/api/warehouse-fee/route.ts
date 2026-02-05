@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { updateProductCurrentCost } from '@/lib/product-cost'
 
 // GET /api/warehouse-fee - 창고료 목록 조회
 export async function GET(request: NextRequest) {
@@ -244,10 +245,26 @@ export async function PUT(request: NextRequest) {
           },
         })
         
-        return updatedFee
+        return { updatedFee, lotsWithWeight }
       })
       
-      return NextResponse.json(result)
+      // 트랜잭션 완료 후, 영향받은 품목들의 currentCost 재계산
+      const affectedProductIds = Array.from(new Set(
+        result.lotsWithWeight
+          .map(lot => lot.productId)
+          .filter((id): id is number => id != null)
+      ))
+
+      for (const productId of affectedProductIds) {
+        try {
+          await updateProductCurrentCost(productId)
+        } catch (error) {
+          console.error(`Failed to update currentCost for product ${productId}:`, error)
+          // 원가 업데이트 실패해도 배분 자체는 완료되었으므로 계속 진행
+        }
+      }
+      
+      return NextResponse.json(result.updatedFee)
     }
     
     // 창고료 정보 수정 (배분 전만 가능)
