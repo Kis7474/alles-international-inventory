@@ -608,9 +608,7 @@ export async function DELETE(request: NextRequest) {
 
       // Remove duplicates and recalculate
       const uniqueProductIds = Array.from(new Set(affectedProductIds))
-      for (const productId of uniqueProductIds) {
-        await updateProductCurrentCost(productId)
-      }
+      await Promise.all(uniqueProductIds.map(productId => updateProductCurrentCost(productId)))
 
       return NextResponse.json({ success: true, count: ids.length })
     }
@@ -666,9 +664,7 @@ export async function DELETE(request: NextRequest) {
 
     // Remove duplicates and recalculate
     const uniqueProductIds = Array.from(new Set(affectedProductIds))
-    for (const productId of uniqueProductIds) {
-      await updateProductCurrentCost(productId)
-    }
+    await Promise.all(uniqueProductIds.map(productId => updateProductCurrentCost(productId)))
 
     return NextResponse.json({ success: true })
   } catch (error) {
