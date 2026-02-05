@@ -7,7 +7,11 @@ export async function GET() {
     const items = await prisma.item.findMany({
       orderBy: { code: 'asc' },
     })
-    return NextResponse.json(items)
+    return NextResponse.json(items, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+      },
+    })
   } catch (error) {
     console.error('Error fetching items:', error)
     return NextResponse.json(

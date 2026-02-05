@@ -71,6 +71,8 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type') // IMPORT or EXPORT
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '20')
     
     // 단일 레코드 조회
     if (id) {
@@ -131,9 +133,21 @@ export async function GET(request: NextRequest) {
         category: true,
       },
       orderBy: { date: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
     })
 
-    return NextResponse.json(records)
+    const total = await prisma.importExport.count({ where })
+
+    return NextResponse.json({
+      data: records,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    })
   } catch (error) {
     console.error('Error fetching import/export records:', error)
     return NextResponse.json(

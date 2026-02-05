@@ -7,6 +7,8 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const categoryId = searchParams.get('categoryId')
     const searchName = searchParams.get('searchName')
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '20')
     
     interface WhereClause {
       type: string
@@ -44,7 +46,11 @@ export async function GET(request: Request) {
         },
       },
       orderBy: { id: 'asc' },
+      skip: (page - 1) * limit,
+      take: limit,
     })
+    
+    const total = await prisma.product.count({ where })
     
     // Transform to match Material interface for backward compatibility
     const transformedMaterials = materials.map(product => {
@@ -57,7 +63,15 @@ export async function GET(request: Request) {
       }
     })
     
-    return NextResponse.json(transformedMaterials)
+    return NextResponse.json({
+      data: transformedMaterials,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    })
   } catch (error) {
     console.error('Error fetching materials:', error)
     return NextResponse.json({ error: 'Failed to fetch materials' }, { status: 500 })

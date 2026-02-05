@@ -87,10 +87,18 @@ export async function GET(request: Request) {
           }
         })
       )
-      return NextResponse.json(productsWithCostInfo)
+      return NextResponse.json(productsWithCostInfo, {
+        headers: {
+          'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+        },
+      })
     }
     
-    return NextResponse.json(products)
+    return NextResponse.json(products, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+      },
+    })
   } catch (error) {
     console.error('Error fetching products:', error)
     return NextResponse.json({ error: 'Failed to fetch products' }, { status: 500 })

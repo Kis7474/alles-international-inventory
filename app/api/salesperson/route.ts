@@ -6,7 +6,11 @@ export async function GET() {
     const salespersons = await prisma.salesperson.findMany({
       orderBy: { name: 'asc' },
     })
-    return NextResponse.json(salespersons)
+    return NextResponse.json(salespersons, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+      },
+    })
   } catch (error) {
     console.error('Error fetching salespersons:', error)
     return NextResponse.json(

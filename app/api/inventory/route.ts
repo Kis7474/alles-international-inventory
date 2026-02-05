@@ -8,6 +8,8 @@ export async function GET(request: NextRequest) {
     const productId = searchParams.get('productId')
     const itemId = searchParams.get('itemId') // 하위 호환성
     const storageLocation = searchParams.get('storageLocation')
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '20')
 
     if (productId) {
       // 특정 품목의 LOT별 상세 재고
@@ -79,7 +81,7 @@ export async function GET(request: NextRequest) {
         lots,
       })
     } else {
-      // 전체 품목별 재고 현황 (Product 기반)
+      // 전체 품목별 재고 현황 (Product 기반) - with pagination
       interface InventoryWhereClause {
         productId: { not: null }
         quantityRemaining: { gt: number }
@@ -131,8 +133,13 @@ export async function GET(request: NextRequest) {
         ? totalStorageExpense / totalInventoryQuantity 
         : 0
 
+      // Apply pagination
+      const startIndex = (page - 1) * limit
+      const endIndex = startIndex + limit
+      const paginatedInventory = inventory.slice(startIndex, endIndex)
+
       const result = await Promise.all(
-        inventory.map(async (item) => {
+        paginatedInventory.map(async (item) => {
           const product = await prisma.product.findUnique({
             where: { id: item.productId! },
             include: {
@@ -200,7 +207,15 @@ export async function GET(request: NextRequest) {
         })
       )
 
-      return NextResponse.json(result)
+      return NextResponse.json({
+        data: result,
+        pagination: {
+          page,
+          limit,
+          total: inventory.length,
+          totalPages: Math.ceil(inventory.length / limit),
+        },
+      })
     }
   } catch (error) {
     console.error('Error fetching inventory:', error)
