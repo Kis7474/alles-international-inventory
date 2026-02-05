@@ -18,12 +18,6 @@ interface Vendor {
   type: string
 }
 
-interface ProductSalesVendor {
-  id: number
-  vendorId: number
-  vendor: Vendor
-}
-
 interface Product {
   id: number
   code: string | null
@@ -36,7 +30,6 @@ interface Product {
   currentCost: number | null
   purchaseVendorId: number
   purchaseVendor: Vendor
-  salesVendors: ProductSalesVendor[]
 }
 
 export default function MasterProductsPage() {
@@ -282,9 +275,6 @@ export default function MasterProductsPage() {
                   매입처
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  매출처
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                   카테고리
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
@@ -318,19 +308,6 @@ export default function MasterProductsPage() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {product.purchaseVendor?.name || '-'}
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-900">
-                    {product.salesVendors && product.salesVendors.length > 0 ? (
-                      <div className="flex flex-wrap gap-1">
-                        {product.salesVendors.map((sv) => (
-                          <span key={sv.id} className="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
-                            {sv.vendor.name}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    )}
-                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {product.category?.nameKo || '-'}
                   </td>
@@ -359,7 +336,7 @@ export default function MasterProductsPage() {
               ))}
               {products.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={8} className="px-6 py-4 text-center text-gray-500">
                     등록된 품목이 없습니다.
                   </td>
                 </tr>
