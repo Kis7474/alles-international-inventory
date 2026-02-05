@@ -10,6 +10,8 @@ export async function GET(request: NextRequest) {
     const categoryId = searchParams.get('categoryId')
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '20')
 
     interface WhereClause {
       type?: string
@@ -51,9 +53,21 @@ export async function GET(request: NextRequest) {
         vendor: true,
       },
       orderBy: { date: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
     })
 
-    return NextResponse.json(sales)
+    const total = await prisma.salesRecord.count({ where })
+
+    return NextResponse.json({
+      data: sales,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    })
   } catch (error) {
     console.error('Error fetching sales:', error)
     return NextResponse.json(

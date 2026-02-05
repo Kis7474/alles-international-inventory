@@ -11,6 +11,8 @@ export async function GET(request: NextRequest) {
     const productId = searchParams.get('productId')
     const storageLocation = searchParams.get('storageLocation')
     const importExportId = searchParams.get('importExportId')
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '20')
 
     interface WhereClause {
       receivedDate?: {
@@ -64,8 +66,21 @@ export async function GET(request: NextRequest) {
         { receivedDate: 'desc' },
         { id: 'desc' },
       ],
+      skip: (page - 1) * limit,
+      take: limit,
     })
-    return NextResponse.json(lots)
+
+    const total = await prisma.inventoryLot.count({ where })
+
+    return NextResponse.json({
+      data: lots,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    })
   } catch (error) {
     console.error('Error fetching lots:', error)
     return NextResponse.json(
