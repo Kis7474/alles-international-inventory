@@ -68,8 +68,19 @@ export default function ProductModal({ productId, isOpen, onClose, onSave }: Pro
       purchaseVendorId: data.purchaseVendorId?.toString() || '',
     })
     // 매출거래처별 가격 로드
-    if (data.vendorProductPrices) {
-      setSalesVendorPrices(data.vendorProductPrices.map((vp: any) => ({
+    if (data.vendorPrices) {
+      // Group by vendor and get the latest price for each
+      const pricesByVendor = new Map<number, any>()
+      data.vendorPrices.forEach((vp: any) => {
+        if (vp.salesPrice !== null && vp.salesPrice !== undefined) {
+          // Only keep the latest entry per vendor (they are already sorted by effectiveDate desc)
+          if (!pricesByVendor.has(vp.vendorId)) {
+            pricesByVendor.set(vp.vendorId, vp)
+          }
+        }
+      })
+      
+      setSalesVendorPrices(Array.from(pricesByVendor.values()).map((vp: any) => ({
         vendorId: vp.vendorId,
         vendorName: vp.vendor?.name || '',
         salesPrice: vp.salesPrice,
