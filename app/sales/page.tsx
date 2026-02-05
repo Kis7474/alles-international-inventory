@@ -65,11 +65,18 @@ export default function SalesPage() {
         fetch('/api/categories'),
       ])
 
-      const salesData = await salesRes.json()
+      const salesResponse = await salesRes.json()
       const salespersonsData = await salespersonsRes.json()
       const categoriesData = await categoriesRes.json()
 
-      setSales(salesData)
+      // 하위 호환성: 배열이면 그대로 사용, 객체면 data 속성 사용
+      if (Array.isArray(salesResponse)) {
+        setSales(salesResponse)
+      } else {
+        setSales(salesResponse.data || [])
+        // pagination 정보는 받지만 현재는 UI에 표시하지 않음 (향후 기능 추가 가능)
+      }
+      
       setSalespersons(salespersonsData)
       setCategories(categoriesData)
     } catch (error) {
@@ -91,8 +98,16 @@ export default function SalesPage() {
       if (filterEndDate) params.append('endDate', filterEndDate)
 
       const res = await fetch(`/api/sales?${params.toString()}`)
-      const data = await res.json()
-      setSales(data)
+      const response = await res.json()
+      
+      // 하위 호환성: 배열이면 그대로 사용, 객체면 data 속성 사용
+      if (Array.isArray(response)) {
+        setSales(response)
+      } else {
+        setSales(response.data || [])
+        // pagination 정보는 받지만 현재는 UI에 표시하지 않음 (향후 기능 추가 가능)
+      }
+      
       setSelectedIds([])
       setSelectAll(false)
     } catch (error) {
