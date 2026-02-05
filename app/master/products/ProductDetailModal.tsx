@@ -34,15 +34,6 @@ interface ProductMonthlyCost {
   quantity: number
 }
 
-interface VendorProductPrice {
-  id: number
-  vendorId: number
-  vendor: Vendor
-  salesPrice: number | null
-  purchasePrice: number | null
-  effectiveDate: string
-}
-
 interface SalesVendorWithPrice {
   id: number
   vendorId: number
