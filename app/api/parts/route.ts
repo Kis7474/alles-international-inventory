@@ -36,21 +36,26 @@ export async function GET(request: Request) {
       include: {
         category: true,
         purchaseVendor: true,
-        salesVendors: {
+        vendorPrices: {
           include: {
             vendor: true,
           },
+          orderBy: { effectiveDate: 'desc' },
         },
       },
       orderBy: { id: 'asc' },
     })
     
     // Transform to match Part interface for backward compatibility
-    const transformedParts = parts.map(product => ({
-      ...product,
-      salesVendor: product.salesVendors.length > 0 ? product.salesVendors[0].vendor : null,
-      salesVendorId: product.salesVendors.length > 0 ? product.salesVendors[0].vendorId : null,
-    }))
+    const transformedParts = parts.map(product => {
+      // Get the latest sales vendor price
+      const latestSalesPrice = product.vendorPrices.find(vp => vp.salesPrice !== null && vp.salesPrice !== undefined)
+      return {
+        ...product,
+        salesVendor: latestSalesPrice?.vendor || null,
+        salesVendorId: latestSalesPrice?.vendorId || null,
+      }
+    })
     
     return NextResponse.json(transformedParts)
   } catch (error) {
@@ -89,16 +94,11 @@ export async function POST(request: Request) {
         description,
         defaultPurchasePrice: defaultPurchasePrice ? parseFloat(defaultPurchasePrice) : null,
         purchaseVendorId: purchaseVendorId ? parseInt(purchaseVendorId) : null,
-        salesVendors: salesVendorId ? {
-          create: {
-            vendorId: parseInt(salesVendorId),
-          },
-        } : undefined,
       },
       include: {
         category: true,
         purchaseVendor: true,
-        salesVendors: {
+        vendorPrices: {
           include: {
             vendor: true,
           },
@@ -106,11 +106,24 @@ export async function POST(request: Request) {
       },
     })
 
+    // Create sales vendor price if provided
+    if (salesVendorId) {
+      await prisma.vendorProductPrice.create({
+        data: {
+          vendorId: parseInt(salesVendorId),
+          productId: part.id,
+          salesPrice: 0, // Default to 0, can be updated later
+          effectiveDate: new Date(),
+        },
+      })
+    }
+
     // Transform response for backward compatibility
+    const latestSalesPrice = part.vendorPrices.find(vp => vp.salesPrice !== null && vp.salesPrice !== undefined)
     const response = {
       ...part,
-      salesVendor: part.salesVendors.length > 0 ? part.salesVendors[0].vendor : null,
-      salesVendorId: part.salesVendors.length > 0 ? part.salesVendors[0].vendorId : null,
+      salesVendor: latestSalesPrice?.vendor || null,
+      salesVendorId: latestSalesPrice?.vendorId || null,
     }
 
     return NextResponse.json(response, { status: 201 })
@@ -140,9 +153,12 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'ID가 필요합니다.' }, { status: 400 })
     }
 
-    // Delete existing sales vendor relationships
-    await prisma.productSalesVendor.deleteMany({
-      where: { productId: parseInt(id) },
+    // Delete existing sales vendor relationships (VendorProductPrice)
+    await prisma.vendorProductPrice.deleteMany({
+      where: { 
+        productId: parseInt(id),
+        salesPrice: { not: null }
+      },
     })
 
     const part = await prisma.product.update({
@@ -156,16 +172,11 @@ export async function PUT(request: Request) {
         description,
         defaultPurchasePrice: defaultPurchasePrice ? parseFloat(defaultPurchasePrice) : null,
         purchaseVendorId: purchaseVendorId ? parseInt(purchaseVendorId) : null,
-        salesVendors: salesVendorId ? {
-          create: {
-            vendorId: parseInt(salesVendorId),
-          },
-        } : undefined,
       },
       include: {
         category: true,
         purchaseVendor: true,
-        salesVendors: {
+        vendorPrices: {
           include: {
             vendor: true,
           },
@@ -173,11 +184,24 @@ export async function PUT(request: Request) {
       },
     })
 
+    // Create sales vendor price if provided
+    if (salesVendorId) {
+      await prisma.vendorProductPrice.create({
+        data: {
+          vendorId: parseInt(salesVendorId),
+          productId: part.id,
+          salesPrice: 0, // Default to 0, can be updated later
+          effectiveDate: new Date(),
+        },
+      })
+    }
+
     // Transform response for backward compatibility
+    const latestSalesPrice = part.vendorPrices.find(vp => vp.salesPrice !== null && vp.salesPrice !== undefined)
     const response = {
       ...part,
-      salesVendor: part.salesVendors.length > 0 ? part.salesVendors[0].vendor : null,
-      salesVendorId: part.salesVendors.length > 0 ? part.salesVendors[0].vendorId : null,
+      salesVendor: latestSalesPrice?.vendor || null,
+      salesVendorId: latestSalesPrice?.vendorId || null,
     }
 
     return NextResponse.json(response)
