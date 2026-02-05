@@ -65,6 +65,12 @@ export async function GET(request: Request) {
             vendor: true,
           },
         },
+        vendorPrices: {
+          include: {
+            vendor: true,
+          },
+          orderBy: { effectiveDate: 'desc' },
+        },
         priceHistory: {
           orderBy: { effectiveDate: 'desc' },
           take: 1,
@@ -109,6 +115,7 @@ export async function POST(request: Request) {
       defaultSalesPrice,
       purchaseVendorId,
       salesVendorIds,
+      salesVendors,
     } = body
     
     // Validate required fields
@@ -162,6 +169,20 @@ export async function POST(request: Request) {
       },
     })
     
+    // salesVendors 배열로 거래처별 가격 저장 (새 방식)
+    if (salesVendors && Array.isArray(salesVendors)) {
+      await Promise.all(salesVendors.map((sv: { vendorId: number; salesPrice: number }) =>
+        prisma.vendorProductPrice.create({
+          data: {
+            vendorId: sv.vendorId,
+            productId: product.id,
+            salesPrice: sv.salesPrice,
+            effectiveDate: new Date(),
+          },
+        })
+      ))
+    }
+    
     return NextResponse.json(product)
   } catch (error) {
     console.error('Error creating product:', error)
@@ -185,6 +206,7 @@ export async function PUT(request: Request) {
       defaultSalesPrice,
       purchaseVendorId,
       salesVendorIds,
+      salesVendors,
     } = body
     
     // Validate required fields
@@ -253,6 +275,25 @@ export async function PUT(request: Request) {
         },
       },
     })
+    
+    // salesVendors 배열로 거래처별 가격 저장 (새 방식)
+    if (salesVendors && Array.isArray(salesVendors)) {
+      // 기존 가격 삭제
+      await prisma.vendorProductPrice.deleteMany({
+        where: { productId: parsedId }
+      })
+      // 새로 생성
+      await Promise.all(salesVendors.map((sv: { vendorId: number; salesPrice: number }) =>
+        prisma.vendorProductPrice.create({
+          data: {
+            vendorId: sv.vendorId,
+            productId: parsedId,
+            salesPrice: sv.salesPrice,
+            effectiveDate: new Date(),
+          },
+        })
+      ))
+    }
     
     return NextResponse.json(product)
   } catch (error) {
