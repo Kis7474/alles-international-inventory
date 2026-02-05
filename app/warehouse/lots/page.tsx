@@ -118,8 +118,11 @@ export default function LotsPage() {
         productsData = productsResponse
       } else if (productsResponse.data && Array.isArray(productsResponse.data)) {
         productsData = productsResponse.data
+      } else if (productsResponse.error) {
+        // productsResponse가 { error: ... } 객체인 경우
+        console.error('Error fetching products:', productsResponse.error)
       }
-      // productsResponse가 { error: ... } 객체인 경우 빈 배열로 유지
+      // 빈 배열로 유지하여 .map() 에러 방지
       
       setLots(lotsData)
       setProducts(productsData)
