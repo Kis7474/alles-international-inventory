@@ -43,6 +43,14 @@ export default function MasterMaterialsPage() {
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [selectAll, setSelectAll] = useState(false)
   
+  // 페이지네이션 상태
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 0,
+  })
+  
   const [filterCategoryId, setFilterCategoryId] = useState('')
   const [filterSearchName, setFilterSearchName] = useState('')
   
@@ -69,10 +77,20 @@ export default function MasterMaterialsPage() {
         fetch('/api/categories'),
         fetch('/api/vendors'),
       ])
-      const materialsData = await materialsRes.json()
+      const materialsResponse = await materialsRes.json()
       const categoriesData = await categoriesRes.json()
       const vendorsData = await vendorsRes.json()
-      setMaterials(materialsData)
+      
+      // 하위 호환성: 배열이면 그대로 사용, 객체면 data 속성 사용
+      if (Array.isArray(materialsResponse)) {
+        setMaterials(materialsResponse)
+      } else {
+        setMaterials(materialsResponse.data || [])
+        if (materialsResponse.pagination) {
+          setPagination(materialsResponse.pagination)
+        }
+      }
+      
       setCategories(categoriesData)
       setVendors(vendorsData)
     } catch (error) {
@@ -90,8 +108,18 @@ export default function MasterMaterialsPage() {
       if (filterSearchName) params.append('searchName', filterSearchName)
 
       const res = await fetch(`/api/materials?${params.toString()}`)
-      const data = await res.json()
-      setMaterials(data)
+      const response = await res.json()
+      
+      // 하위 호환성: 배열이면 그대로 사용, 객체면 data 속성 사용
+      if (Array.isArray(response)) {
+        setMaterials(response)
+      } else {
+        setMaterials(response.data || [])
+        if (response.pagination) {
+          setPagination(response.pagination)
+        }
+      }
+      
       setSelectedIds([])
       setSelectAll(false)
     } catch (error) {

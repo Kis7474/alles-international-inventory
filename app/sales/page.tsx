@@ -42,6 +42,14 @@ export default function SalesPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   
+  // 페이지네이션 상태
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 0,
+  })
+  
   // 필터 상태
   const [filterType, setFilterType] = useState('')
   const [filterSalesperson, setFilterSalesperson] = useState('')
@@ -65,11 +73,20 @@ export default function SalesPage() {
         fetch('/api/categories'),
       ])
 
-      const salesData = await salesRes.json()
+      const salesResponse = await salesRes.json()
       const salespersonsData = await salespersonsRes.json()
       const categoriesData = await categoriesRes.json()
 
-      setSales(salesData)
+      // 하위 호환성: 배열이면 그대로 사용, 객체면 data 속성 사용
+      if (Array.isArray(salesResponse)) {
+        setSales(salesResponse)
+      } else {
+        setSales(salesResponse.data || [])
+        if (salesResponse.pagination) {
+          setPagination(salesResponse.pagination)
+        }
+      }
+      
       setSalespersons(salespersonsData)
       setCategories(categoriesData)
     } catch (error) {
@@ -91,8 +108,18 @@ export default function SalesPage() {
       if (filterEndDate) params.append('endDate', filterEndDate)
 
       const res = await fetch(`/api/sales?${params.toString()}`)
-      const data = await res.json()
-      setSales(data)
+      const response = await res.json()
+      
+      // 하위 호환성: 배열이면 그대로 사용, 객체면 data 속성 사용
+      if (Array.isArray(response)) {
+        setSales(response)
+      } else {
+        setSales(response.data || [])
+        if (response.pagination) {
+          setPagination(response.pagination)
+        }
+      }
+      
       setSelectedIds([])
       setSelectAll(false)
     } catch (error) {

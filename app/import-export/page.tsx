@@ -37,6 +37,14 @@ export default function ImportExportPage() {
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [selectAll, setSelectAll] = useState(false)
   
+  // 페이지네이션 상태
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 0,
+  })
+  
   // PDF modal state
   const [showPdfModal, setShowPdfModal] = useState(false)
   const [currentPdfUrl, setCurrentPdfUrl] = useState('')
@@ -55,8 +63,17 @@ export default function ImportExportPage() {
       if (filter.endDate) params.append('endDate', filter.endDate)
 
       const res = await fetch(`/api/import-export?${params.toString()}`)
-      const data = await res.json()
-      setRecords(data)
+      const response = await res.json()
+      
+      // 하위 호환성: 배열이면 그대로 사용, 객체면 data 속성 사용
+      if (Array.isArray(response)) {
+        setRecords(response)
+      } else {
+        setRecords(response.data || [])
+        if (response.pagination) {
+          setPagination(response.pagination)
+        }
+      }
     } catch (error) {
       console.error('Error fetching records:', error)
     } finally {
