@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { formatCurrency } from '@/lib/utils'
+import ProductDetailModal from './ProductDetailModal'
 
 interface Category {
   id: number
@@ -33,6 +34,7 @@ interface Product {
   description: string | null
   defaultPurchasePrice: number | null
   defaultSalesPrice: number | null
+  currentCost: number | null
   purchaseVendorId: number
   purchaseVendor: Vendor
   salesVendors: ProductSalesVendor[]
@@ -44,6 +46,8 @@ export default function MasterProductsPage() {
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
+  const [showDetailModal, setShowDetailModal] = useState(false)
+  const [viewingProduct, setViewingProduct] = useState<number | null>(null)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [selectAll, setSelectAll] = useState(false)
@@ -382,6 +386,9 @@ export default function MasterProductsPage() {
                   기본 매입가
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
+                  현재 원가
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
                   기본 매출가
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">
@@ -432,9 +439,25 @@ export default function MasterProductsPage() {
                     {product.defaultPurchasePrice ? formatCurrency(product.defaultPurchasePrice) : '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                    {product.currentCost ? (
+                      <span className="font-semibold text-green-700">
+                        {formatCurrency(product.currentCost)}
+                      </span>
+                    ) : '-'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
                     {product.defaultSalesPrice ? formatCurrency(product.defaultSalesPrice) : '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
+                    <button
+                      onClick={() => {
+                        setViewingProduct(product.id)
+                        setShowDetailModal(true)
+                      }}
+                      className="text-green-600 hover:text-green-900 mr-3"
+                    >
+                      상세
+                    </button>
                     <button
                       onClick={() => handleEdit(product)}
                       className="text-blue-600 hover:text-blue-900 mr-3"
@@ -452,7 +475,7 @@ export default function MasterProductsPage() {
               ))}
               {products.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={11} className="px-6 py-4 text-center text-gray-500">
                     등록된 품목이 없습니다.
                   </td>
                 </tr>
@@ -663,6 +686,17 @@ export default function MasterProductsPage() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* 상세 모달 */}
+      {showDetailModal && viewingProduct && (
+        <ProductDetailModal
+          productId={viewingProduct}
+          onClose={() => {
+            setShowDetailModal(false)
+            setViewingProduct(null)
+          }}
+        />
       )}
     </div>
   )
