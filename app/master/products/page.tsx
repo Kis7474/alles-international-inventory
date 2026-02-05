@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { formatCurrency } from '@/lib/utils'
-import ProductDetailModal from './ProductDetailModal'
+import ProductModal from './ProductModal'
 
 interface Category {
   id: number
@@ -43,33 +43,15 @@ interface Product {
 export default function MasterProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
-  const [vendors, setVendors] = useState<Vendor[]>([])
   const [loading, setLoading] = useState(true)
-  const [showModal, setShowModal] = useState(false)
-  const [showDetailModal, setShowDetailModal] = useState(false)
-  const [viewingProduct, setViewingProduct] = useState<number | null>(null)
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+  const [showProductModal, setShowProductModal] = useState(false)
+  const [editingProductId, setEditingProductId] = useState<number | null>(null)
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [selectAll, setSelectAll] = useState(false)
   
   // 필터 상태
   const [filterCategoryId, setFilterCategoryId] = useState('')
   const [filterSearchName, setFilterSearchName] = useState('')
-  
-  // Sales vendor management
-  const [selectedSalesVendorId, setSelectedSalesVendorId] = useState('')
-  
-  const [formData, setFormData] = useState({
-    code: '',
-    name: '',
-    unit: 'EA',
-    categoryId: '',
-    description: '',
-    defaultPurchasePrice: '',
-    defaultSalesPrice: '',
-    purchaseVendorId: '',
-    salesVendorIds: [] as string[],
-  })
 
   useEffect(() => {
     fetchData()
@@ -77,17 +59,14 @@ export default function MasterProductsPage() {
 
   const fetchData = async () => {
     try {
-      const [productsRes, categoriesRes, vendorsRes] = await Promise.all([
+      const [productsRes, categoriesRes] = await Promise.all([
         fetch('/api/products'),
         fetch('/api/categories'),
-        fetch('/api/vendors'),
       ])
       const productsData = await productsRes.json()
       const categoriesData = await categoriesRes.json()
-      const vendorsData = await vendorsRes.json()
       setProducts(productsData)
       setCategories(categoriesData)
-      setVendors(vendorsData)
     } catch (error) {
       console.error('Error fetching data:', error)
     } finally {
@@ -112,62 +91,6 @@ export default function MasterProductsPage() {
       alert('필터링 중 오류가 발생했습니다.')
     } finally {
       setLoading(false)
-    }
-  }
-
-  const addSalesVendor = () => {
-    if (!selectedSalesVendorId) return
-    if (formData.salesVendorIds.includes(selectedSalesVendorId)) {
-      alert('이미 추가된 거래처입니다.')
-      return
-    }
-    setFormData({
-      ...formData,
-      salesVendorIds: [...formData.salesVendorIds, selectedSalesVendorId],
-    })
-    setSelectedSalesVendorId('')
-  }
-
-  const removeSalesVendor = (vendorId: string) => {
-    setFormData({
-      ...formData,
-      salesVendorIds: formData.salesVendorIds.filter((id) => id !== vendorId),
-    })
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (!formData.purchaseVendorId) {
-      alert('매입 거래처를 선택해주세요.')
-      return
-    }
-    
-    try {
-      const url = '/api/products'
-      const method = editingProduct ? 'PUT' : 'POST'
-      const body = editingProduct
-        ? { ...formData, id: editingProduct.id }
-        : formData
-
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-
-      if (res.ok) {
-        await fetchData()
-        handleCloseModal()
-        setSelectedIds([])
-        setSelectAll(false)
-      } else {
-        const error = await res.json()
-        alert(error.error || '오류가 발생했습니다.')
-      }
-    } catch (error) {
-      console.error('Error saving product:', error)
-      alert('저장 중 오류가 발생했습니다.')
     }
   }
 
@@ -236,37 +159,10 @@ export default function MasterProductsPage() {
     }
   }
 
-  const handleEdit = (product: Product) => {
-    setEditingProduct(product)
-    setFormData({
-      code: product.code || '',
-      name: product.name,
-      unit: product.unit,
-      categoryId: product.categoryId?.toString() || '',
-      description: product.description || '',
-      defaultPurchasePrice: product.defaultPurchasePrice?.toString() || '',
-      defaultSalesPrice: product.defaultSalesPrice?.toString() || '',
-      purchaseVendorId: product.purchaseVendorId.toString(),
-      salesVendorIds: product.salesVendors?.map((sv) => sv.vendorId.toString()) || [],
-    })
-    setShowModal(true)
-  }
-
-  const handleCloseModal = () => {
-    setShowModal(false)
-    setEditingProduct(null)
-    setFormData({
-      code: '',
-      name: '',
-      unit: 'EA',
-      categoryId: '',
-      description: '',
-      defaultPurchasePrice: '',
-      defaultSalesPrice: '',
-      purchaseVendorId: '',
-      salesVendorIds: [],
-    })
-    setSelectedSalesVendorId('')
+  const handleProductSave = () => {
+    setShowProductModal(false)
+    setEditingProductId(null)
+    fetchData()
   }
 
   if (loading) {
@@ -291,7 +187,10 @@ export default function MasterProductsPage() {
             </button>
           )}
           <button
-            onClick={() => setShowModal(true)}
+            onClick={() => {
+              setEditingProductId(null)
+              setShowProductModal(true)
+            }}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
             + 품목 등록
@@ -383,13 +282,7 @@ export default function MasterProductsPage() {
                   카테고리
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  기본 매입가
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
                   현재 원가
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
-                  기본 매출가
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">
                   관리
@@ -436,33 +329,21 @@ export default function MasterProductsPage() {
                     {product.category?.nameKo || '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                    {product.defaultPurchasePrice ? formatCurrency(product.defaultPurchasePrice) : '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
                     {product.currentCost ? (
                       <span className="font-semibold text-green-700">
                         {formatCurrency(product.currentCost)}
                       </span>
                     ) : '-'}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                    {product.defaultSalesPrice ? formatCurrency(product.defaultSalesPrice) : '-'}
-                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
                     <button
                       onClick={() => {
-                        setViewingProduct(product.id)
-                        setShowDetailModal(true)
+                        setEditingProductId(product.id)
+                        setShowProductModal(true)
                       }}
-                      className="text-green-600 hover:text-green-900 mr-3"
-                    >
-                      상세
-                    </button>
-                    <button
-                      onClick={() => handleEdit(product)}
                       className="text-blue-600 hover:text-blue-900 mr-3"
                     >
-                      수정
+                      상세/수정
                     </button>
                     <button
                       onClick={() => handleDelete(product.id)}
@@ -475,7 +356,7 @@ export default function MasterProductsPage() {
               ))}
               {products.length === 0 && (
                 <tr>
-                  <td colSpan={11} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={9} className="px-6 py-4 text-center text-gray-500">
                     등록된 품목이 없습니다.
                   </td>
                 </tr>
@@ -485,217 +366,15 @@ export default function MasterProductsPage() {
         </div>
       </div>
 
-      {/* 모달 */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <h2 className="text-2xl font-bold mb-6 text-gray-900">
-              {editingProduct ? '품목 수정' : '품목 등록'}
-            </h2>
-            <form onSubmit={handleSubmit}>
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                {/* 매입 거래처 선택 (필수) */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    매입 거래처 * <span className="text-xs text-blue-600">(거래처 관리에서 등록된 매입처)</span>
-                  </label>
-                  <select
-                    required
-                    value={formData.purchaseVendorId}
-                    onChange={(e) => setFormData({ ...formData, purchaseVendorId: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                  >
-                    <option value="">선택하세요</option>
-                    {vendors
-                      .filter(v => v.type === 'DOMESTIC_PURCHASE' || v.type === 'INTERNATIONAL_PURCHASE')
-                      .map((vendor) => (
-                        <option key={vendor.id} value={vendor.id}>
-                          [{vendor.code}] {vendor.name}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-
-                {/* 품목명 */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">품목명 *</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                  />
-                </div>
-              </div>
-
-              {/* 매출 거래처 관리 */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  매출 거래처 <span className="text-xs text-gray-500">(여러 거래처 추가 가능)</span>
-                </label>
-                
-                {/* 현재 등록된 매출 거래처 목록 */}
-                <div className="flex flex-wrap gap-2 mb-2 min-h-[32px]">
-                  {formData.salesVendorIds.map((vendorId) => {
-                    const vendor = vendors.find(v => v.id.toString() === vendorId)
-                    return vendor ? (
-                      <span key={vendorId} className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
-                        {vendor.name}
-                        <button
-                          type="button"
-                          onClick={() => removeSalesVendor(vendorId)}
-                          className="ml-2 text-blue-600 hover:text-blue-800 font-bold"
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ) : null
-                  })}
-                  {formData.salesVendorIds.length === 0 && (
-                    <span className="text-gray-400 text-sm">등록된 매출 거래처가 없습니다</span>
-                  )}
-                </div>
-                
-                {/* 매출 거래처 추가 */}
-                <div className="flex gap-2">
-                  <select
-                    value={selectedSalesVendorId}
-                    onChange={(e) => setSelectedSalesVendorId(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                  >
-                    <option value="">매출 거래처 선택</option>
-                    {vendors
-                      .filter(v => v.type === 'DOMESTIC_SALES' || v.type === 'INTERNATIONAL_SALES')
-                      .filter(v => !formData.salesVendorIds.includes(v.id.toString()))
-                      .map((vendor) => (
-                        <option key={vendor.id} value={vendor.id}>
-                          [{vendor.code}] {vendor.name}
-                        </option>
-                      ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={addSalesVendor}
-                    className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-                  >
-                    추가
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    품목코드 (선택)
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.code}
-                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    단위 *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.unit}
-                    onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                    placeholder="EA, BOX, KG 등"
-                  />
-                </div>
-              </div>
-
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  카테고리
-                </label>
-                <select
-                  value={formData.categoryId}
-                  onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                >
-                  <option value="">선택</option>
-                  {categories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.nameKo}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    기본 매입가 (₩)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.defaultPurchasePrice}
-                    onChange={(e) => setFormData({ ...formData, defaultPurchasePrice: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    기본 매출가 (₩)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.defaultSalesPrice}
-                    onChange={(e) => setFormData({ ...formData, defaultSalesPrice: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                  />
-                </div>
-              </div>
-
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  설명
-                </label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={handleCloseModal}
-                  className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
-                >
-                  취소
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                >
-                  {editingProduct ? '수정' : '등록'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* 상세 모달 */}
-      {showDetailModal && viewingProduct && (
-        <ProductDetailModal
-          productId={viewingProduct}
+      {/* Product Modal - 통합 (등록/상세/수정) */}
+      {showProductModal && (
+        <ProductModal
+          productId={editingProductId}
           onClose={() => {
-            setShowDetailModal(false)
-            setViewingProduct(null)
+            setShowProductModal(false)
+            setEditingProductId(null)
           }}
+          onSave={handleProductSave}
         />
       )}
     </div>
