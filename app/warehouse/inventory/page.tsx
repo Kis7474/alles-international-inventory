@@ -55,8 +55,18 @@ export default function InventoryPage() {
       }
       
       const res = await fetch(`/api/inventory?${params.toString()}`)
-      const data = await res.json()
-      setInventory(data)
+      const response = await res.json()
+      
+      // 방어적 코딩: 배열이면 그대로, 객체면 data 속성 사용
+      let inventoryData: InventoryItem[] = []
+      if (Array.isArray(response)) {
+        inventoryData = response
+      } else if (response.data && Array.isArray(response.data)) {
+        inventoryData = response.data
+      }
+      // response가 에러 객체 { error: ... }인 경우 빈 배열로 유지
+      
+      setInventory(inventoryData)
     } catch (error) {
       console.error('Error fetching inventory:', error)
       alert('재고 조회 중 오류가 발생했습니다.')
