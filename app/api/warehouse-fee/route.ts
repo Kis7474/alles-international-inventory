@@ -252,7 +252,7 @@ export async function PUT(request: NextRequest) {
       const affectedProductIds = Array.from(new Set(
         result.lotsWithWeight
           .map(lot => lot.productId)
-          .filter((id): id is number => id !== null && id !== undefined)
+          .filter((id): id is number => id != null)
       ))
 
       for (const productId of affectedProductIds) {
