@@ -112,7 +112,7 @@ export async function POST(request: Request) {
         data: {
           vendorId: parseInt(salesVendorId),
           productId: part.id,
-          salesPrice: 0, // Default to 0, can be updated later
+          salesPrice: null, // Will be updated later when price is set
           effectiveDate: new Date(),
         },
       })
@@ -190,7 +190,7 @@ export async function PUT(request: Request) {
         data: {
           vendorId: parseInt(salesVendorId),
           productId: part.id,
-          salesPrice: 0, // Default to 0, can be updated later
+          salesPrice: null, // Will be updated later when price is set
           effectiveDate: new Date(),
         },
       })
