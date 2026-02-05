@@ -60,22 +60,17 @@ export default function WarehouseFeePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    const data = {
-      yearMonth: formData.yearMonth,
-      totalFee: parseFloat(formData.totalFee),
-      memo: formData.memo || null,
-    }
-
     try {
       if (editingFee) {
-        // 수정
+        // 수정 - yearMonth는 수정 불가이므로 editingFee에서 가져옴
         const res = await fetch('/api/warehouse-fee', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             yearMonth: editingFee.yearMonth,
             action: 'update',
-            ...data,
+            totalFee: parseFloat(formData.totalFee),
+            memo: formData.memo || null,
           }),
         })
 
@@ -92,7 +87,11 @@ export default function WarehouseFeePage() {
         const res = await fetch('/api/warehouse-fee', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
+          body: JSON.stringify({
+            yearMonth: formData.yearMonth,
+            totalFee: parseFloat(formData.totalFee),
+            memo: formData.memo || null,
+          }),
         })
 
         const result = await res.json()
