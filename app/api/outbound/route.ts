@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getProductCurrentCost } from '@/lib/product-cost'
 
 // Type definitions
 interface LotWhereClause {
@@ -18,13 +19,28 @@ interface MovementCreateData {
   totalCost: number
   productId?: number
   itemId?: number
+  vendorId?: number
+  salespersonId?: number
+  salesRecordId?: number
+  outboundType?: string
+  notes?: string
 }
 
 // POST - FIFO 출고 처리
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { productId, itemId, quantity, outboundDate, storageLocation } = body
+    const { 
+      productId, 
+      itemId, 
+      quantity, 
+      outboundDate, 
+      storageLocation,
+      vendorId,
+      salespersonId,
+      outboundType,
+      notes
+    } = body
 
     // 유효성 검사
     if (!productId && !itemId) {
@@ -46,6 +62,16 @@ export async function POST(request: NextRequest) {
         { error: '출고수량은 0보다 커야 합니다.' },
         { status: 400 }
       )
+    }
+
+    // 판매출고인 경우 거래처와 담당자는 필수
+    if (outboundType === 'SALES') {
+      if (!vendorId || !salespersonId) {
+        return NextResponse.json(
+          { error: '판매출고는 거래처와 담당자가 필수입니다.' },
+          { status: 400 }
+        )
+      }
     }
 
     // 해당 품목의 사용 가능한 LOT 조회 및 FIFO 출고 처리를 트랜잭션으로 처리
@@ -83,6 +109,83 @@ export async function POST(request: NextRequest) {
         throw new Error(
           `재고가 부족합니다. 현재 재고: ${totalAvailable}, 요청 수량: ${quantity}`
         )
+      }
+
+      let salesRecordId: number | undefined = undefined
+
+      // 판매출고인 경우 SalesRecord 생성
+      if (outboundType === 'SALES' && productId) {
+        // 품목 정보 조회
+        const product = await tx.product.findUnique({
+          where: { id: productId },
+          select: {
+            name: true,
+            categoryId: true,
+          },
+        })
+
+        if (!product) {
+          throw new Error('품목 정보를 찾을 수 없습니다.')
+        }
+
+        // 원가 계산: 총 출고 원가 (수량 × currentCost)
+        const costData = await getProductCurrentCost(productId)
+        const totalCost = quantity * costData.cost
+
+        // 매출가 조회: VendorProductPrice → Product.defaultSalesPrice → 0
+        let unitPrice = 0
+        
+        // 1. VendorProductPrice에서 조회
+        const vendorPrice = await tx.vendorProductPrice.findFirst({
+          where: {
+            vendorId: parseInt(vendorId),
+            productId,
+            effectiveDate: {
+              lte: new Date(outboundDate),
+            },
+          },
+          orderBy: {
+            effectiveDate: 'desc',
+          },
+        })
+
+        if (vendorPrice && vendorPrice.salesPrice) {
+          unitPrice = vendorPrice.salesPrice
+        } else {
+          // 2. Product.defaultSalesPrice 사용
+          const productPrice = await tx.product.findUnique({
+            where: { id: productId },
+            select: { defaultSalesPrice: true },
+          })
+          unitPrice = productPrice?.defaultSalesPrice || 0
+        }
+
+        const amount = quantity * unitPrice
+        const margin = amount - totalCost
+        const marginRate = amount > 0 ? (margin / amount) * 100 : 0
+
+        // SalesRecord 생성
+        const salesRecord = await tx.salesRecord.create({
+          data: {
+            date: new Date(outboundDate),
+            type: 'SALES',
+            salespersonId: parseInt(salespersonId),
+            categoryId: product.categoryId || 1, // categoryId가 null인 경우 기본값 사용
+            productId,
+            vendorId: parseInt(vendorId),
+            itemName: product.name,
+            quantity,
+            unitPrice,
+            amount,
+            cost: totalCost,
+            margin,
+            marginRate,
+            costSource: 'OUTBOUND_AUTO',
+            notes: notes || null,
+          },
+        })
+
+        salesRecordId = salesRecord.id
       }
 
       // FIFO 출고 처리
@@ -126,6 +229,13 @@ export async function POST(request: NextRequest) {
           movementData.itemId = itemId
         }
 
+        // Phase 4 추가 필드
+        if (vendorId) movementData.vendorId = parseInt(vendorId)
+        if (salespersonId) movementData.salespersonId = parseInt(salespersonId)
+        if (salesRecordId) movementData.salesRecordId = salesRecordId
+        if (outboundType) movementData.outboundType = outboundType
+        if (notes) movementData.notes = notes
+
         await tx.inventoryMovement.create({
           data: movementData,
         })
@@ -142,11 +252,11 @@ export async function POST(request: NextRequest) {
         remainingQuantity -= quantityToDeduct
       }
 
-      return outboundDetails
+      return { outboundDetails, salesRecordId }
     })
 
     // 총 출고 원가 계산
-    const totalOutboundCost = result.reduce(
+    const totalOutboundCost = result.outboundDetails.reduce(
       (sum, detail) => sum + detail.totalCost,
       0
     )
@@ -158,12 +268,13 @@ export async function POST(request: NextRequest) {
       success: true,
       totalQuantity: quantity,
       totalCost: totalOutboundCost,
-      details: result,
+      details: result.outboundDetails,
+      salesRecordId: result.salesRecordId,
     })
   } catch (error) {
     console.error('Error processing outbound:', error)
     return NextResponse.json(
-      { error: '출고 처리 중 오류가 발생했습니다.' },
+      { error: error instanceof Error ? error.message : '출고 처리 중 오류가 발생했습니다.' },
       { status: 500 }
     )
   }
@@ -212,6 +323,9 @@ export async function GET(request: NextRequest) {
         item: true,
         product: true,
         lot: true,
+        vendor: true,
+        salesperson: true,
+        salesRecord: true,
       },
       orderBy: [
         { movementDate: 'desc' },
@@ -254,6 +368,12 @@ export async function DELETE(request: NextRequest) {
         )
       }
 
+      // salesRecordId 수집
+      const salesRecordIds = movements
+        .filter(m => m.salesRecordId !== null)
+        .map(m => m.salesRecordId as number)
+      const uniqueSalesRecordIds = [...new Set(salesRecordIds)]
+
       // 출고 내역 삭제 및 LOT 잔량 복구 (트랜잭션)
       await prisma.$transaction(async (tx) => {
         for (const movement of movements) {
@@ -271,6 +391,20 @@ export async function DELETE(request: NextRequest) {
                   increment: movement.quantity,
                 },
               },
+            })
+          }
+        }
+
+        // 연관된 SalesRecord 삭제
+        // 해당 salesRecordId를 참조하는 다른 movement가 없는 경우에만 삭제
+        for (const salesRecordId of uniqueSalesRecordIds) {
+          const remainingMovements = await tx.inventoryMovement.count({
+            where: { salesRecordId },
+          })
+          
+          if (remainingMovements === 0) {
+            await tx.salesRecord.delete({
+              where: { id: salesRecordId },
             })
           }
         }
@@ -306,6 +440,8 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
+    const salesRecordId = movement.salesRecordId
+
     // 출고 내역 삭제 및 LOT 잔량 복구 (트랜잭션)
     await prisma.$transaction(async (tx) => {
       // 출고 내역 삭제
@@ -323,6 +459,20 @@ export async function DELETE(request: NextRequest) {
             },
           },
         })
+      }
+
+      // 연관된 SalesRecord 삭제
+      // 해당 salesRecordId를 참조하는 다른 movement가 없는 경우에만 삭제
+      if (salesRecordId) {
+        const remainingMovements = await tx.inventoryMovement.count({
+          where: { salesRecordId },
+        })
+        
+        if (remainingMovements === 0) {
+          await tx.salesRecord.delete({
+            where: { id: salesRecordId },
+          })
+        }
       }
     })
 

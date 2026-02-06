@@ -42,15 +42,15 @@ model Product {
   lastCostUpdatedAt DateTime? // 원가 마지막 업데이트 시각
 
   // 관계
-  priceHistory      ProductPriceHistory[]
-  vendorPrices      VendorProductPrice[] // 거래처별 특별가
-  salesRecords      SalesRecord[] // 매입매출
-  importExports     ImportExport[] // 수입/수출
-  importExportItems ImportExportItem[] // 수입/수출 품목 상세
-  inventoryLots     InventoryLot[] // 창고 입고
+  priceHistory       ProductPriceHistory[]
+  vendorPrices       VendorProductPrice[] // 거래처별 특별가
+  salesRecords       SalesRecord[] // 매입매출
+  importExports      ImportExport[] // 수입/수출
+  importExportItems  ImportExportItem[] // 수입/수출 품목 상세
+  inventoryLots      InventoryLot[] // 창고 입고
   inventoryMovements InventoryMovement[] // 입출고 이력
-  projectItems      ProjectItem[] // 프로젝트 품목 연결 추가
-  monthlyCosts      ProductMonthlyCost[] // 품목별 월별 원가 이력
+  projectItems       ProjectItem[] // 프로젝트 품목 연결 추가
+  monthlyCosts       ProductMonthlyCost[] // 품목별 월별 원가 이력
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -106,11 +106,12 @@ model Vendor {
   memo          String?
 
   // 관계
-  purchaseProducts Product[]            @relation("PurchaseVendor") // 이 거래처가 매입처인 품목들
-  vendorPrices     VendorProductPrice[]
-  salesRecords     SalesRecord[]
-  importExports    ImportExport[]
-  inventoryLots    InventoryLot[]
+  purchaseProducts   Product[]            @relation("PurchaseVendor") // 이 거래처가 매입처인 품목들
+  vendorPrices       VendorProductPrice[]
+  salesRecords       SalesRecord[]
+  importExports      ImportExport[]
+  inventoryLots      InventoryLot[]
+  inventoryMovements InventoryMovement[] // Phase 4: 출고 연동
 
   // 재료/부품 매입처
   materials Material[] @relation("MaterialPurchaseVendor")
@@ -154,9 +155,10 @@ model Salesperson {
   commissionRate Float   @default(0) // IK는 0.15
 
   // 관계
-  salesRecords  SalesRecord[]
-  importExports ImportExport[]
-  inventoryLots InventoryLot[]
+  salesRecords       SalesRecord[]
+  importExports      ImportExport[]
+  inventoryLots      InventoryLot[]
+  inventoryMovements InventoryMovement[] // Phase 4: 출고 연동
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -343,6 +345,16 @@ model InventoryMovement {
   refType String? // 참조 타입
   refId   String? // 참조 ID
 
+  // Phase 4 추가
+  vendorId      Int? // 출고 거래처
+  vendor        Vendor?      @relation(fields: [vendorId], references: [id])
+  salespersonId Int? // 담당자
+  salesperson   Salesperson? @relation(fields: [salespersonId], references: [id])
+  salesRecordId Int? // 연동된 매출 기록 (N:1, @unique 없음!)
+  salesRecord   SalesRecord? @relation(fields: [salesRecordId], references: [id])
+  outboundType  String? // 'SALES' | 'OTHER' (판매출고 vs 기타출고)
+  notes         String? // 비고
+
   createdAt DateTime @default(now())
 }
 
@@ -415,6 +427,12 @@ model SalesRecord {
   supplyAmount Float? // 공급가액
   vatAmount    Float? // 부가세액
   totalAmount  Float? // 합계 (공급가액 + 부가세)
+
+  // Phase 4 추가
+  costSource String? // 'PRODUCT_CURRENT' | 'PRODUCT_DEFAULT' | 'MANUAL' | 'OUTBOUND_AUTO'
+
+  // 출고 연동 관계
+  outboundMovements InventoryMovement[]
 
   notes     String?
   createdAt DateTime @default(now())
