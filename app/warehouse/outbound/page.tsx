@@ -110,7 +110,7 @@ export default function OutboundPage() {
       // API returns { data: [...], pagination: {...} } format
       const data: InventoryProduct[] = Array.isArray(responseData) 
         ? responseData 
-        : (responseData.data || [])
+        : (Array.isArray(responseData.data) ? responseData.data : [])
       
       // Filter to only products with inventory
       setInventoryProducts(data.filter((item) => item.totalQuantity > 0))
