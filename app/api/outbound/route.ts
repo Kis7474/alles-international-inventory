@@ -1,6 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+// Type definitions
+interface LotWhereClause {
+  quantityRemaining: { gt: number }
+  productId?: number
+  itemId?: number
+  storageLocation?: string
+}
+
+interface MovementCreateData {
+  movementDate: Date
+  lotId: number
+  type: string
+  quantity: number
+  unitCost: number
+  totalCost: number
+  productId?: number
+  itemId?: number
+}
+
 // POST - FIFO 출고 처리
 export async function POST(request: NextRequest) {
   try {
@@ -32,13 +51,6 @@ export async function POST(request: NextRequest) {
     // 해당 품목의 사용 가능한 LOT 조회 및 FIFO 출고 처리를 트랜잭션으로 처리
     const result = await prisma.$transaction(async (tx) => {
       // Build where clause for LOT query
-      interface LotWhereClause {
-        quantityRemaining: { gt: number }
-        productId?: number
-        itemId?: number
-        storageLocation?: string
-      }
-
       const whereClause: LotWhereClause = {
         quantityRemaining: { gt: 0 },
       }
@@ -99,17 +111,6 @@ export async function POST(request: NextRequest) {
         })
 
         // 출고 이력 생성 (productId 기반)
-        interface MovementCreateData {
-          movementDate: Date
-          lotId: number
-          type: string
-          quantity: number
-          unitCost: number
-          totalCost: number
-          productId?: number
-          itemId?: number
-        }
-
         const movementData: MovementCreateData = {
           movementDate: new Date(outboundDate),
           lotId: lot.id,
