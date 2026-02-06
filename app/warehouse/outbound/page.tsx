@@ -87,10 +87,11 @@ export default function OutboundPage() {
     try {
       const historyRes = await fetch('/api/outbound')
       const historyData = await historyRes.json()
-      setHistory(historyData)
+      setHistory(Array.isArray(historyData) ? historyData : [])
     } catch (error) {
       console.error('Error fetching data:', error)
       alert('데이터 조회 중 오류가 발생했습니다.')
+      setHistory([])
     } finally {
       setLoading(false)
     }
@@ -128,12 +129,13 @@ export default function OutboundPage() {
 
       const res = await fetch(`/api/outbound?${params.toString()}`)
       const data = await res.json()
-      setHistory(data)
+      setHistory(Array.isArray(data) ? data : [])
       setSelectedIds([])
       setSelectAll(false)
     } catch (error) {
       console.error('Error filtering outbound:', error)
       alert('필터링 중 오류가 발생했습니다.')
+      setHistory([])
     } finally {
       setLoading(false)
     }
