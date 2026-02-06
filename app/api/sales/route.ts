@@ -99,8 +99,40 @@ export async function POST(request: NextRequest) {
     // 금액 계산
     const amount = quantity * unitPrice
     
+    // 원가 검증 및 costSource 설정 (매출인 경우만)
+    let finalCost = 0
+    let costSource = null
+    
+    if (type === 'SALES') {
+      if (productId) {
+        // 서버에서 currentCost 조회
+        const { getProductCurrentCost } = await import('@/lib/product-cost')
+        const costData = await getProductCurrentCost(parseInt(productId))
+        
+        // 총 원가 = 수량 × 단위원가
+        const serverCalculatedCost = quantity * costData.cost
+        
+        // costSource 설정
+        if (costData.source === 'CURRENT') {
+          costSource = 'PRODUCT_CURRENT'
+          finalCost = serverCalculatedCost
+        } else if (costData.source === 'DEFAULT') {
+          costSource = 'PRODUCT_DEFAULT'
+          finalCost = serverCalculatedCost
+        } else {
+          // cost가 제공되었으면 MANUAL, 아니면 0
+          costSource = cost ? 'MANUAL' : 'PRODUCT_CURRENT'
+          finalCost = cost ? parseFloat(cost) : 0
+        }
+      } else {
+        // productId가 없으면 사용자 입력값 사용
+        costSource = 'MANUAL'
+        finalCost = cost ? parseFloat(cost) : 0
+      }
+    }
+    
     // 마진 계산 (매출일 경우만)
-    const margin = type === 'SALES' ? amount - (cost || 0) : 0
+    const margin = type === 'SALES' ? amount - finalCost : 0
     const marginRate = type === 'SALES' && amount > 0 ? (margin / amount) * 100 : 0
 
     const salesRecord = await prisma.salesRecord.create({
@@ -116,9 +148,10 @@ export async function POST(request: NextRequest) {
         quantity: parseFloat(quantity),
         unitPrice: parseFloat(unitPrice),
         amount,
-        cost: type === 'SALES' ? parseFloat(cost || 0) : 0,
+        cost: finalCost,
         margin,
         marginRate,
+        costSource,
         notes: notes || null,
       },
       include: {
@@ -162,8 +195,40 @@ export async function PUT(request: NextRequest) {
     // 금액 계산
     const amount = quantity * unitPrice
     
+    // 원가 검증 및 costSource 설정 (매출인 경우만)
+    let finalCost = 0
+    let costSource = null
+    
+    if (type === 'SALES') {
+      if (productId) {
+        // 서버에서 currentCost 조회
+        const { getProductCurrentCost } = await import('@/lib/product-cost')
+        const costData = await getProductCurrentCost(parseInt(productId))
+        
+        // 총 원가 = 수량 × 단위원가
+        const serverCalculatedCost = quantity * costData.cost
+        
+        // costSource 설정
+        if (costData.source === 'CURRENT') {
+          costSource = 'PRODUCT_CURRENT'
+          finalCost = serverCalculatedCost
+        } else if (costData.source === 'DEFAULT') {
+          costSource = 'PRODUCT_DEFAULT'
+          finalCost = serverCalculatedCost
+        } else {
+          // cost가 제공되었으면 MANUAL, 아니면 0
+          costSource = cost ? 'MANUAL' : 'PRODUCT_CURRENT'
+          finalCost = cost ? parseFloat(cost) : 0
+        }
+      } else {
+        // productId가 없으면 사용자 입력값 사용
+        costSource = 'MANUAL'
+        finalCost = cost ? parseFloat(cost) : 0
+      }
+    }
+    
     // 마진 계산 (매출일 경우만)
-    const margin = type === 'SALES' ? amount - (cost || 0) : 0
+    const margin = type === 'SALES' ? amount - finalCost : 0
     const marginRate = type === 'SALES' && amount > 0 ? (margin / amount) * 100 : 0
 
     const salesRecord = await prisma.salesRecord.update({
@@ -180,9 +245,10 @@ export async function PUT(request: NextRequest) {
         quantity: parseFloat(quantity),
         unitPrice: parseFloat(unitPrice),
         amount,
-        cost: type === 'SALES' ? parseFloat(cost || 0) : 0,
+        cost: finalCost,
         margin,
         marginRate,
+        costSource,
         notes: notes || null,
       },
       include: {

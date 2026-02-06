@@ -125,15 +125,14 @@ export default function NewSalesPage() {
         // Auto-fill category from product
         const categoryId = product.categoryId ? product.categoryId.toString() : ''
         
-        // Auto-fill purchase price from product's defaultPurchasePrice
-        const purchasePrice = product.defaultPurchasePrice || 0
+        // Fetch currentCost from API
+        fetchProductCost(parseInt(productId))
         
         setFormData((prev) => ({ 
           ...prev, 
           productId, 
           itemName: product.name,
           categoryId: categoryId,
-          cost: purchasePrice.toString(), // Set cost to purchase price
         }))
         
         // Fetch vendor-specific price if vendor is selected
@@ -147,13 +146,31 @@ export default function NewSalesPage() {
             productId, 
             itemName: product.name, 
             categoryId: categoryId,
-            cost: purchasePrice.toString(),
             unitPrice: salesPrice.toString() 
           }))
         }
       }
     } else {
       setFormData((prev) => ({ ...prev, productId: '', itemName: '', unitPrice: '', cost: '' }))
+    }
+  }
+
+  const fetchProductCost = async (productId: number) => {
+    try {
+      const res = await fetch(`/api/products/${productId}/cost`)
+      const data = await res.json()
+      
+      if (data.cost > 0) {
+        // Set unit cost (not total cost)
+        setFormData((prev) => ({ ...prev, cost: data.cost.toString() }))
+      }
+    } catch (error) {
+      console.error('Error fetching product cost:', error)
+      // Fallback to defaultPurchasePrice if available
+      const product = products.find((p) => p.id === productId)
+      if (product && product.defaultPurchasePrice) {
+        setFormData((prev) => ({ ...prev, cost: product.defaultPurchasePrice!.toString() }))
+      }
     }
   }
 
@@ -287,8 +304,10 @@ export default function NewSalesPage() {
   const calculateMargin = () => {
     if (formData.type !== 'SALES') return 0
     const amount = calculateAmount()
-    const cost = parseFloat(formData.cost) || 0
-    return amount - cost
+    const unitCost = parseFloat(formData.cost) || 0
+    const quantity = parseFloat(formData.quantity) || 0
+    const totalCost = unitCost * quantity
+    return amount - totalCost
   }
 
   const calculateMarginRate = () => {
@@ -526,7 +545,7 @@ export default function NewSalesPage() {
             {formData.type === 'SALES' && (
               <div>
                 <label className="block text-sm font-medium mb-1 text-gray-700">
-                  원가 {formData.productId && <span className="text-xs text-blue-600">(품목에서 자동 설정됨)</span>}
+                  단위원가 {formData.productId && <span className="text-xs text-blue-600">(품목에서 자동 설정됨)</span>}
                 </label>
                 <input
                   type="number"
