@@ -48,6 +48,7 @@ model Product {
   importExports     ImportExport[] // 수입/수출
   importExportItems ImportExportItem[] // 수입/수출 품목 상세
   inventoryLots     InventoryLot[] // 창고 입고
+  inventoryMovements InventoryMovement[] // 입출고 이력
   projectItems      ProjectItem[] // 프로젝트 품목 연결 추가
   monthlyCosts      ProductMonthlyCost[] // 품목별 월별 원가 이력
 
@@ -328,8 +329,10 @@ model InventoryLot {
 model InventoryMovement {
   id           Int           @id @default(autoincrement())
   movementDate DateTime
-  itemId       Int
-  item         Item          @relation(fields: [itemId], references: [id])
+  itemId       Int? // 하위 호환성을 위해 optional로 변경
+  item         Item?         @relation(fields: [itemId], references: [id])
+  productId    Int? // 통합 품목 연결
+  product      Product?      @relation(fields: [productId], references: [id])
   lotId        Int?
   lot          InventoryLot? @relation(fields: [lotId], references: [id])
   type         String // IN, OUT, ADJUST

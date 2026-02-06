@@ -50,7 +50,14 @@ export async function updateProductCurrentCost(productId: number): Promise<numbe
   })
 
   if (warehouseLots.length === 0) {
-    // No warehouse lots, currentCost remains null or unchanged
+    // No warehouse lots, set currentCost to null
+    await prisma.product.update({
+      where: { id: productId },
+      data: {
+        currentCost: null,
+        lastCostUpdatedAt: new Date(),
+      },
+    })
     return 0
   }
 

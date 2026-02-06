@@ -203,6 +203,7 @@ export async function GET(request: NextRequest) {
             unit: product?.unit,
             purchaseVendor: product?.purchaseVendor?.name,
             category: product?.category?.nameKo,
+            currentCost: product?.currentCost, // 품목별 현재 원가
             totalQuantity,
             avgUnitCost: Math.round(avgUnitCost * 100) / 100,
             avgUnitCostWithoutStorage: avgUnitCostWithoutStorage,
