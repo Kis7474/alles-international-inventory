@@ -105,11 +105,18 @@ export default function OutboundPage() {
       }
       
       const res = await fetch(`/api/inventory?${params.toString()}`)
-      const data: InventoryProduct[] = await res.json()
+      const responseData = await res.json()
+      
+      // API returns { data: [...], pagination: {...} } format
+      const data: InventoryProduct[] = Array.isArray(responseData) 
+        ? responseData 
+        : (responseData.data || [])
+      
       // Filter to only products with inventory
       setInventoryProducts(data.filter((item) => item.totalQuantity > 0))
     } catch (error) {
       console.error('Error fetching inventory:', error)
+      setInventoryProducts([])
     }
   }
   
