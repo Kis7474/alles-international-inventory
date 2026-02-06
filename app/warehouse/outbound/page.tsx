@@ -3,13 +3,6 @@
 import { useEffect, useState } from 'react'
 import { formatNumber } from '@/lib/utils'
 
-interface Item {
-  id: number
-  code: string
-  name: string
-  unit: string
-}
-
 interface InventoryProduct {
   productId: number
   productName: string
@@ -41,7 +34,11 @@ interface OutboundHistory {
   item: {
     code: string
     name: string
-  }
+  } | null
+  product: {
+    code: string | null
+    name: string
+  } | null
   lot: {
     lotCode: string | null
     receivedDate: string
@@ -49,7 +46,6 @@ interface OutboundHistory {
 }
 
 export default function OutboundPage() {
-  const [items, setItems] = useState<Item[]>([])
   const [history, setHistory] = useState<OutboundHistory[]>([])
   const [inventoryProducts, setInventoryProducts] = useState<InventoryProduct[]>([])
   const [selectedProductInfo, setSelectedProductInfo] = useState<InventoryProduct | null>(null)
@@ -64,7 +60,7 @@ export default function OutboundPage() {
   // 필터 상태
   const [filterStartDate, setFilterStartDate] = useState('')
   const [filterEndDate, setFilterEndDate] = useState('')
-  const [filterItemId, setFilterItemId] = useState('')
+  const [filterProductId, setFilterProductId] = useState('')
   
   const [outboundResult, setOutboundResult] = useState<{
     totalQuantity: number
@@ -73,7 +69,6 @@ export default function OutboundPage() {
   } | null>(null)
   const [formData, setFormData] = useState({
     productId: '',
-    itemId: '',
     quantity: '',
     outboundDate: new Date().toISOString().split('T')[0],
   })
@@ -90,15 +85,8 @@ export default function OutboundPage() {
 
   const fetchData = async () => {
     try {
-      const [itemsRes, historyRes] = await Promise.all([
-        fetch('/api/items'),
-        fetch('/api/outbound'),
-      ])
-      const [itemsData, historyData] = await Promise.all([
-        itemsRes.json(),
-        historyRes.json(),
-      ])
-      setItems(itemsData)
+      const historyRes = await fetch('/api/outbound')
+      const historyData = await historyRes.json()
       setHistory(historyData)
     } catch (error) {
       console.error('Error fetching data:', error)
@@ -126,7 +114,7 @@ export default function OutboundPage() {
   
   const handleProductSelect = (productId: string) => {
     const selected = inventoryProducts.find(p => p.productId === parseInt(productId))
-    setFormData({ ...formData, productId, itemId: '' })
+    setFormData({ ...formData, productId })
     setSelectedProductInfo(selected || null)
   }
 
@@ -136,7 +124,7 @@ export default function OutboundPage() {
       const params = new URLSearchParams()
       if (filterStartDate) params.append('startDate', filterStartDate)
       if (filterEndDate) params.append('endDate', filterEndDate)
-      if (filterItemId) params.append('itemId', filterItemId)
+      if (filterProductId) params.append('productId', filterProductId)
 
       const res = await fetch(`/api/outbound?${params.toString()}`)
       const data = await res.json()
@@ -156,9 +144,9 @@ export default function OutboundPage() {
 
     const data = {
       productId: formData.productId ? parseInt(formData.productId) : null,
-      itemId: formData.itemId ? parseInt(formData.itemId) : null,
       quantity: parseFloat(formData.quantity),
       outboundDate: formData.outboundDate,
+      storageLocation: selectedStorageLocation,
     }
 
     try {
@@ -180,7 +168,6 @@ export default function OutboundPage() {
       setShowForm(false)
       setFormData({
         productId: '',
-        itemId: '',
         quantity: '',
         outboundDate: new Date().toISOString().split('T')[0],
       })
@@ -318,14 +305,14 @@ export default function OutboundPage() {
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700">품목</label>
             <select
-              value={filterItemId}
-              onChange={(e) => setFilterItemId(e.target.value)}
+              value={filterProductId}
+              onChange={(e) => setFilterProductId(e.target.value)}
               className="w-full px-3 py-3 md:py-2 border rounded-lg text-gray-900"
             >
               <option value="">전체</option>
-              {items.map((item) => (
-                <option key={item.id} value={item.id}>
-                  [{item.code}] {item.name}
+              {inventoryProducts.map((item) => (
+                <option key={item.productId} value={item.productId}>
+                  {item.productName}
                 </option>
               ))}
             </select>
@@ -343,7 +330,7 @@ export default function OutboundPage() {
             onClick={() => {
               setFilterStartDate('')
               setFilterEndDate('')
-              setFilterItemId('')
+              setFilterProductId('')
               fetchData()
             }}
             className="bg-gray-300 text-gray-700 px-6 py-3 md:py-2 rounded-lg hover:bg-gray-400 min-h-[44px]"
@@ -607,7 +594,12 @@ export default function OutboundPage() {
                     {new Date(record.movementDate).toLocaleDateString('ko-KR')}
                   </td>
                   <td className="px-4 py-4">
-                    [{record.item.code}] {record.item.name}
+                    {record.product 
+                      ? `${record.product.code ? `[${record.product.code}]` : ''} ${record.product.name}`
+                      : record.item 
+                        ? `[${record.item.code}] ${record.item.name}`
+                        : '-'
+                    }
                   </td>
                   <td className="px-4 py-4">
                     {record.lot?.lotCode || '-'}
@@ -681,7 +673,12 @@ export default function OutboundPage() {
                   </button>
                 </div>
                 <div className="font-bold text-gray-900 mb-2">
-                  [{record.item.code}] {record.item.name}
+                  {record.product 
+                    ? `${record.product.code ? `[${record.product.code}]` : ''} ${record.product.name}`
+                    : record.item 
+                      ? `[${record.item.code}] ${record.item.name}`
+                      : '-'
+                  }
                 </div>
                 <div className="space-y-1 text-sm">
                   <div className="flex justify-between">

@@ -5,12 +5,19 @@ import { prisma } from '@/lib/prisma'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { itemId, quantity, outboundDate } = body
+    const { productId, itemId, quantity, outboundDate, storageLocation } = body
 
     // 유효성 검사
-    if (!itemId || !quantity || !outboundDate) {
+    if (!productId && !itemId) {
       return NextResponse.json(
-        { error: '품목, 수량, 출고일은 필수 항목입니다.' },
+        { error: '품목은 필수 항목입니다.' },
+        { status: 400 }
+      )
+    }
+
+    if (!quantity || !outboundDate) {
+      return NextResponse.json(
+        { error: '수량, 출고일은 필수 항목입니다.' },
         { status: 400 }
       )
     }
@@ -24,11 +31,30 @@ export async function POST(request: NextRequest) {
 
     // 해당 품목의 사용 가능한 LOT 조회 및 FIFO 출고 처리를 트랜잭션으로 처리
     const result = await prisma.$transaction(async (tx) => {
+      // Build where clause for LOT query
+      interface LotWhereClause {
+        quantityRemaining: { gt: number }
+        productId?: number
+        itemId?: number
+        storageLocation?: string
+      }
+
+      const whereClause: LotWhereClause = {
+        quantityRemaining: { gt: 0 },
+      }
+
+      if (productId) {
+        whereClause.productId = productId
+      } else if (itemId) {
+        whereClause.itemId = itemId
+      }
+
+      if (storageLocation) {
+        whereClause.storageLocation = storageLocation
+      }
+
       const availableLots = await tx.inventoryLot.findMany({
-        where: {
-          itemId,
-          quantityRemaining: { gt: 0 },
-        },
+        where: whereClause,
         orderBy: [
           { receivedDate: 'asc' },
           { id: 'asc' },
@@ -72,17 +98,35 @@ export async function POST(request: NextRequest) {
           },
         })
 
-        // 출고 이력 생성
+        // 출고 이력 생성 (productId 기반)
+        interface MovementCreateData {
+          movementDate: Date
+          lotId: number
+          type: string
+          quantity: number
+          unitCost: number
+          totalCost: number
+          productId?: number
+          itemId?: number
+        }
+
+        const movementData: MovementCreateData = {
+          movementDate: new Date(outboundDate),
+          lotId: lot.id,
+          type: 'OUT',
+          quantity: quantityToDeduct,
+          unitCost: lot.unitCost,
+          totalCost,
+        }
+
+        if (productId) {
+          movementData.productId = productId
+        } else if (itemId) {
+          movementData.itemId = itemId
+        }
+
         await tx.inventoryMovement.create({
-          data: {
-            movementDate: new Date(outboundDate),
-            itemId,
-            lotId: lot.id,
-            type: 'OUT',
-            quantity: quantityToDeduct,
-            unitCost: lot.unitCost,
-            totalCost,
-          },
+          data: movementData,
         })
 
         outboundDetails.push({
@@ -106,6 +150,9 @@ export async function POST(request: NextRequest) {
       0
     )
 
+    // 중요: 출고 시에는 updateProductCurrentCost를 호출하지 않음
+    // 원가는 월말 창고료 배분 시에만 업데이트됨
+
     return NextResponse.json({
       success: true,
       totalQuantity: quantity,
@@ -125,12 +172,14 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
+    const productId = searchParams.get('productId')
     const itemId = searchParams.get('itemId')
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
 
     interface WhereClause {
       type: string
+      productId?: number
       itemId?: number
       movementDate?: {
         gte?: Date
@@ -140,6 +189,9 @@ export async function GET(request: NextRequest) {
 
     const where: WhereClause = { type: 'OUT' }
     
+    if (productId) {
+      where.productId = parseInt(productId)
+    }
     if (itemId) {
       where.itemId = parseInt(itemId)
     }
@@ -157,6 +209,7 @@ export async function GET(request: NextRequest) {
       where,
       include: {
         item: true,
+        product: true,
         lot: true,
       },
       orderBy: [
