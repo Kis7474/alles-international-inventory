@@ -372,7 +372,7 @@ export async function DELETE(request: NextRequest) {
       const salesRecordIds = movements
         .filter(m => m.salesRecordId !== null)
         .map(m => m.salesRecordId as number)
-      const uniqueSalesRecordIds = [...new Set(salesRecordIds)]
+      const uniqueSalesRecordIds = Array.from(new Set(salesRecordIds))
 
       // 출고 내역 삭제 및 LOT 잔량 복구 (트랜잭션)
       await prisma.$transaction(async (tx) => {
