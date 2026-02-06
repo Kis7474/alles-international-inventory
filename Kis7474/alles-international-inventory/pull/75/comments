@@ -1,0 +1,34 @@
+## 🐛 빌드 에러 분석
+
+빌드 실패 원인은 `app/warehouse/outbound/page.tsx` **204번 줄**의 `@typescript-eslint/no-explicit-any` 에러 2개입니다:
+
+```
+204:45  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+204:53  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+```
+
+### 문제 코드 (L204)
+```tsx
+const latestPrice = prices.sort((a: any, b: any) => 
+  new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime()
+)[0]
+```
+
+### ✅ 수정 방법
+
+파일 상단에 인터페이스를 추가하고, `any`를 타입으로 교체:
+
+```tsx
+// 인터페이스 추가
+interface VendorPriceRecord {
+  salesPrice: number | null
+  effectiveDate: string
+}
+
+// L204 수정
+const latestPrice = prices.sort((a: VendorPriceRecord, b: VendorPriceRecord) => 
+  new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime()
+)[0]
+```
+
+이 2개 에러만 수정하면 빌드가 통과됩니다. 나머지 Warning들은 `react-hooks/exhaustive-deps` 관련이며 빌드 실패와 무관합니다.
