@@ -12,16 +12,16 @@ interface LotWhereClause {
 
 interface MovementCreateData {
   movementDate: Date
-  lotId: number
+  lot: { connect: { id: number } }
   type: string
   quantity: number
   unitCost: number
   totalCost: number
-  productId?: number
-  itemId?: number
-  vendorId?: number
-  salespersonId?: number
-  salesRecordId?: number
+  product?: { connect: { id: number } }
+  item?: { connect: { id: number } }
+  vendor?: { connect: { id: number } }
+  salesperson?: { connect: { id: number } }
+  salesRecord?: { connect: { id: number } }
   outboundType?: string
   notes?: string
 }
@@ -216,7 +216,7 @@ export async function POST(request: NextRequest) {
         // 출고 이력 생성 (productId 기반)
         const movementData: MovementCreateData = {
           movementDate: new Date(outboundDate),
-          lotId: lot.id,
+          lot: { connect: { id: lot.id } },
           type: 'OUT',
           quantity: quantityToDeduct,
           unitCost: lot.unitCost,
@@ -224,15 +224,15 @@ export async function POST(request: NextRequest) {
         }
 
         if (productId) {
-          movementData.productId = productId
+          movementData.product = { connect: { id: productId } }
         } else if (itemId) {
-          movementData.itemId = itemId
+          movementData.item = { connect: { id: itemId } }
         }
 
         // Phase 4 추가 필드
-        if (vendorId) movementData.vendorId = parseInt(vendorId)
-        if (salespersonId) movementData.salespersonId = parseInt(salespersonId)
-        if (salesRecordId) movementData.salesRecordId = salesRecordId
+        if (vendorId) movementData.vendor = { connect: { id: parseInt(vendorId) } }
+        if (salespersonId) movementData.salesperson = { connect: { id: parseInt(salespersonId) } }
+        if (salesRecordId) movementData.salesRecord = { connect: { id: salesRecordId } }
         if (outboundType) movementData.outboundType = outboundType
         if (notes) movementData.notes = notes
 

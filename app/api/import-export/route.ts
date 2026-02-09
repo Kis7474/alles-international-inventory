@@ -593,6 +593,12 @@ export async function DELETE(request: NextRequest) {
 
       // Delete in proper order to respect FK constraints
       await prisma.$transaction(async (tx) => {
+        // 0. Unlink CustomsTracking records FIRST to avoid FK constraint violation
+        await tx.customsTracking.updateMany({
+          where: { importId: { in: ids } },
+          data: { importId: null, linkedAt: null },
+        })
+
         // 1. Delete all related InventoryLots FIRST
         await tx.inventoryLot.deleteMany({
           where: { importExportId: { in: ids } },
@@ -649,6 +655,12 @@ export async function DELETE(request: NextRequest) {
 
     // Delete in transaction with proper order
     await prisma.$transaction(async (tx) => {
+      // 1. Unlink CustomsTracking records FIRST to avoid FK constraint violation
+      await tx.customsTracking.updateMany({
+        where: { importId: parsedId },
+        data: { importId: null, linkedAt: null },
+      })
+
       // 2. Delete related InventoryLots FIRST
       await tx.inventoryLot.deleteMany({
         where: { importExportId: parsedId },
