@@ -361,7 +361,7 @@ export async function PUT(request: NextRequest) {
     }
     
     return NextResponse.json(
-      { error: 'action 파라미터가 필요합니다. (distribute, cancel-distribution 또는 update)' },
+      { error: 'action 파라미터가 필요합니다. (distribute, update, 또는 cancel-distribution)' },
       { status: 400 }
     )
   } catch (error) {
