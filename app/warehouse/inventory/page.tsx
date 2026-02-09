@@ -40,6 +40,13 @@ interface ItemDetail {
   lots: Lot[]
 }
 
+// 창고료 포함 실질 단가 계산 헬퍼 함수
+function calculateActualUnitCost(lot: Lot): number {
+  return lot.quantityRemaining > 0 
+    ? lot.unitCost + (lot.warehouseFee || 0) / lot.quantityRemaining 
+    : lot.unitCost
+}
+
 export default function InventoryPage() {
   const [inventory, setInventory] = useState<InventoryItem[]>([])
   const [selectedItem, setSelectedItem] = useState<ItemDetail | null>(null)
@@ -378,7 +385,7 @@ export default function InventoryPage() {
                           ₩{formatNumber(lot.warehouseFee || 0, 2)}
                         </td>
                         <td className="px-4 py-3 text-right font-bold text-blue-700">
-                          ₩{formatNumber(lot.quantityRemaining > 0 ? lot.unitCost + (lot.warehouseFee || 0) / lot.quantityRemaining : lot.unitCost, 2)}
+                          ₩{formatNumber(calculateActualUnitCost(lot), 2)}
                         </td>
                       </tr>
                     ))}
@@ -419,7 +426,7 @@ export default function InventoryPage() {
                       <div className="flex justify-between pt-2 border-t">
                         <span className="text-gray-700 font-bold">실질 단가:</span>
                         <span className="font-bold text-blue-700">
-                          ₩{formatNumber(lot.quantityRemaining > 0 ? lot.unitCost + (lot.warehouseFee || 0) / lot.quantityRemaining : lot.unitCost, 2)}
+                          ₩{formatNumber(calculateActualUnitCost(lot), 2)}
                         </span>
                       </div>
                     </div>
