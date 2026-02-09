@@ -201,7 +201,11 @@ export default function OutboundPage() {
       const prices = await res.json()
       
       if (prices.length > 0) {
-        const latestPrice = prices.sort((a: any, b: any) => 
+        interface VendorPrice {
+          effectiveDate: string
+          salesPrice: number
+        }
+        const latestPrice = prices.sort((a: VendorPrice, b: VendorPrice) => 
           new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime()
         )[0]
         

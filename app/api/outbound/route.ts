@@ -203,7 +203,13 @@ export async function POST(request: NextRequest) {
         if (remainingQuantity <= 0) break
 
         const quantityToDeduct = Math.min(remainingQuantity, lot.quantityRemaining)
-        const totalCost = quantityToDeduct * lot.unitCost
+        
+        // 창고료 포함 원가 계산: (lot.unitCost * lot.quantityRemaining + lot.warehouseFee) / lot.quantityRemaining
+        // 즉, lot.unitCost + (lot.warehouseFee / lot.quantityRemaining)
+        const unitCostWithWarehouseFee = lot.quantityRemaining > 0 
+          ? lot.unitCost + (lot.warehouseFee || 0) / lot.quantityRemaining 
+          : lot.unitCost
+        const totalCost = quantityToDeduct * unitCostWithWarehouseFee
 
         // LOT 잔량 감소
         await tx.inventoryLot.update({
@@ -219,7 +225,7 @@ export async function POST(request: NextRequest) {
           lot: { connect: { id: lot.id } },
           type: 'OUT',
           quantity: quantityToDeduct,
-          unitCost: lot.unitCost,
+          unitCost: unitCostWithWarehouseFee,
           totalCost,
         }
 
@@ -245,7 +251,7 @@ export async function POST(request: NextRequest) {
           lotCode: lot.lotCode,
           receivedDate: lot.receivedDate,
           quantity: quantityToDeduct,
-          unitCost: lot.unitCost,
+          unitCost: unitCostWithWarehouseFee,
           totalCost,
         })
 
