@@ -10,6 +10,7 @@ interface InventoryItem {
   unit: string
   purchaseVendor: string | null
   category: string | null
+  currentCost: number | null
   totalQuantity: number
   avgUnitCost: number
   avgUnitCostWithoutStorage: number
@@ -19,6 +20,7 @@ interface InventoryItem {
   lotCount: number
   storageExpensePerUnit?: number
   totalStorageExpense?: number
+  latestDistributedPeriod?: string | null
 }
 
 interface Lot {
@@ -28,6 +30,8 @@ interface Lot {
   quantityReceived: number
   quantityRemaining: number
   unitCost: number
+  warehouseFee: number
+  storageLocation: string
 }
 
 interface ItemDetail {
@@ -100,7 +104,11 @@ export default function InventoryPage() {
           <h3 className="text-base md:text-lg font-bold text-orange-900 mb-2">💰 창고료 정보</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
             <div>
-              <p className="text-xs md:text-sm text-orange-700">이번 달 총 창고료</p>
+              <p className="text-xs md:text-sm text-orange-700">
+                {inventory[0].latestDistributedPeriod 
+                  ? `최근 배분 (${inventory[0].latestDistributedPeriod})` 
+                  : '창고료 배분 대기'}
+              </p>
               <p className="text-xl md:text-2xl font-bold text-orange-900">
                 ₩{formatNumber(inventory[0].totalStorageExpense || 0, 0)}
               </p>
@@ -176,6 +184,9 @@ export default function InventoryPage() {
                   <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">
                     재고
                   </th>
+                  <th className="px-4 py-3 text-right text-sm font-bold text-blue-700 bg-blue-50">
+                    현재 원가<br />(Product.currentCost)
+                  </th>
                   <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">
                     평균단가<br />(창고료 포함)
                   </th>
@@ -212,6 +223,9 @@ export default function InventoryPage() {
                     <td className="px-4 py-3 text-right text-gray-900">
                       {formatNumber(item.totalQuantity, 0)} {item.unit}
                     </td>
+                    <td className="px-4 py-3 text-right font-bold text-blue-700 bg-blue-50">
+                      {item.currentCost !== null ? `₩${formatNumber(item.currentCost, 2)}` : '-'}
+                    </td>
                     <td className="px-4 py-3 text-right font-medium text-blue-700">
                       ₩{formatNumber(item.avgUnitCost, 2)}
                     </td>
@@ -229,7 +243,7 @@ export default function InventoryPage() {
                 {inventory.length === 0 && (
                   <tr>
                     <td
-                      colSpan={8}
+                      colSpan={9}
                       className="px-6 py-8 text-center text-gray-500"
                     >
                       재고가 없습니다.
@@ -266,6 +280,12 @@ export default function InventoryPage() {
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600">재고:</span>
                     <span className="font-bold text-gray-900">{formatNumber(item.totalQuantity, 0)} {item.unit}</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-2 border-t bg-blue-50 -mx-4 px-4 py-2">
+                    <span className="text-gray-700 font-bold">현재 원가:</span>
+                    <span className="font-bold text-blue-700">
+                      {item.currentCost !== null ? `₩${formatNumber(item.currentCost, 2)}` : '-'}
+                    </span>
                   </div>
                   <div className="flex justify-between items-center pt-2 border-t">
                     <span className="text-gray-600">평균단가:</span>
@@ -328,6 +348,12 @@ export default function InventoryPage() {
                       <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">
                         단가
                       </th>
+                      <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">
+                        창고료
+                      </th>
+                      <th className="px-4 py-3 text-right text-sm font-medium text-blue-700">
+                        실질 단가
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
@@ -347,6 +373,12 @@ export default function InventoryPage() {
                         </td>
                         <td className="px-4 py-3 text-right">
                           ₩{formatNumber(lot.unitCost, 2)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-orange-600">
+                          ₩{formatNumber(lot.warehouseFee || 0, 2)}
+                        </td>
+                        <td className="px-4 py-3 text-right font-bold text-blue-700">
+                          ₩{formatNumber(lot.quantityRemaining > 0 ? lot.unitCost + (lot.warehouseFee || 0) / lot.quantityRemaining : lot.unitCost, 2)}
                         </td>
                       </tr>
                     ))}
@@ -380,6 +412,16 @@ export default function InventoryPage() {
                         <span className="text-gray-600">단가:</span>
                         <span className="text-gray-900">₩{formatNumber(lot.unitCost, 2)}</span>
                       </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">창고료:</span>
+                        <span className="text-orange-600">₩{formatNumber(lot.warehouseFee || 0, 2)}</span>
+                      </div>
+                      <div className="flex justify-between pt-2 border-t">
+                        <span className="text-gray-700 font-bold">실질 단가:</span>
+                        <span className="font-bold text-blue-700">
+                          ₩{formatNumber(lot.quantityRemaining > 0 ? lot.unitCost + (lot.warehouseFee || 0) / lot.quantityRemaining : lot.unitCost, 2)}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -410,11 +452,11 @@ export default function InventoryPage() {
             </div>
           </div>
           <div>
-            <div className="text-xs md:text-sm text-gray-600 mb-1">총 재고 가치</div>
+            <div className="text-xs md:text-sm text-gray-600 mb-1">총 재고 가치 (창고료 포함)</div>
             <div className="text-2xl md:text-3xl font-bold text-purple-600">
               ₩
               {formatNumber(
-                inventory.reduce((sum, item) => sum + item.totalValue, 0),
+                inventory.reduce((sum, item) => sum + item.totalValueWithStorage, 0),
                 0
               )}
             </div>

@@ -108,27 +108,25 @@ export async function GET(request: NextRequest) {
         },
       })
 
-      // 창고료 조회 (현재 월)
-      const now = new Date()
-      const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-      
-      // WarehouseFee에서 해당 월의 창고료 조회
-      const warehouseFee = await prisma.warehouseFee.findUnique({
-        where: { yearMonth: currentPeriod },
-        include: {
-          distributions: true,
+      // 창고료 조회 (가장 최근 배분된 월)
+      const latestWarehouseFee = await prisma.warehouseFee.findFirst({
+        where: {
+          distributedAt: { not: null },
+        },
+        orderBy: {
+          yearMonth: 'desc',
         },
       })
       
-      const totalStorageExpense = warehouseFee?.totalFee || 0
-      const isDistributed = warehouseFee?.distributedAt != null
+      const totalStorageExpense = latestWarehouseFee?.totalFee || 0
+      const latestDistributedPeriod = latestWarehouseFee?.yearMonth || null
       
       // 총 재고 수량 계산
       const totalInventoryQuantity = inventory.reduce(
         (sum, item) => sum + (item._sum.quantityRemaining || 0), 0
       )
       
-      // 단위당 창고료 배분 (수량 기준) - 미배분 시 예상치 계산용
+      // 단위당 창고료 배분 (수량 기준) - 정보 표시용
       const storageExpensePerUnit = totalInventoryQuantity > 0 
         ? totalStorageExpense / totalInventoryQuantity 
         : 0
@@ -177,21 +175,12 @@ export async function GET(request: NextRequest) {
           const avgUnitCostWithoutStorage = totalQuantity > 0 ? Math.round((totalValue / totalQuantity) * 100) / 100 : 0
           
           // 창고료 반영된 평균 단가 계산
-          let allocatedStorageExpense = 0
-          let avgUnitCost = avgUnitCostWithoutStorage
-          
-          if (isDistributed) {
-            // 배분 완료: LOT별 실제 배분된 창고료 합산
-            allocatedStorageExpense = lots.reduce(
-              (sum, lot) => sum + (lot.warehouseFee || 0),
-              0
-            )
-            avgUnitCost = totalQuantity > 0 ? avgUnitCostWithoutStorage + (allocatedStorageExpense / totalQuantity) : avgUnitCostWithoutStorage
-          } else {
-            // 미배분: 수량 기준 예상 배분
-            allocatedStorageExpense = storageExpensePerUnit * totalQuantity
-            avgUnitCost = avgUnitCostWithoutStorage + storageExpensePerUnit
-          }
+          // LOT의 warehouseFee는 이미 모든 월의 누적 창고료이므로 항상 이를 사용
+          const allocatedStorageExpense = lots.reduce(
+            (sum, lot) => sum + (lot.warehouseFee || 0),
+            0
+          )
+          const avgUnitCost = totalQuantity > 0 ? avgUnitCostWithoutStorage + (allocatedStorageExpense / totalQuantity) : avgUnitCostWithoutStorage
           
           // 창고료 포함 총 가치
           const totalValueWithStorage = avgUnitCost * totalQuantity
@@ -215,6 +204,7 @@ export async function GET(request: NextRequest) {
             // 창고료 정보
             storageExpensePerUnit: Math.round(storageExpensePerUnit * 100) / 100,
             totalStorageExpense: totalStorageExpense,
+            latestDistributedPeriod: latestDistributedPeriod,
           }
         })
       )
