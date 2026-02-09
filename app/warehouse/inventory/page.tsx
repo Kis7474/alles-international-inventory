@@ -30,7 +30,7 @@ interface Lot {
   quantityReceived: number
   quantityRemaining: number
   unitCost: number
-  warehouseFee: number
+  warehouseFee: number | null
   storageLocation: string
 }
 

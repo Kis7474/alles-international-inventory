@@ -119,6 +119,7 @@ export async function GET(request: NextRequest) {
       })
       
       const totalStorageExpense = latestWarehouseFee?.totalFee || 0
+      // null indicates no distributed fees exist yet
       const latestDistributedPeriod = latestWarehouseFee?.yearMonth || null
       
       // 총 재고 수량 계산
