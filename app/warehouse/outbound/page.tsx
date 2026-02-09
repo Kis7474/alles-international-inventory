@@ -31,6 +31,8 @@ interface OutboundHistory {
   quantity: number
   unitCost: number
   totalCost: number
+  outboundType: string | null
+  notes: string | null
   item: {
     code: string
     name: string
@@ -42,6 +44,18 @@ interface OutboundHistory {
   lot: {
     lotCode: string | null
     receivedDate: string
+  } | null
+  vendor: {
+    id: number
+    name: string
+  } | null
+  salesperson: {
+    id: number
+    name: string
+  } | null
+  salesRecord: {
+    id: number
+    amount: number
   } | null
 }
 
@@ -57,6 +71,12 @@ export default function OutboundPage() {
   const [selectAll, setSelectAll] = useState(false)
   const [selectedStorageLocation, setSelectedStorageLocation] = useState<'WAREHOUSE' | 'OFFICE'>('WAREHOUSE')
   
+  // Phase 4: 추가 상태
+  const [vendors, setVendors] = useState<Array<{ id: number; name: string; code: string; type: string }>>([])
+  const [salespersons, setSalespersons] = useState<Array<{ id: number; name: string }>>([])
+  const [costPreview, setCostPreview] = useState<{ cost: number; source: string } | null>(null)
+  const [pricePreview, setPricePreview] = useState<number | null>(null)
+  
   // 필터 상태
   const [filterStartDate, setFilterStartDate] = useState('')
   const [filterEndDate, setFilterEndDate] = useState('')
@@ -66,16 +86,23 @@ export default function OutboundPage() {
     totalQuantity: number
     totalCost: number
     details: OutboundDetail[]
+    salesRecordId?: number
   } | null>(null)
   const [formData, setFormData] = useState({
     productId: '',
     quantity: '',
     outboundDate: new Date().toISOString().split('T')[0],
+    outboundType: 'OTHER', // 'SALES' | 'OTHER'
+    vendorId: '',
+    salespersonId: '',
+    notes: '',
   })
 
   useEffect(() => {
     fetchData()
     fetchInventoryProducts()
+    fetchVendors()
+    fetchSalespersons()
   }, [])
 
   useEffect(() => {
@@ -119,11 +146,119 @@ export default function OutboundPage() {
       setInventoryProducts([])
     }
   }
+
+  const fetchVendors = async () => {
+    try {
+      const res = await fetch('/api/vendors')
+      const data = await res.json()
+      setVendors(data || [])
+    } catch (error) {
+      console.error('Error fetching vendors:', error)
+      setVendors([])
+    }
+  }
+
+  const fetchSalespersons = async () => {
+    try {
+      const res = await fetch('/api/salesperson')
+      const data = await res.json()
+      setSalespersons(data || [])
+    } catch (error) {
+      console.error('Error fetching salespersons:', error)
+      setSalespersons([])
+    }
+  }
   
   const handleProductSelect = (productId: string) => {
     const selected = inventoryProducts.find(p => p.productId === parseInt(productId))
     setFormData({ ...formData, productId })
     setSelectedProductInfo(selected || null)
+    
+    // Fetch cost preview for SALES type
+    if (formData.outboundType === 'SALES' && productId) {
+      fetchCostPreview(parseInt(productId))
+      if (formData.vendorId) {
+        fetchPricePreview(parseInt(productId), parseInt(formData.vendorId))
+      }
+    }
+  }
+
+  const fetchCostPreview = async (productId: number) => {
+    try {
+      const res = await fetch(`/api/products/${productId}/cost`)
+      const data = await res.json()
+      setCostPreview(data)
+    } catch (error) {
+      console.error('Error fetching cost preview:', error)
+      setCostPreview(null)
+    }
+  }
+
+  const fetchPricePreview = async (productId: number, vendorId: number) => {
+    try {
+      // Try VendorProductPrice first
+      const res = await fetch(`/api/vendor-product-prices?productId=${productId}&vendorId=${vendorId}`)
+      const prices = await res.json()
+      
+      if (prices.length > 0) {
+        const latestPrice = prices.sort((a: any, b: any) => 
+          new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime()
+        )[0]
+        
+        if (latestPrice.salesPrice) {
+          setPricePreview(latestPrice.salesPrice)
+          return
+        }
+      }
+      
+      // Fallback to defaultSalesPrice
+      const product = inventoryProducts.find(p => p.productId === productId)
+      const defaultPrice = product ? await fetchProductDefaultPrice(productId) : 0
+      setPricePreview(defaultPrice)
+    } catch (error) {
+      console.error('Error fetching price preview:', error)
+      setPricePreview(null)
+    }
+  }
+
+  const fetchProductDefaultPrice = async (productId: number): Promise<number> => {
+    try {
+      const res = await fetch(`/api/products/${productId}`)
+      const data = await res.json()
+      return data.defaultSalesPrice || 0
+    } catch (error) {
+      console.error('Error fetching product default price:', error)
+      return 0
+    }
+  }
+
+  const handleVendorChange = (vendorId: string) => {
+    setFormData({ ...formData, vendorId })
+    
+    // Fetch price preview if product is selected
+    if (formData.productId && vendorId) {
+      fetchPricePreview(parseInt(formData.productId), parseInt(vendorId))
+    }
+  }
+
+  const handleOutboundTypeChange = (outboundType: string) => {
+    setFormData({ 
+      ...formData, 
+      outboundType,
+      vendorId: outboundType === 'SALES' ? formData.vendorId : '',
+      salespersonId: outboundType === 'SALES' ? formData.salespersonId : '',
+    })
+    
+    // Fetch previews if SALES and product selected
+    if (outboundType === 'SALES' && formData.productId) {
+      fetchCostPreview(parseInt(formData.productId))
+      if (formData.vendorId) {
+        fetchPricePreview(parseInt(formData.productId), parseInt(formData.vendorId))
+      }
+    } else {
+      setCostPreview(null)
+      setPricePreview(null)
+    }
   }
 
   const handleFilter = async () => {
@@ -156,6 +291,10 @@ export default function OutboundPage() {
       quantity: parseFloat(formData.quantity),
       outboundDate: formData.outboundDate,
       storageLocation: selectedStorageLocation,
+      outboundType: formData.outboundType,
+      vendorId: formData.vendorId ? parseInt(formData.vendorId) : null,
+      salespersonId: formData.salespersonId ? parseInt(formData.salespersonId) : null,
+      notes: formData.notes || null,
     }
 
     try {
@@ -179,7 +318,13 @@ export default function OutboundPage() {
         productId: '',
         quantity: '',
         outboundDate: new Date().toISOString().split('T')[0],
+        outboundType: 'OTHER',
+        vendorId: '',
+        salespersonId: '',
+        notes: '',
       })
+      setCostPreview(null)
+      setPricePreview(null)
       fetchData()
       setSelectedIds([])
       setSelectAll(false)
@@ -388,6 +533,78 @@ export default function OutboundPage() {
                 </label>
               </div>
             </div>
+
+            {/* 출고 목적 선택 */}
+            <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+              <label className="block text-sm font-medium mb-2 text-gray-700">출고 목적 *</label>
+              <div className="flex gap-4">
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="radio"
+                    value="SALES"
+                    checked={formData.outboundType === 'SALES'}
+                    onChange={() => handleOutboundTypeChange('SALES')}
+                    className="mr-2"
+                  />
+                  <span className="text-gray-700">판매출고 (매출 자동 생성)</span>
+                </label>
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="radio"
+                    value="OTHER"
+                    checked={formData.outboundType === 'OTHER'}
+                    onChange={() => handleOutboundTypeChange('OTHER')}
+                    className="mr-2"
+                  />
+                  <span className="text-gray-700">기타출고 (샘플, 내부이동, 폐기 등)</span>
+                </label>
+              </div>
+            </div>
+
+            {/* 판매출고 시 추가 필드 */}
+            {formData.outboundType === 'SALES' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-700">
+                    거래처 * <span className="text-xs text-blue-600">(매출 거래처만 표시)</span>
+                  </label>
+                  <select
+                    required
+                    value={formData.vendorId}
+                    onChange={(e) => handleVendorChange(e.target.value)}
+                    className="w-full px-3 py-3 md:py-2 border rounded-lg text-gray-900"
+                  >
+                    <option value="">거래처를 선택하세요</option>
+                    {vendors
+                      .filter(v => v.type === 'DOMESTIC_SALES' || v.type === 'INTERNATIONAL_SALES')
+                      .map((vendor) => (
+                        <option key={vendor.id} value={vendor.id}>
+                          [{vendor.code}] {vendor.name}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-700">
+                    담당자 *
+                  </label>
+                  <select
+                    required
+                    value={formData.salespersonId}
+                    onChange={(e) => setFormData({ ...formData, salespersonId: e.target.value })}
+                    className="w-full px-3 py-3 md:py-2 border rounded-lg text-gray-900"
+                  >
+                    <option value="">담당자를 선택하세요</option>
+                    {salespersons.map((sp) => (
+                      <option key={sp.id} value={sp.id}>
+                        {sp.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
               <div>
@@ -452,6 +669,62 @@ export default function OutboundPage() {
               </div>
             </div>
 
+            {/* 판매출고 시 매출가/원가/마진 미리보기 */}
+            {formData.outboundType === 'SALES' && formData.productId && formData.quantity && (
+              <div className="bg-blue-50 p-4 rounded-lg mb-4">
+                <h3 className="font-medium mb-3 text-blue-900">매출 미리보기</h3>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+                  <div>
+                    <div className="text-blue-600">단위원가</div>
+                    <div className="text-lg font-bold text-blue-900">
+                      {costPreview ? `₩${costPreview.cost.toLocaleString()}` : '-'}
+                    </div>
+                    <div className="text-xs text-blue-600">
+                      {costPreview?.source === 'CURRENT' && '(창고료 포함 현재원가)'}
+                      {costPreview?.source === 'DEFAULT' && '(기본 매입가)'}
+                      {costPreview?.source === 'NONE' && '(원가 없음)'}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-blue-600">단위매출가</div>
+                    <div className="text-lg font-bold text-blue-900">
+                      {pricePreview !== null ? `₩${pricePreview.toLocaleString()}` : '-'}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-blue-600">예상 마진</div>
+                    <div className="text-lg font-bold text-green-600">
+                      {costPreview && pricePreview !== null
+                        ? `₩${((pricePreview - costPreview.cost) * parseFloat(formData.quantity)).toLocaleString()}`
+                        : '-'}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-blue-600">마진율</div>
+                    <div className="text-lg font-bold text-purple-600">
+                      {costPreview && pricePreview !== null && pricePreview > 0
+                        ? `${(((pricePreview - costPreview.cost) / pricePreview) * 100).toFixed(1)}%`
+                        : '-'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 비고 */}
+            <div>
+              <label className="block text-sm font-medium mb-1 text-gray-700">
+                비고 (선택)
+              </label>
+              <textarea
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                className="w-full px-3 py-3 md:py-2 border rounded-lg text-gray-900"
+                rows={2}
+                placeholder="비고 사항을 입력하세요"
+              />
+            </div>
+
             <div className="bg-yellow-50 p-4 rounded-lg">
               <div className="text-sm text-yellow-800">
                 💡 FIFO(선입선출) 방식으로 가장 오래된 LOT부터 자동으로 출고됩니다.
@@ -506,6 +779,14 @@ export default function OutboundPage() {
                 </div>
               </div>
             </div>
+
+            {outboundResult.salesRecordId && (
+              <div className="bg-white p-3 rounded border border-green-300">
+                <div className="text-sm text-green-700">
+                  ✅ 매출 기록이 자동으로 생성되었습니다. (ID: #{outboundResult.salesRecordId})
+                </div>
+              </div>
+            )}
 
             <div>
               <div className="text-sm font-medium mb-2">LOT별 출고 내역:</div>
@@ -569,19 +850,25 @@ export default function OutboundPage() {
                   출고일
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                  출고목적
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
                   품목
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                  LOT 코드
+                  거래처
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                  담당자
                 </th>
                 <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">
                   수량
                 </th>
                 <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">
-                  단가
-                </th>
-                <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">
                   총액
+                </th>
+                <th className="px-4 py-3 text-center text-sm font-medium text-gray-700">
+                  연동매출
                 </th>
                 <th className="px-4 py-3 text-center text-sm font-medium text-gray-700">
                   관리
@@ -603,6 +890,19 @@ export default function OutboundPage() {
                     {new Date(record.movementDate).toLocaleDateString('ko-KR')}
                   </td>
                   <td className="px-4 py-4">
+                    {record.outboundType === 'SALES' ? (
+                      <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-medium">
+                        판매출고
+                      </span>
+                    ) : record.outboundType === 'OTHER' ? (
+                      <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs font-medium">
+                        기타출고
+                      </span>
+                    ) : (
+                      <span className="text-gray-400 text-xs">-</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-4">
                     {record.product 
                       ? `${record.product.code ? `[${record.product.code}]` : ''} ${record.product.name}`
                       : record.item 
@@ -611,16 +911,28 @@ export default function OutboundPage() {
                     }
                   </td>
                   <td className="px-4 py-4">
-                    {record.lot?.lotCode || '-'}
+                    {record.vendor ? record.vendor.name : '-'}
+                  </td>
+                  <td className="px-4 py-4">
+                    {record.salesperson ? record.salesperson.name : '-'}
                   </td>
                   <td className="px-4 py-4 text-right">
                     {formatNumber(record.quantity, 0)}
                   </td>
                   <td className="px-4 py-4 text-right">
-                    ₩{formatNumber(record.unitCost, 2)}
-                  </td>
-                  <td className="px-4 py-4 text-right">
                     ₩{formatNumber(record.totalCost, 0)}
+                  </td>
+                  <td className="px-4 py-4 text-center">
+                    {record.salesRecord ? (
+                      <a 
+                        href={`/sales/${record.salesRecord.id}`}
+                        className="text-blue-600 hover:text-blue-800 text-sm"
+                      >
+                        #{record.salesRecord.id}
+                      </a>
+                    ) : (
+                      <span className="text-gray-400 text-xs">-</span>
+                    )}
                   </td>
                   <td className="px-4 py-4 text-center">
                     <button
@@ -635,7 +947,7 @@ export default function OutboundPage() {
               {history.length === 0 && (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={10}
                     className="px-6 py-8 text-center text-gray-500"
                   >
                     출고 내역이 없습니다.
@@ -670,9 +982,20 @@ export default function OutboundPage() {
                       onChange={() => handleSelect(record.id)}
                       className="w-4 h-4 rounded mr-2"
                     />
-                    <span className="text-xs text-gray-600">
-                      {new Date(record.movementDate).toLocaleDateString('ko-KR')}
-                    </span>
+                    <div>
+                      <div className="text-xs text-gray-600">
+                        {new Date(record.movementDate).toLocaleDateString('ko-KR')}
+                      </div>
+                      {record.outboundType === 'SALES' ? (
+                        <span className="px-2 py-0.5 bg-green-100 text-green-800 rounded text-xs font-medium mt-1 inline-block">
+                          판매출고
+                        </span>
+                      ) : record.outboundType === 'OTHER' ? (
+                        <span className="px-2 py-0.5 bg-gray-100 text-gray-800 rounded text-xs font-medium mt-1 inline-block">
+                          기타출고
+                        </span>
+                      ) : null}
+                    </div>
                   </label>
                   <button
                     onClick={() => handleDelete(record.id)}
@@ -690,22 +1013,37 @@ export default function OutboundPage() {
                   }
                 </div>
                 <div className="space-y-1 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">LOT:</span>
-                    <span className="text-gray-900">{record.lot?.lotCode || '-'}</span>
-                  </div>
+                  {record.vendor && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">거래처:</span>
+                      <span className="text-gray-900">{record.vendor.name}</span>
+                    </div>
+                  )}
+                  {record.salesperson && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">담당자:</span>
+                      <span className="text-gray-900">{record.salesperson.name}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span className="text-gray-600">수량:</span>
                     <span className="text-gray-900">{formatNumber(record.quantity, 0)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">단가:</span>
-                    <span className="text-gray-900">₩{formatNumber(record.unitCost, 2)}</span>
                   </div>
                   <div className="flex justify-between items-center pt-2 border-t">
                     <span className="text-gray-600 font-medium">총액:</span>
                     <span className="font-bold text-gray-900">₩{formatNumber(record.totalCost, 0)}</span>
                   </div>
+                  {record.salesRecord && (
+                    <div className="flex justify-between pt-2 border-t">
+                      <span className="text-gray-600">연동매출:</span>
+                      <a 
+                        href={`/sales/${record.salesRecord.id}`}
+                        className="text-blue-600 hover:text-blue-800 text-sm"
+                      >
+                        #{record.salesRecord.id}
+                      </a>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
