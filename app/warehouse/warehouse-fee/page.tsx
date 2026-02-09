@@ -7,6 +7,7 @@ interface WarehouseFeeDistribution {
   id: number
   distributedFee: number
   quantityAtTime: number
+  storageDays: number
   lot: {
     id: number
     lotCode: string | null
@@ -182,6 +183,35 @@ export default function WarehouseFeePage() {
     }
   }
 
+  const handleCancelDistribution = async (yearMonth: string) => {
+    if (!confirm('배분을 취소하시겠습니까? 이미 출고된 항목의 원가에는 영향을 줄 수 있습니다.')) return
+
+    try {
+      const res = await fetch('/api/warehouse-fee', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          yearMonth,
+          action: 'cancel-distribution',
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        alert(data.error || '배분 취소 중 오류가 발생했습니다.')
+        return
+      }
+
+      alert('배분이 취소되었습니다.')
+      setSelectedFee(null)
+      fetchFees()
+    } catch (error) {
+      console.error('Error canceling distribution:', error)
+      alert('배분 취소 중 오류가 발생했습니다.')
+    }
+  }
+
   const handleCancel = () => {
     setShowForm(false)
     setEditingFee(null)
@@ -269,7 +299,6 @@ export default function WarehouseFeePage() {
             <div className="bg-blue-50 p-4 rounded-lg">
               <div className="text-sm text-blue-800">
                 💡 창고료는 LOT별로 배분되어 재고 원가에 반영됩니다.
-                배분 후에는 수정/삭제할 수 없습니다.
               </div>
             </div>
 
@@ -348,12 +377,20 @@ export default function WarehouseFeePage() {
                 <td className="px-6 py-4 text-center">
                   <div className="flex justify-center gap-2">
                     {fee.distributedAt ? (
-                      <button
-                        onClick={() => handleViewDetails(fee)}
-                        className="text-blue-600 hover:text-blue-800 text-sm"
-                      >
-                        배분 내역
-                      </button>
+                      <>
+                        <button
+                          onClick={() => handleViewDetails(fee)}
+                          className="text-blue-600 hover:text-blue-800 text-sm"
+                        >
+                          배분 내역
+                        </button>
+                        <button
+                          onClick={() => handleCancelDistribution(fee.yearMonth)}
+                          className="text-orange-600 hover:text-orange-800 text-sm"
+                        >
+                          배분 취소
+                        </button>
+                      </>
                     ) : (
                       <>
                         <button
@@ -449,7 +486,13 @@ export default function WarehouseFeePage() {
                     배분 시점 수량
                   </th>
                   <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">
+                    보관일수
+                  </th>
+                  <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">
                     배분 금액
+                  </th>
+                  <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">
+                    배분비율
                   </th>
                   <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">
                     단위당 배분액
@@ -471,8 +514,14 @@ export default function WarehouseFeePage() {
                     <td className="px-4 py-3 text-sm text-right">
                       {formatNumber(dist.quantityAtTime, 2)}
                     </td>
+                    <td className="px-4 py-3 text-sm text-right">
+                      {dist.storageDays}일
+                    </td>
                     <td className="px-4 py-3 text-sm text-right font-medium">
                       ₩{formatNumber(dist.distributedFee, 2)}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-right">
+                      {formatNumber((dist.distributedFee / selectedFee.totalFee) * 100, 1)}%
                     </td>
                     <td className="px-4 py-3 text-sm text-right">
                       ₩{formatNumber(
@@ -500,6 +549,9 @@ export default function WarehouseFeePage() {
                     )}
                   </td>
                   <td className="px-4 py-3 text-sm text-right">
+                    -
+                  </td>
+                  <td className="px-4 py-3 text-sm text-right">
                     ₩{formatNumber(
                       selectedFee.distributions.reduce(
                         (sum, dist) => sum + dist.distributedFee,
@@ -507,6 +559,9 @@ export default function WarehouseFeePage() {
                       ),
                       2
                     )}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-right">
+                    100%
                   </td>
                   <td></td>
                 </tr>

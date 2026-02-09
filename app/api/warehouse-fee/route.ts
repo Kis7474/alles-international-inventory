@@ -211,6 +211,7 @@ export async function PUT(request: NextRequest) {
                 lotId: lot.id,
                 distributedFee,
                 quantityAtTime: lot.quantityRemaining,
+                storageDays: lot.storageDays,
               },
             })
             
@@ -267,6 +268,78 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json(result.updatedFee)
     }
     
+    // 창고료 배분 취소 (롤백)
+    if (action === 'cancel-distribution') {
+      if (!fee.distributedAt) {
+        return NextResponse.json(
+          { error: '배분되지 않은 창고료입니다.' },
+          { status: 400 }
+        )
+      }
+      
+      // 트랜잭션으로 배분 취소 처리
+      const result = await prisma.$transaction(async (tx) => {
+        // 배분 내역 조회
+        const distributions = await tx.warehouseFeeDistribution.findMany({
+          where: { warehouseFeeId: fee.id },
+          include: {
+            lot: {
+              include: {
+                product: true,
+              },
+            },
+          },
+        })
+        
+        // 각 LOT의 warehouseFee 필드에서 배분액 차감
+        await Promise.all(
+          distributions.map(async (dist) => {
+            await tx.inventoryLot.update({
+              where: { id: dist.lotId },
+              data: {
+                warehouseFee: {
+                  decrement: dist.distributedFee,
+                },
+              },
+            })
+          })
+        )
+        
+        // 모든 배분 내역 삭제
+        await tx.warehouseFeeDistribution.deleteMany({
+          where: { warehouseFeeId: fee.id },
+        })
+        
+        // distributedAt을 null로 초기화
+        const updatedFee = await tx.warehouseFee.update({
+          where: { id: fee.id },
+          data: {
+            distributedAt: null,
+          },
+        })
+        
+        return { updatedFee, distributions }
+      })
+      
+      // 트랜잭션 완료 후, 영향받은 품목들의 currentCost 재계산
+      const affectedProductIds = Array.from(new Set(
+        result.distributions
+          .map(dist => dist.lot.productId)
+          .filter((id): id is number => id != null)
+      ))
+
+      for (const productId of affectedProductIds) {
+        try {
+          await updateProductCurrentCost(productId)
+        } catch (error) {
+          console.error(`Failed to update currentCost for product ${productId}:`, error)
+          // 원가 업데이트 실패해도 배분 취소 자체는 완료되었으므로 계속 진행
+        }
+      }
+      
+      return NextResponse.json(result.updatedFee)
+    }
+    
     // 창고료 정보 수정 (배분 전만 가능)
     if (action === 'update') {
       if (fee.distributedAt) {
@@ -288,7 +361,7 @@ export async function PUT(request: NextRequest) {
     }
     
     return NextResponse.json(
-      { error: 'action 파라미터가 필요합니다. (distribute 또는 update)' },
+      { error: 'action 파라미터가 필요합니다. (distribute, update, 또는 cancel-distribution)' },
       { status: 400 }
     )
   } catch (error) {

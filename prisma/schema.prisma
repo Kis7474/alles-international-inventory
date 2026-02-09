@@ -393,6 +393,7 @@ model WarehouseFeeDistribution {
   lot            InventoryLot @relation(fields: [lotId], references: [id], onDelete: Cascade)
   distributedFee Float // 배분된 창고료
   quantityAtTime Float // 배분 시점의 잔량
+  storageDays    Int          @default(0) // 보관일수
   createdAt      DateTime     @default(now())
 
   @@unique([warehouseFeeId, lotId])
