@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getProductCostWithStorage } from '@/lib/storage-cost'
 
 // GET /api/products - 통합 품목 목록 조회
 export async function GET(request: Request) {
@@ -68,17 +67,22 @@ export async function GET(request: Request) {
       orderBy: { id: 'asc' },
     })
     
-    // Include storage cost information if requested
+    // Phase 5: Include cost information using currentCost from Product (more accurate than getProductCostWithStorage)
+    // getProductCostWithStorage uses estimated storage rate, while currentCost uses actual allocated warehouse fees
     if (includeCostInfo) {
-      const productsWithCostInfo = await Promise.all(
-        products.map(async (product) => {
-          const costInfo = await getProductCostWithStorage(product.id)
-          return {
-            ...product,
-            costInfo,
-          }
-        })
-      )
+      const productsWithCostInfo = products.map((product) => {
+        return {
+          ...product,
+          costInfo: {
+            // Use currentCost which is calculated by updateProductCurrentCost() with actual allocated warehouse fees
+            totalCostWithStorage: product.currentCost || 0,
+            // For backward compatibility, provide empty structure
+            baseAvgCost: 0,
+            storageCostPerUnit: 0,
+            storageCostRate: 0,
+          },
+        }
+      })
       return NextResponse.json(productsWithCostInfo, {
         headers: {
           'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',

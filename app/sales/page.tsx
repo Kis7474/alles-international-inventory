@@ -73,14 +73,27 @@ export default function SalesPage() {
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [selectAll, setSelectAll] = useState(false)
 
+  // Phase 5: 페이지네이션 상태
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [total, setTotal] = useState(0)
+  const limit = 50 // Phase 5: 한 페이지에 50건 표시
+
   useEffect(() => {
+    // Only fetch data once on mount - fetchData shouldn't change after initial render
+    // and we don't want to refetch when formData changes
     fetchData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const fetchData = async () => {
     try {
+      const params = new URLSearchParams()
+      params.append('page', '1')
+      params.append('limit', limit.toString())
+
       const [salesRes, salespersonsRes, categoriesRes, vendorsRes] = await Promise.all([
-        fetch('/api/sales'),
+        fetch(`/api/sales?${params.toString()}`),
         fetch('/api/salesperson'),
         fetch('/api/categories'),
         fetch('/api/vendors'), // Phase 4
@@ -91,12 +104,10 @@ export default function SalesPage() {
       const categoriesData = await categoriesRes.json()
       const vendorsData = await vendorsRes.json() // Phase 4
 
-      // 하위 호환성: 배열이면 그대로 사용, 객체면 data 속성 사용
-      if (Array.isArray(salesResponse)) {
-        setSales(salesResponse)
-      } else {
-        setSales(salesResponse.data || [])
-      }
+      // Phase 5: 페이지네이션 정보 저장
+      setSales(salesResponse.data || [])
+      setTotalPages(salesResponse.pagination?.totalPages || 1)
+      setTotal(salesResponse.pagination?.total || 0)
       
       setSalespersons(salespersonsData)
       setCategories(categoriesData)
@@ -113,6 +124,10 @@ export default function SalesPage() {
     setLoading(true)
     try {
       const params = new URLSearchParams()
+      // Phase 5: 페이지네이션 파라미터 추가
+      params.append('page', page.toString())
+      params.append('limit', limit.toString())
+      
       if (filterType) params.append('type', filterType)
       if (filterSalesperson) params.append('salespersonId', filterSalesperson)
       if (filterCategory) params.append('categoryId', filterCategory)
@@ -124,12 +139,10 @@ export default function SalesPage() {
       const res = await fetch(`/api/sales?${params.toString()}`)
       const response = await res.json()
       
-      // 하위 호환성: 배열이면 그대로 사용, 객체면 data 속성 사용
-      if (Array.isArray(response)) {
-        setSales(response)
-      } else {
-        setSales(response.data || [])
-      }
+      // Phase 5: 페이지네이션 정보 저장
+      setSales(response.data || [])
+      setTotalPages(response.pagination?.totalPages || 1)
+      setTotal(response.pagination?.total || 0)
       
       setSelectedIds([])
       setSelectAll(false)
@@ -331,6 +344,61 @@ export default function SalesPage() {
     }
   }
 
+  // Phase 5: 페이지네이션 핸들러
+  const handlePageChange = async (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalPages && newPage !== page) {
+      setPage(newPage)
+      setLoading(true)
+      try {
+        const params = new URLSearchParams()
+        params.append('page', newPage.toString())
+        params.append('limit', limit.toString())
+        
+        if (filterType) params.append('type', filterType)
+        if (filterSalesperson) params.append('salespersonId', filterSalesperson)
+        if (filterCategory) params.append('categoryId', filterCategory)
+        if (filterVendor) params.append('vendorId', filterVendor)
+        if (filterItemName) params.append('itemName', filterItemName)
+        if (filterStartDate) params.append('startDate', filterStartDate)
+        if (filterEndDate) params.append('endDate', filterEndDate)
+
+        const res = await fetch(`/api/sales?${params.toString()}`)
+        const response = await res.json()
+        
+        setSales(response.data || [])
+        setTotalPages(response.pagination?.totalPages || 1)
+        setTotal(response.pagination?.total || 0)
+        
+        setSelectedIds([])
+        setSelectAll(false)
+      } catch (error) {
+        console.error('Error fetching page:', error)
+        alert('페이지 조회 중 오류가 발생했습니다.')
+      } finally {
+        setLoading(false)
+      }
+    }
+  }
+
+  // Phase 5: 필터 적용 시 첫 페이지로 리셋
+  const handleFilterApply = () => {
+    setPage(1)
+    handleFilter()
+  }
+
+  // Phase 5: 필터 초기화 시 첫 페이지로 리셋
+  const handleFilterReset = () => {
+    setFilterType('')
+    setFilterSalesperson('')
+    setFilterCategory('')
+    setFilterVendor('')
+    setFilterItemName('')
+    setFilterStartDate('')
+    setFilterEndDate('')
+    setPage(1)
+    fetchData()
+  }
+
   // Phase 4: 정렬된 데이터
   const sortedSales = [...sales].sort((a, b) => {
     let aVal: number | string = 0
@@ -513,22 +581,13 @@ export default function SalesPage() {
         
         <div className="mt-4">
           <button
-            onClick={handleFilter}
+            onClick={handleFilterApply}
             className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
           >
             필터 적용
           </button>
           <button
-            onClick={() => {
-              setFilterType('')
-              setFilterSalesperson('')
-              setFilterCategory('')
-              setFilterVendor('') // Phase 4
-              setFilterItemName('') // Phase 4
-              setFilterStartDate('')
-              setFilterEndDate('')
-              fetchData()
-            }}
+            onClick={handleFilterReset}
             className="ml-2 bg-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-400"
           >
             초기화
@@ -691,6 +750,69 @@ export default function SalesPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Phase 5: 페이지네이션 UI */}
+        {total > 0 && (
+          <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+              {/* 아이템 표시 정보 */}
+              <div className="text-sm text-gray-700">
+                전체 <span className="font-semibold">{total}</span>건 중{' '}
+                <span className="font-semibold">{(page - 1) * limit + 1}</span>-
+                <span className="font-semibold">{Math.min(page * limit, total)}</span>건 표시
+              </div>
+
+              {/* 페이지 버튼 */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handlePageChange(page - 1)}
+                  disabled={page === 1}
+                  className="px-3 py-1 rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  이전
+                </button>
+
+                {/* 페이지 번호 */}
+                <div className="flex gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum: number
+                    if (totalPages <= 5) {
+                      pageNum = i + 1
+                    } else if (page <= 3) {
+                      pageNum = i + 1
+                    } else if (page >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i
+                    } else {
+                      pageNum = page - 2 + i
+                    }
+                    
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => handlePageChange(pageNum)}
+                        className={`px-3 py-1 rounded border ${
+                          page === pageNum
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                <button
+                  onClick={() => handlePageChange(page + 1)}
+                  disabled={page === totalPages}
+                  className="px-3 py-1 rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  다음
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

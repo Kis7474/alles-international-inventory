@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { formatNumber } from '@/lib/utils'
 import CardSkeleton from '@/components/ui/CardSkeleton'
+import Link from 'next/link'
 
 interface OverviewData {
   currentMonth: {
@@ -59,6 +60,14 @@ interface OverviewData {
   }>
 }
 
+interface InventoryItem {
+  productId: number | null
+  productName: string
+  totalQuantity: number
+  totalValueWithStorage: number
+  avgUnitCost: number
+}
+
 export default function DashboardClient({ 
   initialData 
 }: { 
@@ -72,6 +81,17 @@ export default function DashboardClient({
       return res.json()
     },
     initialData,
+  })
+
+  // Phase 5: Inventory summary query - limit to top items for performance
+  const { data: inventoryData, isLoading: inventoryLoading } = useQuery({
+    queryKey: ['dashboard-inventory'],
+    queryFn: async () => {
+      // Only fetch top 100 items for dashboard summary to avoid performance issues
+      const res = await fetch('/api/inventory?limit=100')
+      if (!res.ok) throw new Error('Failed to fetch inventory')
+      return res.json()
+    },
   })
 
   if (isLoading || !data) {
@@ -438,6 +458,123 @@ export default function DashboardClient({
             </div>
           )}
         </div>
+      </div>
+
+      {/* Phase 5: 재고 현황 요약 */}
+      <div className="bg-white p-4 md:p-6 rounded-lg shadow">
+        <div className="flex justify-between items-center mb-3 md:mb-4">
+          <h2 className="text-lg md:text-xl font-bold text-gray-900">재고 현황</h2>
+          <Link 
+            href="/warehouse/inventory"
+            className="text-sm text-blue-600 hover:text-blue-800"
+          >
+            자세히 보기 →
+          </Link>
+        </div>
+
+        {inventoryLoading ? (
+          <div className="py-8 text-center text-gray-500">
+            재고 정보 로딩 중...
+          </div>
+        ) : inventoryData?.data ? (
+          <>
+            {/* 재고 요약 카드 */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <div className="text-sm text-blue-600 mb-1">총 품목 수</div>
+                <div className="text-2xl font-bold text-blue-900">
+                  {inventoryData.data.length}개
+                </div>
+              </div>
+              <div className="bg-green-50 p-4 rounded-lg">
+                <div className="text-sm text-green-600 mb-1">총 재고 수량</div>
+                <div className="text-2xl font-bold text-green-900">
+                  {formatNumber(
+                    inventoryData.data.reduce((sum: number, item: InventoryItem) => sum + item.totalQuantity, 0),
+                    0
+                  )}
+                </div>
+              </div>
+              <div className="bg-purple-50 p-4 rounded-lg">
+                <div className="text-sm text-purple-600 mb-1">총 재고 가치 (창고료 포함)</div>
+                <div className="text-2xl font-bold text-purple-900">
+                  ₩{formatNumber(
+                    inventoryData.data.reduce((sum: number, item: InventoryItem) => sum + item.totalValueWithStorage, 0),
+                    0
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* TOP 10 재고 (가치 기준) */}
+            <div>
+              <h3 className="text-md font-bold mb-3 text-gray-900">재고 가치 TOP 10</h3>
+              
+              {/* Desktop Table */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="min-w-full">
+                  <thead className="border-b">
+                    <tr>
+                      <th className="text-left py-2 text-gray-700">품목명</th>
+                      <th className="text-right py-2 text-gray-700">수량</th>
+                      <th className="text-right py-2 text-gray-700">평균 단가</th>
+                      <th className="text-right py-2 text-gray-700">총 가치</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {inventoryData.data
+                      .sort((a: InventoryItem, b: InventoryItem) => b.totalValueWithStorage - a.totalValueWithStorage)
+                      .slice(0, 10)
+                      .map((item: InventoryItem, idx: number) => (
+                        <tr key={item.productId || idx} className="border-b">
+                          <td className="py-2 text-gray-900">{item.productName}</td>
+                          <td className="py-2 text-right text-gray-900">
+                            {formatNumber(item.totalQuantity, 2)}
+                          </td>
+                          <td className="py-2 text-right text-gray-900">
+                            ₩{formatNumber(item.avgUnitCost, 0)}
+                          </td>
+                          <td className="py-2 text-right text-gray-900">
+                            ₩{formatNumber(item.totalValueWithStorage, 0)}
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Card View */}
+              <div className="md:hidden space-y-3">
+                {inventoryData.data
+                  .sort((a: InventoryItem, b: InventoryItem) => b.totalValueWithStorage - a.totalValueWithStorage)
+                  .slice(0, 10)
+                  .map((item: InventoryItem, idx: number) => (
+                    <div key={item.productId || idx} className="bg-gray-50 p-3 rounded-lg">
+                      <div className="font-bold text-gray-900 mb-2">{item.productName}</div>
+                      <div className="space-y-1 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">수량:</span>
+                          <span className="text-gray-900">{formatNumber(item.totalQuantity, 2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">평균 단가:</span>
+                          <span className="text-gray-900">₩{formatNumber(item.avgUnitCost, 0)}</span>
+                        </div>
+                        <div className="flex justify-between items-center pt-1 border-t">
+                          <span className="text-gray-600">총 가치:</span>
+                          <span className="font-bold text-gray-900">₩{formatNumber(item.totalValueWithStorage, 0)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="py-8 text-center text-gray-500">
+            재고 정보가 없습니다.
+          </div>
+        )}
       </div>
     </div>
   )
