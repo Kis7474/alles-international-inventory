@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
       bankAccount,
       receiverName,
       receiverSignature,
+      // salesRecordIds, // 매출 레코드 ID 배열 (선택적) - 향후 연동에 사용
     } = body
 
     // 거래번호 생성
