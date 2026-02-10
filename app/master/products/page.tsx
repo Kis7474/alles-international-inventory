@@ -36,6 +36,7 @@ interface Product {
 export default function MasterProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [vendors, setVendors] = useState<Vendor[]>([]) // NEW: vendors for filter
   const [loading, setLoading] = useState(true)
   const [showProductModal, setShowProductModal] = useState(false)
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null)
@@ -45,6 +46,7 @@ export default function MasterProductsPage() {
   // 필터 상태
   const [filterCategoryId, setFilterCategoryId] = useState('')
   const [filterSearchName, setFilterSearchName] = useState('')
+  const [filterPurchaseVendorId, setFilterPurchaseVendorId] = useState('') // NEW: vendor filter
 
   useEffect(() => {
     fetchData()
@@ -52,14 +54,17 @@ export default function MasterProductsPage() {
 
   const fetchData = async () => {
     try {
-      const [productsRes, categoriesRes] = await Promise.all([
+      const [productsRes, categoriesRes, vendorsRes] = await Promise.all([
         fetch('/api/products'),
         fetch('/api/categories'),
+        fetch('/api/vendors'), // NEW: fetch vendors
       ])
       const productsData = await productsRes.json()
       const categoriesData = await categoriesRes.json()
+      const vendorsData = await vendorsRes.json()
       setProducts(productsData)
       setCategories(categoriesData)
+      setVendors(vendorsData) // NEW: set vendors
     } catch (error) {
       console.error('Error fetching data:', error)
     } finally {
@@ -73,6 +78,7 @@ export default function MasterProductsPage() {
       const params = new URLSearchParams()
       if (filterCategoryId) params.append('categoryId', filterCategoryId)
       if (filterSearchName) params.append('searchName', filterSearchName)
+      if (filterPurchaseVendorId) params.append('purchaseVendorId', filterPurchaseVendorId) // NEW: vendor filter
 
       const res = await fetch(`/api/products?${params.toString()}`)
       const data = await res.json()
@@ -84,6 +90,13 @@ export default function MasterProductsPage() {
       alert('필터링 중 오류가 발생했습니다.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  // NEW: Handle Enter key for search
+  const handleSearchKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleFilter()
     }
   }
 
@@ -201,7 +214,7 @@ export default function MasterProductsPage() {
       {/* 필터 */}
       <div className="bg-white p-6 rounded-lg shadow mb-6">
         <h2 className="text-lg font-bold mb-4 text-gray-900">필터</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700">카테고리</label>
             <select
@@ -224,9 +237,26 @@ export default function MasterProductsPage() {
               type="text"
               value={filterSearchName}
               onChange={(e) => setFilterSearchName(e.target.value)}
-              placeholder="품목명 또는 코드로 검색"
+              onKeyPress={handleSearchKeyPress}
+              placeholder="품목명 또는 코드로 검색 (Enter 키)"
               className="w-full px-3 py-2 border rounded-lg text-gray-900"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1 text-gray-700">매입 거래처</label>
+            <select
+              value={filterPurchaseVendorId}
+              onChange={(e) => setFilterPurchaseVendorId(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg text-gray-900"
+            >
+              <option value="">전체</option>
+              {vendors.map((vendor) => (
+                <option key={vendor.id} value={vendor.id}>
+                  {vendor.name}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
         
@@ -241,6 +271,7 @@ export default function MasterProductsPage() {
             onClick={() => {
               setFilterCategoryId('')
               setFilterSearchName('')
+              setFilterPurchaseVendorId('')
               fetchData()
             }}
             className="ml-2 bg-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-400"

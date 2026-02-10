@@ -140,7 +140,7 @@ export default function SalesPage() {
   }
 
   const handleDelete = async (id: number) => {
-    if (!confirm('정말 삭제하시겠습니까?')) return
+    if (!confirm('매출과 연동된 매입 기록도 함께 삭제됩니다.\n정말 삭제하시겠습니까?')) return
 
     try {
       const res = await fetch(`/api/sales?id=${id}`, {
@@ -184,7 +184,7 @@ export default function SalesPage() {
 
   // 선택 삭제
   const handleBulkDelete = async () => {
-    if (!confirm(`${selectedIds.length}개 항목을 삭제하시겠습니까?`)) return
+    if (!confirm(`${selectedIds.length}개 항목과 연동된 매입 기록도 함께 삭제됩니다.\n삭제하시겠습니까?`)) return
     
     try {
       const res = await fetch('/api/sales', {
