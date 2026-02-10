@@ -34,6 +34,12 @@ export async function calculateStorageCostRate(): Promise<number> {
 
 /**
  * Get product cost with storage costs included
+ * 
+ * @deprecated This function uses ESTIMATED storage cost rate based on current month's warehouse fees.
+ * For ACCURATE costs, use Product.currentCost field which is calculated by updateProductCurrentCost()
+ * with ACTUAL allocated warehouse fees from each LOT.
+ * 
+ * This function will be removed in a future version. Use Product.currentCost instead.
  */
 export async function getProductCostWithStorage(productId: number): Promise<{
   baseAvgCost: number
