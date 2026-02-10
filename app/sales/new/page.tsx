@@ -72,9 +72,7 @@ export default function NewSalesPage() {
   // Filtered products based on vendor and type
   const [availableProducts, setAvailableProducts] = useState<Product[]>([])
   
-  // Search states
-  const [vendorSearch, setVendorSearch] = useState('')
-  const [productSearch, setProductSearch] = useState('')
+  // Phase 4: vendorSearch and productSearch removed - now using Autocomplete component
   
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -177,7 +175,6 @@ export default function NewSalesPage() {
 
   const handleVendorChange = (vendorId: string) => {
     setFormData((prev) => ({ ...prev, vendorId, productId: '', itemName: '' }))
-    setProductSearch('')
     
     if (vendorId) {
       if (formData.type === 'PURCHASE') {
@@ -199,8 +196,6 @@ export default function NewSalesPage() {
   const handleTypeChange = (type: string) => {
     setFormData({ ...formData, type, vendorId: '', productId: '', itemName: '' })
     setAvailableProducts([])
-    setVendorSearch('')
-    setProductSearch('')
   }
 
   const fetchVendorPrice = async (productId: number, vendorId: number, date: string, type: string) => {

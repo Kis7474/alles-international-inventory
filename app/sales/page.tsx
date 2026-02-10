@@ -23,11 +23,6 @@ interface Vendor {
   name: string
 }
 
-interface Product {
-  id: number
-  name: string
-}
-
 interface SalesRecord {
   id: number
   date: string
@@ -56,7 +51,7 @@ export default function SalesPage() {
   const [salespersons, setSalespersons] = useState<Salesperson[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [vendors, setVendors] = useState<Vendor[]>([]) // Phase 4
-  const [products, setProducts] = useState<Product[]>([]) // Phase 4
+  // Phase 4: products loaded for autocomplete but we use itemName filter instead
   const [loading, setLoading] = useState(true)
   
   // 필터 상태
@@ -82,19 +77,17 @@ export default function SalesPage() {
 
   const fetchData = async () => {
     try {
-      const [salesRes, salespersonsRes, categoriesRes, vendorsRes, productsRes] = await Promise.all([
+      const [salesRes, salespersonsRes, categoriesRes, vendorsRes] = await Promise.all([
         fetch('/api/sales'),
         fetch('/api/salesperson'),
         fetch('/api/categories'),
         fetch('/api/vendors'), // Phase 4
-        fetch('/api/products'), // Phase 4
       ])
 
       const salesResponse = await salesRes.json()
       const salespersonsData = await salespersonsRes.json()
       const categoriesData = await categoriesRes.json()
       const vendorsData = await vendorsRes.json() // Phase 4
-      const productsData = await productsRes.json() // Phase 4
 
       // 하위 호환성: 배열이면 그대로 사용, 객체면 data 속성 사용
       if (Array.isArray(salesResponse)) {
@@ -106,7 +99,6 @@ export default function SalesPage() {
       setSalespersons(salespersonsData)
       setCategories(categoriesData)
       setVendors(vendorsData) // Phase 4
-      setProducts(productsData) // Phase 4
     } catch (error) {
       console.error('Error fetching data:', error)
       alert('데이터 조회 중 오류가 발생했습니다.')
