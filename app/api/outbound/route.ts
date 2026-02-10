@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
         let unitPrice = 0
         
         // 1. 프론트에서 전달한 unitPriceOverride 우선
-        if (unitPriceOverride && unitPriceOverride > 0) {
+        if (unitPriceOverride != null && parseFloat(unitPriceOverride) > 0) {
           unitPrice = parseFloat(unitPriceOverride)
         } else {
           // 2. VendorProductPrice에서 조회

@@ -303,7 +303,8 @@ export default function OutboundPage() {
       outboundType: formData.outboundType,
       vendorId: formData.vendorId ? parseInt(formData.vendorId) : null,
       salespersonId: formData.salespersonId ? parseInt(formData.salespersonId) : null,
-      unitPriceOverride: formData.unitPriceOverride ? parseFloat(formData.unitPriceOverride) : null, // Phase 4
+      // Phase 4: Always send as number (0 if empty)
+      unitPriceOverride: formData.unitPriceOverride ? parseFloat(formData.unitPriceOverride) : 0,
       notes: formData.notes || null,
     }
 
