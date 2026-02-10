@@ -12,22 +12,7 @@ export async function GET(request: Request) {
     const includeCostInfo = searchParams.get('includeCostInfo') === 'true'
     const type = searchParams.get('type') // 품목 타입 필터 추가
     
-    interface WhereClause {
-      categoryId?: number
-      type?: string | { in: string[] }
-      OR?: Array<{
-        name?: { contains: string }
-        code?: { contains: string }
-      }>
-      vendorPrices?: {
-        some: {
-          vendorId: number
-          salesPrice: { not: null }
-        }
-      }
-    }
-    
-    const where: WhereClause = {}
+    const where: any = {}
     
     if (categoryId) {
       where.categoryId = parseInt(categoryId)
