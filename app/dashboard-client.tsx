@@ -83,11 +83,12 @@ export default function DashboardClient({
     initialData,
   })
 
-  // Phase 5: Inventory summary query
+  // Phase 5: Inventory summary query - limit to top items for performance
   const { data: inventoryData, isLoading: inventoryLoading } = useQuery({
     queryKey: ['dashboard-inventory'],
     queryFn: async () => {
-      const res = await fetch('/api/inventory?limit=1000') // Get all inventory items
+      // Only fetch top 100 items for dashboard summary to avoid performance issues
+      const res = await fetch('/api/inventory?limit=100')
       if (!res.ok) throw new Error('Failed to fetch inventory')
       return res.json()
     },

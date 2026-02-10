@@ -87,6 +87,8 @@ export default function EditSalesPage() {
   })
 
   useEffect(() => {
+    // Fetch data once on mount when ID is available
+    // fetchData shouldn't change after initial render, and we only want to fetch when id changes
     fetchData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])

@@ -80,6 +80,8 @@ export default function SalesPage() {
   const limit = 50 // Phase 5: 한 페이지에 50건 표시
 
   useEffect(() => {
+    // Only fetch data once on mount - fetchData shouldn't change after initial render
+    // and we don't want to refetch when formData changes
     fetchData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
