@@ -118,6 +118,7 @@ export async function POST(request: NextRequest) {
       unitPrice,
       cost,
       notes,
+      purchasePriceOverride, // 매입가 오버라이드 (프론트에서 전달)
     } = body
 
     // 금액 계산
@@ -185,6 +186,43 @@ export async function POST(request: NextRequest) {
         vendor: true,
       },
     })
+
+    // ★★★ 매출 등록 시 매입(PURCHASE)도 동시 생성 ★★★
+    if (type === 'SALES' && productId) {
+      const { createAutoPurchaseRecord } = await import('@/lib/purchase-auto')
+      
+      // 품목 정보 조회
+      const product = await prisma.product.findUnique({
+        where: { id: parseInt(productId) },
+        include: { 
+          category: true,
+          purchaseVendor: true,
+        }
+      })
+      
+      if (product && product.purchaseVendorId) {
+        // 매입가 결정: purchasePriceOverride 또는 defaultPurchasePrice
+        const purchasePrice = purchasePriceOverride 
+          ? parseFloat(purchasePriceOverride) 
+          : (product.defaultPurchasePrice || 0)
+        
+        if (purchasePrice > 0) {
+          await createAutoPurchaseRecord({
+            productId: product.id,
+            vendorId: product.purchaseVendorId,
+            salespersonId: parseInt(salespersonId),
+            categoryId: parseInt(categoryId),
+            quantity: parseFloat(quantity),
+            unitPrice: purchasePrice,
+            date: new Date(date),
+            itemName: product.name,
+            costSource: 'SALES_AUTO',
+            linkedSalesId: salesRecord.id,
+            notes: `매출 ${salesRecord.id}에서 자동생성`,
+          })
+        }
+      }
+    }
 
     return NextResponse.json(salesRecord, { status: 201 })
   } catch (error) {
@@ -302,12 +340,24 @@ export async function DELETE(request: NextRequest) {
 
     // Bulk delete
     if (body && body.ids && Array.isArray(body.ids)) {
+      const ids = body.ids.map((id: string | number) => parseInt(id.toString()))
+      
+      // Delete linked purchases first
       await prisma.salesRecord.deleteMany({
         where: {
-          id: { in: body.ids.map((id: string | number) => parseInt(id.toString())) }
+          linkedSalesId: { in: ids },
+          costSource: 'SALES_AUTO',
         }
       })
-      return NextResponse.json({ success: true, count: body.ids.length })
+      
+      // Then delete the sales records
+      await prisma.salesRecord.deleteMany({
+        where: {
+          id: { in: ids }
+        }
+      })
+      
+      return NextResponse.json({ success: true, count: ids.length })
     }
 
     // Single delete
@@ -318,8 +368,19 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
+    const parsedId = parseInt(id)
+
+    // Delete linked purchase records first
+    await prisma.salesRecord.deleteMany({
+      where: {
+        linkedSalesId: parsedId,
+        costSource: 'SALES_AUTO',
+      }
+    })
+
+    // Then delete the sales record
     await prisma.salesRecord.delete({
-      where: { id: parseInt(id) },
+      where: { id: parsedId },
     })
 
     return NextResponse.json({ success: true })

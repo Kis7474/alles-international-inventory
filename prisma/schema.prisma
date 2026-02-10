@@ -430,10 +430,18 @@ model SalesRecord {
   totalAmount  Float? // 합계 (공급가액 + 부가세)
 
   // Phase 4 추가
-  costSource String? // 'PRODUCT_CURRENT' | 'PRODUCT_DEFAULT' | 'MANUAL' | 'OUTBOUND_AUTO'
+  costSource String? // 'PRODUCT_CURRENT' | 'PRODUCT_DEFAULT' | 'MANUAL' | 'OUTBOUND_AUTO' | 'IMPORT_AUTO' | 'INBOUND_AUTO' | 'SALES_AUTO'
 
   // 출고 연동 관계
   outboundMovements InventoryMovement[]
+
+  // 매입-매출 연동 (NEW)
+  linkedSalesId    Int?          @unique // 이 매입에 연동된 매출 ID (매입 레코드에만 사용)
+  linkedSalesRecord SalesRecord? @relation("LinkedPurchase", fields: [linkedSalesId], references: [id], onDelete: SetNull)
+  linkedPurchases  SalesRecord[] @relation("LinkedPurchase") // 이 매출에 연동된 매입들
+
+  // 수입등록 연동 (NEW)
+  importExportId Int? // 수입등록에서 자동생성된 경우
 
   notes     String?
   createdAt DateTime @default(now())

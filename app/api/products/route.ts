@@ -34,10 +34,17 @@ export async function GET(request: Request) {
     }
     if (searchName) {
       where.OR = [
-        { name: { contains: searchName } },
-        { code: { contains: searchName } },
+        { name: { contains: searchName, mode: 'insensitive' } },
+        { code: { contains: searchName, mode: 'insensitive' } },
       ]
     }
+    
+    // 매입거래처 필터 추가
+    const purchaseVendorId = searchParams.get('purchaseVendorId')
+    if (purchaseVendorId) {
+      where.purchaseVendorId = parseInt(purchaseVendorId)
+    }
+    
     if (salesVendorId) {
       // 해당 거래처에 판매하는 품목만 조회 (VendorProductPrice 사용)
       where.vendorPrices = {
