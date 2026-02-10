@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Autocomplete from '@/components/ui/Autocomplete'
 
 interface Salesperson {
   id: number
@@ -71,9 +72,7 @@ export default function NewSalesPage() {
   // Filtered products based on vendor and type
   const [availableProducts, setAvailableProducts] = useState<Product[]>([])
   
-  // Search states
-  const [vendorSearch, setVendorSearch] = useState('')
-  const [productSearch, setProductSearch] = useState('')
+  // Phase 4: vendorSearch and productSearch removed - now using Autocomplete component
   
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -176,7 +175,6 @@ export default function NewSalesPage() {
 
   const handleVendorChange = (vendorId: string) => {
     setFormData((prev) => ({ ...prev, vendorId, productId: '', itemName: '' }))
-    setProductSearch('')
     
     if (vendorId) {
       if (formData.type === 'PURCHASE') {
@@ -198,8 +196,6 @@ export default function NewSalesPage() {
   const handleTypeChange = (type: string) => {
     setFormData({ ...formData, type, vendorId: '', productId: '', itemName: '' })
     setAvailableProducts([])
-    setVendorSearch('')
-    setProductSearch('')
   }
 
   const fetchVendorPrice = async (productId: number, vendorId: number, date: string, type: string) => {
@@ -400,30 +396,19 @@ export default function NewSalesPage() {
 
           {/* 거래처/고객 - 거래처 먼저 선택하도록 순서 변경 */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1 text-gray-700">
-                거래처 선택 * {formData.type === 'PURCHASE' && <span className="text-xs text-blue-600">(매입 거래처만 표시)</span>}
-                {formData.type === 'SALES' && <span className="text-xs text-blue-600">(매출 거래처만 표시)</span>}
-              </label>
-              <select
-                required
-                value={formData.vendorId}
-                onChange={(e) => handleVendorChange(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg text-gray-900"
-              >
-                <option value="">거래처를 선택하세요</option>
-                {filteredVendors
-                  .filter(v => 
-                    v.name.toLowerCase().includes(vendorSearch.toLowerCase()) ||
-                    v.code.toLowerCase().includes(vendorSearch.toLowerCase())
-                  )
-                  .map((vendor) => (
-                    <option key={vendor.id} value={vendor.id}>
-                      [{vendor.code}] {vendor.name}
-                    </option>
-                  ))}
-              </select>
-            </div>
+            {/* Phase 4: Autocomplete for vendor */}
+            <Autocomplete
+              label={`거래처 선택 ${formData.type === 'PURCHASE' ? '(매입 거래처만 표시)' : '(매출 거래처만 표시)'}`}
+              required
+              options={filteredVendors.map(v => ({
+                id: v.id,
+                label: v.name,
+                sublabel: v.code
+              }))}
+              value={formData.vendorId}
+              onChange={(value) => handleVendorChange(value)}
+              placeholder="거래처를 검색하세요"
+            />
 
             <div>
               <label className="block text-sm font-medium mb-1 text-gray-700">
@@ -443,28 +428,19 @@ export default function NewSalesPage() {
 
           {/* 품목 정보 */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1 text-gray-700">
-                품목 선택 <span className="text-xs text-blue-600">(선택한 거래처의 품목만 표시)</span>
-              </label>
-              <select
-                value={formData.productId}
-                onChange={(e) => handleProductChange(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg text-gray-900"
-                disabled={!formData.vendorId}
-              >
-                <option value="">{formData.vendorId ? '품목을 선택하세요' : '거래처를 먼저 선택하세요'}</option>
-                {availableProducts
-                  .filter(p => 
-                    p.name.toLowerCase().includes(productSearch.toLowerCase())
-                  )
-                  .map((product) => (
-                    <option key={product.id} value={product.id}>
-                      {product.name} ({product.unit})
-                    </option>
-                  ))}
-              </select>
-            </div>
+            {/* Phase 4: Autocomplete for product */}
+            <Autocomplete
+              label="품목 선택 (선택한 거래처의 품목만 표시)"
+              options={availableProducts.map(p => ({
+                id: p.id,
+                label: p.name,
+                sublabel: p.unit
+              }))}
+              value={formData.productId}
+              onChange={(value) => handleProductChange(value)}
+              placeholder={formData.vendorId ? '품목을 검색하세요' : '거래처를 먼저 선택하세요'}
+              disabled={!formData.vendorId}
+            />
 
             <div>
               <label className="block text-sm font-medium mb-1 text-gray-700">

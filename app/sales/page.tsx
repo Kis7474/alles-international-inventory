@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { formatNumber } from '@/lib/utils'
 import Link from 'next/link'
+import Autocomplete from '@/components/ui/Autocomplete'
 
 interface Salesperson {
   id: number
@@ -14,6 +15,12 @@ interface Category {
   id: number
   code: string
   nameKo: string
+}
+
+interface Vendor {
+  id: number
+  code: string
+  name: string
 }
 
 interface SalesRecord {
@@ -36,18 +43,29 @@ interface SalesRecord {
   notes: string | null
 }
 
+type SortField = 'date' | 'amount' | 'marginRate'
+type SortDirection = 'asc' | 'desc'
+
 export default function SalesPage() {
   const [sales, setSales] = useState<SalesRecord[]>([])
   const [salespersons, setSalespersons] = useState<Salesperson[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [vendors, setVendors] = useState<Vendor[]>([]) // Phase 4
+  // Phase 4: products loaded for autocomplete but we use itemName filter instead
   const [loading, setLoading] = useState(true)
   
   // 필터 상태
   const [filterType, setFilterType] = useState('')
   const [filterSalesperson, setFilterSalesperson] = useState('')
   const [filterCategory, setFilterCategory] = useState('')
+  const [filterVendor, setFilterVendor] = useState('') // Phase 4
+  const [filterItemName, setFilterItemName] = useState('') // Phase 4
   const [filterStartDate, setFilterStartDate] = useState('')
   const [filterEndDate, setFilterEndDate] = useState('')
+  
+  // Phase 4: 정렬 상태
+  const [sortField, setSortField] = useState<SortField>('date')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
 
   // 다중 선택 상태
   const [selectedIds, setSelectedIds] = useState<number[]>([])
@@ -59,26 +77,28 @@ export default function SalesPage() {
 
   const fetchData = async () => {
     try {
-      const [salesRes, salespersonsRes, categoriesRes] = await Promise.all([
+      const [salesRes, salespersonsRes, categoriesRes, vendorsRes] = await Promise.all([
         fetch('/api/sales'),
         fetch('/api/salesperson'),
         fetch('/api/categories'),
+        fetch('/api/vendors'), // Phase 4
       ])
 
       const salesResponse = await salesRes.json()
       const salespersonsData = await salespersonsRes.json()
       const categoriesData = await categoriesRes.json()
+      const vendorsData = await vendorsRes.json() // Phase 4
 
       // 하위 호환성: 배열이면 그대로 사용, 객체면 data 속성 사용
       if (Array.isArray(salesResponse)) {
         setSales(salesResponse)
       } else {
         setSales(salesResponse.data || [])
-        // pagination 정보는 받지만 현재는 UI에 표시하지 않음 (향후 기능 추가 가능)
       }
       
       setSalespersons(salespersonsData)
       setCategories(categoriesData)
+      setVendors(vendorsData) // Phase 4
     } catch (error) {
       console.error('Error fetching data:', error)
       alert('데이터 조회 중 오류가 발생했습니다.')
@@ -94,6 +114,8 @@ export default function SalesPage() {
       if (filterType) params.append('type', filterType)
       if (filterSalesperson) params.append('salespersonId', filterSalesperson)
       if (filterCategory) params.append('categoryId', filterCategory)
+      if (filterVendor) params.append('vendorId', filterVendor) // Phase 4
+      if (filterItemName) params.append('itemName', filterItemName) // Phase 4
       if (filterStartDate) params.append('startDate', filterStartDate)
       if (filterEndDate) params.append('endDate', filterEndDate)
 
@@ -105,7 +127,6 @@ export default function SalesPage() {
         setSales(response)
       } else {
         setSales(response.data || [])
-        // pagination 정보는 받지만 현재는 UI에 표시하지 않음 (향후 기능 추가 가능)
       }
       
       setSelectedIds([])
@@ -195,6 +216,8 @@ export default function SalesPage() {
       if (filterType) params.append('type', filterType)
       if (filterSalesperson) params.append('salespersonId', filterSalesperson)
       if (filterCategory) params.append('categoryId', filterCategory)
+      if (filterVendor) params.append('vendorId', filterVendor) // Phase 4
+      if (filterItemName) params.append('itemName', filterItemName) // Phase 4
       if (filterStartDate) params.append('startDate', filterStartDate)
       if (filterEndDate) params.append('endDate', filterEndDate)
       
@@ -219,6 +242,50 @@ export default function SalesPage() {
       alert('엑셀 다운로드 중 오류가 발생했습니다.')
     }
   }
+
+  // Phase 4: 정렬 기능
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDirection('desc')
+    }
+  }
+
+  // Phase 4: 정렬된 데이터
+  const sortedSales = [...sales].sort((a, b) => {
+    let aVal: number | string = 0
+    let bVal: number | string = 0
+
+    if (sortField === 'date') {
+      aVal = new Date(a.date).getTime()
+      bVal = new Date(b.date).getTime()
+    } else if (sortField === 'amount') {
+      aVal = a.amount
+      bVal = b.amount
+    } else if (sortField === 'marginRate') {
+      aVal = a.marginRate
+      bVal = b.marginRate
+    }
+
+    if (sortDirection === 'asc') {
+      return aVal > bVal ? 1 : -1
+    } else {
+      return aVal < bVal ? 1 : -1
+    }
+  })
+
+  // Phase 4: 요약 계산
+  const summary = {
+    totalRevenue: sales.filter(s => s.type === 'SALES').reduce((sum, s) => sum + s.amount, 0),
+    totalMargin: sales.filter(s => s.type === 'SALES').reduce((sum, s) => sum + s.margin, 0),
+    totalPurchase: sales.filter(s => s.type === 'PURCHASE').reduce((sum, s) => sum + s.amount, 0),
+    count: sales.length,
+  }
+  const avgMarginRate = summary.totalRevenue > 0 
+    ? (summary.totalMargin / summary.totalRevenue) * 100 
+    : 0
 
   if (loading) {
     return (
@@ -265,7 +332,7 @@ export default function SalesPage() {
       {/* 필터 */}
       <div className="bg-white p-6 rounded-lg shadow mb-6">
         <h2 className="text-lg font-bold mb-4 text-gray-900">필터</h2>
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700">거래유형</label>
             <select
@@ -331,6 +398,32 @@ export default function SalesPage() {
             />
           </div>
         </div>
+
+        {/* Phase 4: 거래처/품목명 필터 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          <Autocomplete
+            label="거래처"
+            options={vendors.map(v => ({ 
+              id: v.id, 
+              label: v.name, 
+              sublabel: v.code 
+            }))}
+            value={filterVendor}
+            onChange={setFilterVendor}
+            placeholder="거래처 검색..."
+          />
+
+          <div>
+            <label className="block text-sm font-medium mb-1 text-gray-700">품목명</label>
+            <input
+              type="text"
+              value={filterItemName}
+              onChange={(e) => setFilterItemName(e.target.value)}
+              placeholder="품목명 검색..."
+              className="w-full px-3 py-2 border rounded-lg text-gray-900"
+            />
+          </div>
+        </div>
         
         <div className="mt-4">
           <button
@@ -344,6 +437,8 @@ export default function SalesPage() {
               setFilterType('')
               setFilterSalesperson('')
               setFilterCategory('')
+              setFilterVendor('') // Phase 4
+              setFilterItemName('') // Phase 4
               setFilterStartDate('')
               setFilterEndDate('')
               fetchData()
@@ -352,6 +447,34 @@ export default function SalesPage() {
           >
             초기화
           </button>
+        </div>
+      </div>
+
+      {/* Phase 4: 요약 카드 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white p-4 rounded-lg shadow">
+          <div className="text-sm text-gray-600">총 매출액</div>
+          <div className="text-2xl font-bold text-blue-600">
+            ₩{formatNumber(summary.totalRevenue, 0)}
+          </div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow">
+          <div className="text-sm text-gray-600">총 마진</div>
+          <div className="text-2xl font-bold text-green-600">
+            ₩{formatNumber(summary.totalMargin, 0)}
+          </div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow">
+          <div className="text-sm text-gray-600">평균 마진율</div>
+          <div className="text-2xl font-bold text-purple-600">
+            {avgMarginRate.toFixed(1)}%
+          </div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow">
+          <div className="text-sm text-gray-600">총 매입액</div>
+          <div className="text-2xl font-bold text-orange-600">
+            ₩{formatNumber(summary.totalPurchase, 0)}
+          </div>
         </div>
       </div>
 
@@ -369,23 +492,38 @@ export default function SalesPage() {
                     className="w-4 h-4 rounded"
                   />
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">날짜</th>
+                <th 
+                  className="px-4 py-3 text-left text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleSort('date')}
+                >
+                  날짜 {sortField === 'date' && (sortDirection === 'asc' ? '↑' : '↓')}
+                </th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">구분</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">거래처</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">품목명</th>
                 <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">수량</th>
                 <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">단가</th>
                 <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">금액(부가세포함)</th>
-                <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">금액</th>
+                <th 
+                  className="px-4 py-3 text-right text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleSort('amount')}
+                >
+                  금액 {sortField === 'amount' && (sortDirection === 'asc' ? '↑' : '↓')}
+                </th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">담당자</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">카테고리</th>
                 <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">마진</th>
-                <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">마진율</th>
+                <th 
+                  className="px-4 py-3 text-right text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleSort('marginRate')}
+                >
+                  마진율 {sortField === 'marginRate' && (sortDirection === 'asc' ? '↑' : '↓')}
+                </th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">작업</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {sales.map((record) => (
+              {sortedSales.map((record) => (
                 <tr key={record.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
                     <input
@@ -457,7 +595,7 @@ export default function SalesPage() {
                   </td>
                 </tr>
               ))}
-              {sales.length === 0 && (
+              {sortedSales.length === 0 && (
                 <tr>
                   <td colSpan={14} className="px-4 py-8 text-center text-gray-500">
                     등록된 매입매출 내역이 없습니다.
