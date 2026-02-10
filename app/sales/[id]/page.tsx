@@ -31,6 +31,8 @@ export default function EditSalesPage() {
     type: 'SALES',
     salespersonId: '',
     categoryId: '',
+    vendorId: '', // NEW: preserve vendorId
+    productId: '', // NEW: preserve productId
     itemName: '',
     customer: '',
     quantity: '',
@@ -63,6 +65,8 @@ export default function EditSalesPage() {
         type: salesData.type,
         salespersonId: salesData.salespersonId.toString(),
         categoryId: salesData.categoryId.toString(),
+        vendorId: salesData.vendorId ? salesData.vendorId.toString() : '', // NEW: preserve vendorId
+        productId: salesData.productId ? salesData.productId.toString() : '', // NEW: preserve productId
         itemName: salesData.itemName,
         customer: salesData.customer || '',
         quantity: salesData.quantity.toString(),

@@ -12,32 +12,24 @@ export async function GET(request: Request) {
     const includeCostInfo = searchParams.get('includeCostInfo') === 'true'
     const type = searchParams.get('type') // 품목 타입 필터 추가
     
-    interface WhereClause {
-      categoryId?: number
-      type?: string | { in: string[] }
-      OR?: Array<{
-        name?: { contains: string }
-        code?: { contains: string }
-      }>
-      vendorPrices?: {
-        some: {
-          vendorId: number
-          salesPrice: { not: null }
-        }
-      }
-    }
-    
-    const where: WhereClause = {}
+    const where: any = {}
     
     if (categoryId) {
       where.categoryId = parseInt(categoryId)
     }
     if (searchName) {
       where.OR = [
-        { name: { contains: searchName } },
-        { code: { contains: searchName } },
+        { name: { contains: searchName, mode: 'insensitive' } },
+        { code: { contains: searchName, mode: 'insensitive' } },
       ]
     }
+    
+    // 매입거래처 필터 추가
+    const purchaseVendorId = searchParams.get('purchaseVendorId')
+    if (purchaseVendorId) {
+      where.purchaseVendorId = parseInt(purchaseVendorId)
+    }
+    
     if (salesVendorId) {
       // 해당 거래처에 판매하는 품목만 조회 (VendorProductPrice 사용)
       where.vendorPrices = {

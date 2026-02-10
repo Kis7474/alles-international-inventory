@@ -87,6 +87,7 @@ export default function NewSalesPage() {
     unitPrice: '',
     cost: '',
     notes: '',
+    purchasePriceOverride: '', // 매입가 오버라이드
   })
 
   useEffect(() => {
@@ -127,11 +128,15 @@ export default function NewSalesPage() {
         // Fetch currentCost from API
         fetchProductCost(parseInt(productId))
         
+        // Set default purchase price override
+        const defaultPurchasePrice = product.defaultPurchasePrice || 0
+        
         setFormData((prev) => ({ 
           ...prev, 
           productId, 
           itemName: product.name,
           categoryId: categoryId,
+          purchasePriceOverride: defaultPurchasePrice.toString(),
         }))
         
         // Fetch vendor-specific price if vendor is selected
@@ -145,12 +150,13 @@ export default function NewSalesPage() {
             productId, 
             itemName: product.name, 
             categoryId: categoryId,
-            unitPrice: salesPrice.toString() 
+            unitPrice: salesPrice.toString(),
+            purchasePriceOverride: defaultPurchasePrice.toString(),
           }))
         }
       }
     } else {
-      setFormData((prev) => ({ ...prev, productId: '', itemName: '', unitPrice: '', cost: '' }))
+      setFormData((prev) => ({ ...prev, productId: '', itemName: '', unitPrice: '', cost: '', purchasePriceOverride: '' }))
     }
   }
 
@@ -268,6 +274,20 @@ export default function NewSalesPage() {
     setLoading(true)
 
     try {
+      // 매출 등록 시 확인 메시지
+      if (formData.type === 'SALES' && formData.productId && formData.purchasePriceOverride) {
+        const purchasePrice = parseFloat(formData.purchasePriceOverride)
+        if (purchasePrice > 0) {
+          const confirmed = confirm(
+            `매입가 ₩${purchasePrice.toLocaleString()}으로 매입도 동시 등록됩니다.\n진행하시겠습니까?`
+          )
+          if (!confirmed) {
+            setLoading(false)
+            return
+          }
+        }
+      }
+
       const res = await fetch('/api/sales', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -534,6 +554,28 @@ export default function NewSalesPage() {
                   placeholder="0"
                   disabled={!!formData.productId}
                 />
+              </div>
+            )}
+
+            {formData.type === 'SALES' && formData.productId && (
+              <div>
+                <label className="block text-sm font-medium mb-1 text-gray-700">
+                  매입가 (자동 매입 등록용) {' '}
+                  <span className="text-xs text-blue-600">(품목 기본 매입가 자동 설정, 수정 가능)</span>
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={formData.purchasePriceOverride}
+                  onChange={(e) =>
+                    setFormData({ ...formData, purchasePriceOverride: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border rounded-lg text-gray-900"
+                  placeholder="0"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  매출 등록 시 이 매입가로 매입 레코드가 자동 생성됩니다
+                </p>
               </div>
             )}
           </div>

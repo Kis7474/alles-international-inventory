@@ -329,6 +329,66 @@ export async function POST(request: NextRequest) {
       otherCost
     )
 
+    // ★★★ 수입등록 시 매입(PURCHASE) SalesRecord 자동생성 ★★★
+    if (type === 'IMPORT') {
+      const { createAutoPurchaseRecord } = await import('@/lib/purchase-auto')
+      
+      if (isMultiItem && items) {
+        // 다중 품목: 각 품목마다 개별 매입 레코드 생성
+        const totalQuantity = (items as ItemInput[]).reduce((sum, item) => sum + parseFloat(item.quantity), 0)
+        const totalAdditionalCosts = (parseFloat(dutyAmount || '0')) + (parseFloat(shippingCost || '0')) + (parseFloat(otherCost || '0'))
+        const additionalCostPerUnit = totalQuantity > 0 ? totalAdditionalCosts / totalQuantity : 0
+        
+        for (const item of items as ItemInput[]) {
+          const itemUnitCost = (parseFloat(item.unitPrice) * parseFloat(exchangeRate)) + additionalCostPerUnit
+          
+          // 품목 정보 조회
+          const product = await prisma.product.findUnique({
+            where: { id: parseInt(item.productId) },
+            include: { category: true }
+          })
+          
+          if (product) {
+            await createAutoPurchaseRecord({
+              productId: product.id,
+              vendorId: parseInt(vendorId),
+              salespersonId: salespersonId ? parseInt(salespersonId) : 1, // 기본 담당자 ID=1
+              categoryId: product.categoryId || 1, // 기본 카테고리 ID=1
+              quantity: parseFloat(item.quantity),
+              unitPrice: itemUnitCost,
+              date: new Date(date),
+              itemName: product.name,
+              costSource: 'IMPORT_AUTO',
+              importExportId: record.id,
+              notes: `수입등록 ${record.id}에서 자동생성`,
+            })
+          }
+        }
+      } else if (productId && unitCost) {
+        // 단일 품목: 하나의 매입 레코드 생성
+        const product = await prisma.product.findUnique({
+          where: { id: parseInt(productId) },
+          include: { category: true }
+        })
+        
+        if (product) {
+          await createAutoPurchaseRecord({
+            productId: product.id,
+            vendorId: parseInt(vendorId),
+            salespersonId: salespersonId ? parseInt(salespersonId) : 1, // 기본 담당자 ID=1
+            categoryId: product.categoryId || 1, // 기본 카테고리 ID=1
+            quantity: parseFloat(quantity),
+            unitPrice: unitCost,
+            date: new Date(date),
+            itemName: product.name,
+            costSource: 'IMPORT_AUTO',
+            importExportId: record.id,
+            notes: `수입등록 ${record.id}에서 자동생성`,
+          })
+        }
+      }
+    }
+
     return NextResponse.json(record, { status: 201 })
   } catch (error) {
     console.error('Error creating import/export record:', error)
@@ -562,6 +622,70 @@ export async function PUT(request: NextRequest) {
       otherCost
     )
 
+    // ★★★ 수입수정 시 기존 매입 레코드 삭제 후 재생성 ★★★
+    if (type === 'IMPORT') {
+      const { deleteAutoPurchaseByImportId, createAutoPurchaseRecord } = await import('@/lib/purchase-auto')
+      
+      // 기존 자동생성 매입 레코드 삭제
+      await deleteAutoPurchaseByImportId(parseInt(id))
+      
+      // 새로운 매입 레코드 생성
+      if (isMultiItem && items) {
+        // 다중 품목: 각 품목마다 개별 매입 레코드 생성
+        const totalQuantity = (items as ItemInput[]).reduce((sum, item) => sum + parseFloat(item.quantity), 0)
+        const totalAdditionalCosts = (parseFloat(dutyAmount || '0')) + (parseFloat(shippingCost || '0')) + (parseFloat(otherCost || '0'))
+        const additionalCostPerUnit = totalQuantity > 0 ? totalAdditionalCosts / totalQuantity : 0
+        
+        for (const item of items as ItemInput[]) {
+          const itemUnitCost = (parseFloat(item.unitPrice) * parseFloat(exchangeRate)) + additionalCostPerUnit
+          
+          // 품목 정보 조회
+          const product = await prisma.product.findUnique({
+            where: { id: parseInt(item.productId) },
+            include: { category: true }
+          })
+          
+          if (product) {
+            await createAutoPurchaseRecord({
+              productId: product.id,
+              vendorId: parseInt(vendorId),
+              salespersonId: salespersonId ? parseInt(salespersonId) : 1,
+              categoryId: product.categoryId || 1,
+              quantity: parseFloat(item.quantity),
+              unitPrice: itemUnitCost,
+              date: new Date(date),
+              itemName: product.name,
+              costSource: 'IMPORT_AUTO',
+              importExportId: parseInt(id),
+              notes: `수입등록 ${id}에서 자동생성`,
+            })
+          }
+        }
+      } else if (productId && unitCost) {
+        // 단일 품목: 하나의 매입 레코드 생성
+        const product = await prisma.product.findUnique({
+          where: { id: parseInt(productId) },
+          include: { category: true }
+        })
+        
+        if (product) {
+          await createAutoPurchaseRecord({
+            productId: product.id,
+            vendorId: parseInt(vendorId),
+            salespersonId: salespersonId ? parseInt(salespersonId) : 1,
+            categoryId: product.categoryId || 1,
+            quantity: parseFloat(quantity),
+            unitPrice: unitCost,
+            date: new Date(date),
+            itemName: product.name,
+            costSource: 'IMPORT_AUTO',
+            importExportId: parseInt(id),
+            notes: `수입등록 ${id}에서 자동생성`,
+          })
+        }
+      }
+    }
+
     return NextResponse.json(record)
   } catch (error) {
     console.error('Error updating import/export record:', error)
@@ -599,17 +723,25 @@ export async function DELETE(request: NextRequest) {
           data: { importId: null, linkedAt: null },
         })
 
-        // 2. Delete all related InventoryLots
+        // 2. Delete all auto-generated purchase records
+        await tx.salesRecord.deleteMany({
+          where: { 
+            importExportId: { in: ids },
+            costSource: 'IMPORT_AUTO',
+          },
+        })
+
+        // 3. Delete all related InventoryLots
         await tx.inventoryLot.deleteMany({
           where: { importExportId: { in: ids } },
         })
 
-        // 3. Delete all related ImportExportItems
+        // 4. Delete all related ImportExportItems
         await tx.importExportItem.deleteMany({
           where: { importExportId: { in: ids } },
         })
 
-        // 4. Delete ImportExport records
+        // 5. Delete ImportExport records
         await tx.importExport.deleteMany({
           where: { id: { in: ids } },
         })
@@ -661,17 +793,25 @@ export async function DELETE(request: NextRequest) {
         data: { importId: null, linkedAt: null },
       })
 
-      // 2. Delete related InventoryLots
+      // 2. Delete auto-generated purchase records
+      await tx.salesRecord.deleteMany({
+        where: { 
+          importExportId: parsedId,
+          costSource: 'IMPORT_AUTO',
+        },
+      })
+
+      // 3. Delete related InventoryLots
       await tx.inventoryLot.deleteMany({
         where: { importExportId: parsedId },
       })
 
-      // 3. Delete related ImportExportItems
+      // 4. Delete related ImportExportItems
       await tx.importExportItem.deleteMany({
         where: { importExportId: parsedId },
       })
 
-      // 4. Delete the ImportExport record
+      // 5. Delete the ImportExport record
       await tx.importExport.delete({
         where: { id: parsedId },
       })
