@@ -95,6 +95,7 @@ export default function OutboundPage() {
     outboundType: 'OTHER', // 'SALES' | 'OTHER'
     vendorId: '',
     salespersonId: '',
+    unitPriceOverride: '', // Phase 4: 매출가 수동 오버라이드
     notes: '',
   })
 
@@ -211,6 +212,8 @@ export default function OutboundPage() {
         
         if (latestPrice.salesPrice) {
           setPricePreview(latestPrice.salesPrice)
+          // Phase 4: Auto-fill unitPriceOverride
+          setFormData(prev => ({ ...prev, unitPriceOverride: latestPrice.salesPrice.toString() }))
           return
         }
       }
@@ -219,6 +222,8 @@ export default function OutboundPage() {
       const product = inventoryProducts.find(p => p.productId === productId)
       const defaultPrice = product ? await fetchProductDefaultPrice(productId) : 0
       setPricePreview(defaultPrice)
+      // Phase 4: Auto-fill unitPriceOverride
+      setFormData(prev => ({ ...prev, unitPriceOverride: defaultPrice.toString() }))
     } catch (error) {
       console.error('Error fetching price preview:', error)
       setPricePreview(null)
@@ -298,6 +303,7 @@ export default function OutboundPage() {
       outboundType: formData.outboundType,
       vendorId: formData.vendorId ? parseInt(formData.vendorId) : null,
       salespersonId: formData.salespersonId ? parseInt(formData.salespersonId) : null,
+      unitPriceOverride: formData.unitPriceOverride ? parseFloat(formData.unitPriceOverride) : null, // Phase 4
       notes: formData.notes || null,
     }
 
@@ -325,6 +331,7 @@ export default function OutboundPage() {
         outboundType: 'OTHER',
         vendorId: '',
         salespersonId: '',
+        unitPriceOverride: '', // Phase 4
         notes: '',
       })
       setCostPreview(null)
@@ -677,7 +684,7 @@ export default function OutboundPage() {
             {formData.outboundType === 'SALES' && formData.productId && formData.quantity && (
               <div className="bg-blue-50 p-4 rounded-lg mb-4">
                 <h3 className="font-medium mb-3 text-blue-900">매출 미리보기</h3>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm mb-4">
                   <div>
                     <div className="text-blue-600">단위원가</div>
                     <div className="text-lg font-bold text-blue-900">
@@ -710,6 +717,25 @@ export default function OutboundPage() {
                         ? `${(((pricePreview - costPreview.cost) / pricePreview) * 100).toFixed(1)}%`
                         : '-'}
                     </div>
+                  </div>
+                </div>
+                
+                {/* Phase 4: 매출가 수동 오버라이드 입력 */}
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-blue-900">
+                    매출 단가 (수동 조정 가능) *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={formData.unitPriceOverride}
+                    onChange={(e) => setFormData({ ...formData, unitPriceOverride: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg text-gray-900"
+                    placeholder="매출 단가를 입력하세요"
+                  />
+                  <div className="text-xs text-blue-600 mt-1">
+                    위 미리보기 값으로 자동 채워지지만, 특가/할인 매출 시 직접 수정할 수 있습니다.
                   </div>
                 </div>
               </div>

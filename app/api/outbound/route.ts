@@ -39,6 +39,7 @@ export async function POST(request: NextRequest) {
       vendorId,
       salespersonId,
       outboundType,
+      unitPriceOverride, // Phase 4: 프론트에서 전달받은 매출가
       notes
     } = body
 
@@ -132,32 +133,37 @@ export async function POST(request: NextRequest) {
         const costData = await getProductCurrentCost(productId)
         const totalCost = quantity * costData.cost
 
-        // 매출가 조회: VendorProductPrice → Product.defaultSalesPrice → 0
+        // Phase 4: 매출가 조회 - unitPriceOverride 우선 사용
         let unitPrice = 0
         
-        // 1. VendorProductPrice에서 조회
-        const vendorPrice = await tx.vendorProductPrice.findFirst({
-          where: {
-            vendorId: parseInt(vendorId),
-            productId,
-            effectiveDate: {
-              lte: new Date(outboundDate),
-            },
-          },
-          orderBy: {
-            effectiveDate: 'desc',
-          },
-        })
-
-        if (vendorPrice && vendorPrice.salesPrice) {
-          unitPrice = vendorPrice.salesPrice
+        // 1. 프론트에서 전달한 unitPriceOverride 우선
+        if (unitPriceOverride && unitPriceOverride > 0) {
+          unitPrice = parseFloat(unitPriceOverride)
         } else {
-          // 2. Product.defaultSalesPrice 사용
-          const productPrice = await tx.product.findUnique({
-            where: { id: productId },
-            select: { defaultSalesPrice: true },
+          // 2. VendorProductPrice에서 조회
+          const vendorPrice = await tx.vendorProductPrice.findFirst({
+            where: {
+              vendorId: parseInt(vendorId),
+              productId,
+              effectiveDate: {
+                lte: new Date(outboundDate),
+              },
+            },
+            orderBy: {
+              effectiveDate: 'desc',
+            },
           })
-          unitPrice = productPrice?.defaultSalesPrice || 0
+
+          if (vendorPrice && vendorPrice.salesPrice) {
+            unitPrice = vendorPrice.salesPrice
+          } else {
+            // 3. Product.defaultSalesPrice 사용
+            const productPrice = await tx.product.findUnique({
+              where: { id: productId },
+              select: { defaultSalesPrice: true },
+            })
+            unitPrice = productPrice?.defaultSalesPrice || 0
+          }
         }
 
         const amount = quantity * unitPrice

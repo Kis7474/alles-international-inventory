@@ -8,6 +8,9 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type')
     const salespersonId = searchParams.get('salespersonId')
     const categoryId = searchParams.get('categoryId')
+    const vendorId = searchParams.get('vendorId') // Phase 4: 거래처 필터
+    const productId = searchParams.get('productId') // Phase 4: 품목 필터
+    const itemName = searchParams.get('itemName') // Phase 4: 품목명 필터
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
     const page = parseInt(searchParams.get('page') || '1')
@@ -17,6 +20,12 @@ export async function GET(request: NextRequest) {
       type?: string
       salespersonId?: number
       categoryId?: number
+      vendorId?: number // Phase 4
+      productId?: number // Phase 4
+      itemName?: { // Phase 4
+        contains: string
+        mode: 'insensitive'
+      }
       date?: {
         gte?: Date
         lte?: Date
@@ -33,6 +42,21 @@ export async function GET(request: NextRequest) {
     }
     if (categoryId) {
       where.categoryId = parseInt(categoryId)
+    }
+    // Phase 4: 거래처 필터
+    if (vendorId) {
+      where.vendorId = parseInt(vendorId)
+    }
+    // Phase 4: 품목 필터
+    if (productId) {
+      where.productId = parseInt(productId)
+    }
+    // Phase 4: 품목명 필터 (부분 일치)
+    if (itemName) {
+      where.itemName = {
+        contains: itemName,
+        mode: 'insensitive'
+      }
     }
     if (startDate || endDate) {
       where.date = {}
