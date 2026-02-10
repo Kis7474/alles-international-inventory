@@ -166,6 +166,11 @@ export async function POST(request: NextRequest) {
           }
         }
 
+        // 단가 검증: 0원 이하인 경우 에러
+        if (unitPrice <= 0) {
+          throw new Error('매출 단가가 설정되지 않았습니다. 품목 관리에서 해당 거래처의 매출 단가를 먼저 등록해주세요.')
+        }
+
         const amount = quantity * unitPrice
         const margin = amount - totalCost
         const marginRate = amount > 0 ? (margin / amount) * 100 : 0

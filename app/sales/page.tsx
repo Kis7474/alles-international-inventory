@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { formatNumber } from '@/lib/utils'
 import Link from 'next/link'
 import Autocomplete from '@/components/ui/Autocomplete'
@@ -47,6 +48,7 @@ type SortField = 'date' | 'amount' | 'marginRate'
 type SortDirection = 'asc' | 'desc'
 
 export default function SalesPage() {
+  const router = useRouter()
   const [sales, setSales] = useState<SalesRecord[]>([])
   const [salespersons, setSalespersons] = useState<Salesperson[]>([])
   const [categories, setCategories] = useState<Category[]>([])
@@ -209,6 +211,82 @@ export default function SalesPage() {
     }
   }
 
+  // 선택한 매출 내역으로 거래명세서 생성
+  const handleCreateTransactionStatement = async () => {
+    if (selectedIds.length === 0) {
+      alert('거래명세서를 생성할 매출 내역을 선택해주세요.')
+      return
+    }
+
+    // 선택된 매출 레코드 가져오기
+    const selectedSales = sales.filter(s => selectedIds.includes(s.id))
+    
+    // 매출 레코드만 선택 가능 (매입은 제외)
+    const nonSalesRecords = selectedSales.filter(s => s.type !== 'SALES')
+    if (nonSalesRecords.length > 0) {
+      alert('매출 내역만 선택해주세요. 매입 내역은 거래명세서를 생성할 수 없습니다.')
+      return
+    }
+    
+    // 모든 선택된 레코드의 거래처가 같은지 확인
+    const vendorNames = [...new Set(selectedSales.map(s => s.vendor?.name).filter(Boolean))]
+    if (vendorNames.length > 1) {
+      alert('같은 거래처의 매출만 선택해주세요.')
+      return
+    }
+    
+    if (vendorNames.length === 0) {
+      alert('거래처 정보가 없는 매출은 거래명세서를 생성할 수 없습니다.')
+      return
+    }
+
+    try {
+      setLoading(true)
+      
+      // 거래명세서 아이템 생성
+      const items = selectedSales.map(s => ({
+        productName: s.itemName,
+        specification: '',
+        quantity: s.quantity,
+        unitPrice: s.unitPrice,
+        amount: s.amount,
+      }))
+      
+      // 거래명세서 생성 API 호출
+      const response = await fetch('/api/documents/transaction-statement', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deliveryDate: new Date().toISOString().split('T')[0],
+          recipientName: vendorNames[0],
+          recipientRef: '',
+          recipientPhone: '',
+          recipientFax: '',
+          paymentTerms: '납품 후 익월 현금결제',
+          bankAccount: '하나은행 586-910007-02104 (예금주: 알레스인터네셔날 주식회사)',
+          receiverName: '',
+          items,
+          salesRecordIds: selectedIds, // 매출 레코드 ID 전달
+        }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        alert(data.error || '거래명세서 생성에 실패했습니다.')
+        return
+      }
+
+      const statement = await response.json()
+      alert('거래명세서가 생성되었습니다.')
+      router.push(`/documents/transaction-statement/${statement.id}`)
+    } catch (error) {
+      console.error('Error creating transaction statement:', error)
+      alert('거래명세서 생성 중 오류가 발생했습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // 엑셀 다운로드
   const handleExcelDownload = async () => {
     try {
@@ -301,12 +379,20 @@ export default function SalesPage() {
         <h1 className="text-3xl font-bold text-gray-900">매입매출 내역</h1>
         <div className="flex gap-2">
           {selectedIds.length > 0 && (
-            <button
-              onClick={handleBulkDelete}
-              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
-            >
-              선택 삭제 ({selectedIds.length}개)
-            </button>
+            <>
+              <button
+                onClick={handleCreateTransactionStatement}
+                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
+              >
+                📄 거래명세서 생성 ({selectedIds.length}개)
+              </button>
+              <button
+                onClick={handleBulkDelete}
+                className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
+              >
+                선택 삭제 ({selectedIds.length}개)
+              </button>
+            </>
           )}
           <button
             onClick={handleExcelDownload}

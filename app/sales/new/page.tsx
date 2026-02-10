@@ -30,13 +30,16 @@ interface Product {
     id: number
     name: string
   }
-  salesVendors: {
+  vendorPrices: {
     id: number
     vendorId: number
     vendor: {
       id: number
       name: string
     }
+    purchasePrice: number | null
+    salesPrice: number | null
+    effectiveDate: string
   }[]
   category: {
     id: number
@@ -188,9 +191,9 @@ export default function NewSalesPage() {
         const filtered = products.filter(p => p.purchaseVendorId === parseInt(vendorId))
         setAvailableProducts(filtered)
       } else {
-        // 매출: 해당 거래처가 매출처로 등록된 품목
+        // 매출: vendorPrices에서 해당 거래처에 salesPrice가 있는 품목 필터
         const filtered = products.filter(p => 
-          p.salesVendors?.some(sv => sv.vendorId === parseInt(vendorId))
+          p.vendorPrices?.some(vp => vp.vendorId === parseInt(vendorId) && vp.salesPrice !== null)
         )
         setAvailableProducts(filtered)
       }
