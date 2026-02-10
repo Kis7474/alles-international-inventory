@@ -25,6 +25,7 @@ interface Product {
   categoryId: number | null
   defaultPurchasePrice: number | null
   defaultSalesPrice: number | null
+  currentCost: number | null
   purchaseVendorId: number
   purchaseVendor: {
     id: number
@@ -128,8 +129,8 @@ export default function NewSalesPage() {
         // Auto-fill category from product
         const categoryId = product.categoryId ? product.categoryId.toString() : ''
         
-        // Fetch currentCost from API
-        fetchProductCost(parseInt(productId))
+        // Phase 5: Use product.currentCost directly (already calculated by updateProductCurrentCost)
+        const cost = product.currentCost || 0
         
         // Set default purchase price override
         const defaultPurchasePrice = product.defaultPurchasePrice || 0
@@ -139,6 +140,7 @@ export default function NewSalesPage() {
           productId, 
           itemName: product.name,
           categoryId: categoryId,
+          cost: cost.toString(),
           purchasePriceOverride: defaultPurchasePrice.toString(),
         }))
         
@@ -148,12 +150,17 @@ export default function NewSalesPage() {
         } else {
           // Use product's default sales price if available
           const salesPrice = product.defaultSalesPrice || 0
+          // Phase 5: Show warning if price is 0
+          if (salesPrice === 0) {
+            alert('⚠️ 단가가 설정되지 않았습니다. 수동으로 입력해주세요.')
+          }
           setFormData((prev) => ({ 
             ...prev, 
             productId, 
             itemName: product.name, 
             categoryId: categoryId,
             unitPrice: salesPrice.toString(),
+            cost: cost.toString(),
             purchasePriceOverride: defaultPurchasePrice.toString(),
           }))
         }
@@ -163,27 +170,8 @@ export default function NewSalesPage() {
     }
   }
 
-  const fetchProductCost = async (productId: number) => {
-    try {
-      const res = await fetch(`/api/products/${productId}/cost`)
-      const data = await res.json()
-      
-      if (data.cost > 0) {
-        // Set unit cost (not total cost)
-        setFormData((prev) => ({ ...prev, cost: data.cost.toString() }))
-      }
-    } catch (error) {
-      console.error('Error fetching product cost:', error)
-      // Fallback to defaultPurchasePrice if available
-      const product = products.find((p) => p.id === productId)
-      if (product && product.defaultPurchasePrice) {
-        setFormData((prev) => ({ ...prev, cost: product.defaultPurchasePrice!.toString() }))
-      }
-    }
-  }
-
   const handleVendorChange = (vendorId: string) => {
-    setFormData((prev) => ({ ...prev, vendorId, productId: '', itemName: '' }))
+    const prevProductId = formData.productId
     
     if (vendorId) {
       if (formData.type === 'PURCHASE') {
@@ -200,6 +188,29 @@ export default function NewSalesPage() {
     } else {
       setAvailableProducts([])
     }
+    
+    // Phase 5: 이전 품목이 새 거래처에서도 유효하면 유지하고 단가만 재조회
+    if (prevProductId && vendorId) {
+      const product = products.find(p => p.id === parseInt(prevProductId))
+      if (product) {
+        let isValid = false
+        if (formData.type === 'PURCHASE') {
+          isValid = product.purchaseVendorId === parseInt(vendorId)
+        } else {
+          isValid = product.vendorPrices?.some(vp => vp.vendorId === parseInt(vendorId) && vp.salesPrice !== null) || false
+        }
+        
+        if (isValid) {
+          // 품목 유지하고 단가만 재조회
+          setFormData((prev) => ({ ...prev, vendorId }))
+          fetchVendorPrice(parseInt(prevProductId), parseInt(vendorId), formData.date, formData.type)
+          return
+        }
+      }
+    }
+    
+    // 품목 리셋
+    setFormData((prev) => ({ ...prev, vendorId, productId: '', itemName: '' }))
   }
   
   const handleTypeChange = (type: string) => {
@@ -221,17 +232,20 @@ export default function NewSalesPage() {
         
         if (applicablePrice) {
           const price = type === 'PURCHASE' ? applicablePrice.purchasePrice : applicablePrice.salesPrice
-          if (price) {
+          if (price && price > 0) {
             setFormData((prev) => ({ ...prev, unitPrice: price.toString() }))
             return
           }
         }
       }
       
-      // Fall back to product's default price
+      // Phase 5: Fall back to product's default price and show warning if 0
       const product = products.find((p) => p.id === productId)
       if (product) {
         const salesPrice = product.defaultSalesPrice || 0
+        if (salesPrice === 0) {
+          alert('⚠️ 단가가 설정되지 않았습니다. 수동으로 입력해주세요.')
+        }
         setFormData((prev) => ({ ...prev, unitPrice: salesPrice.toString() }))
       }
     } catch (error) {
@@ -240,6 +254,9 @@ export default function NewSalesPage() {
       const product = products.find((p) => p.id === productId)
       if (product) {
         const salesPrice = product.defaultSalesPrice || 0
+        if (salesPrice === 0) {
+          alert('⚠️ 단가 조회 중 오류가 발생했습니다. 수동으로 입력해주세요.')
+        }
         setFormData((prev) => ({ ...prev, unitPrice: salesPrice.toString() }))
       }
     }
