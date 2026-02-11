@@ -40,14 +40,13 @@ async function main() {
     let skippedCount = 0
     
     for (const record of salesRecords) {
-      // Calculate what the unit cost should be
-      const currentTotalCost = record.cost
-      const unitCost = currentTotalCost / record.quantity
+      // Calculate what the unit cost should be if current cost is total cost
+      const unitCost = record.cost / record.quantity
       
       // Recalculate margin and marginRate based on unit cost
-      const newTotalCost = unitCost * record.quantity
-      const newMargin = record.amount - newTotalCost
-      const newMarginRate = record.amount > 0 ? (newMargin / record.amount) * 100 : 0
+      const totalCostIfConverted = unitCost * record.quantity
+      const marginIfConverted = record.amount - totalCostIfConverted
+      const marginRateIfConverted = record.amount > 0 ? (marginIfConverted / record.amount) * 100 : 0
       
       // Check if the cost value appears to already be a unit cost
       // If cost is already unit cost, then margin should equal amount - (cost × quantity)
@@ -68,8 +67,8 @@ async function main() {
         where: { id: record.id },
         data: {
           cost: unitCost,
-          margin: newMargin,
-          marginRate: newMarginRate,
+          margin: marginIfConverted,
+          marginRate: marginRateIfConverted,
         },
       })
       
