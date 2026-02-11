@@ -222,6 +222,16 @@ export default function NewSalesPage() {
 
   const fetchVendorPrice = async (productId: number, vendorId: number, date: string, type: string) => {
     try {
+      // Priority 1: 최근 거래 단가 (동일 품목 + 동일 거래처 + 동일 거래유형)
+      const recentPriceRes = await fetch(`/api/products/latest-price?productId=${productId}&vendorId=${vendorId}&type=${type}`)
+      const recentPriceData = await recentPriceRes.json()
+      
+      if (recentPriceData.unitPrice && recentPriceData.unitPrice > 0) {
+        setFormData((prev) => ({ ...prev, unitPrice: recentPriceData.unitPrice.toString() }))
+        return
+      }
+
+      // Priority 2: 거래처별 특별가 (VendorProductPrice)
       const res = await fetch(`/api/vendor-product-prices?productId=${productId}&vendorId=${vendorId}`)
       const prices: VendorPrice[] = await res.json()
       
@@ -241,7 +251,7 @@ export default function NewSalesPage() {
         }
       }
       
-      // Phase 5: Fall back to product's default price based on transaction type
+      // Priority 3: 기본 단가 (Product.defaultPurchasePrice / defaultSalesPrice)
       const product = products.find((p) => p.id === productId)
       if (product) {
         const defaultPrice = type === 'PURCHASE' 
