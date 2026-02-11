@@ -387,10 +387,28 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
               throw new Error(`날짜 형식 오류: ${row.date}`)
             }
             
-            // Calculate VAT amounts - use provided values or calculate
-            const totalWithVat = row.totalWithVat || (row.totalAmount ? row.totalAmount * 1.1 : 0)
-            const supplyAmount = row.supplyAmount || (row.totalAmount || Math.round(totalWithVat / 1.1))
-            const vatAmount = row.vatAmount || (totalWithVat - supplyAmount)
+            // Calculate VAT amounts - use provided values or calculate from unit price and quantity
+            // Priority: provided values > calculate from totalWithVat > calculate from unitPrice * quantity
+            let totalWithVat: number
+            let supplyAmount: number
+            let vatAmount: number
+            
+            if (row.totalWithVat && row.totalWithVat > 0) {
+              // Total with VAT is provided
+              totalWithVat = row.totalWithVat
+              supplyAmount = row.supplyAmount && row.supplyAmount > 0 ? row.supplyAmount : Math.round(totalWithVat / 1.1)
+              vatAmount = row.vatAmount && row.vatAmount > 0 ? row.vatAmount : (totalWithVat - supplyAmount)
+            } else if (row.totalAmount && row.totalAmount > 0) {
+              // Old format: totalAmount is supply amount
+              supplyAmount = row.totalAmount
+              vatAmount = Math.round(supplyAmount * 0.1)
+              totalWithVat = supplyAmount + vatAmount
+            } else {
+              // Calculate from unit price and quantity
+              supplyAmount = row.supplyAmount && row.supplyAmount > 0 ? row.supplyAmount : Math.round(row.unitPrice * row.quantity)
+              vatAmount = row.vatAmount && row.vatAmount > 0 ? row.vatAmount : Math.round(supplyAmount * 0.1)
+              totalWithVat = supplyAmount + vatAmount
+            }
             
             // Ensure required vendor exists - handle both old and new format
             let vendorForTransaction = null

@@ -255,7 +255,8 @@ export default function SalesPage() {
     }
     
     // 모든 선택된 레코드의 거래처가 같은지 확인
-    const vendorNames = Array.from(new Set(selectedSales.map(s => s.vendor?.name).filter(Boolean))) as string[]
+    const vendorNamesSet = new Set(selectedSales.map(s => s.vendor?.name).filter((name): name is string => Boolean(name)))
+    const vendorNames = Array.from(vendorNamesSet)
     if (vendorNames.length > 1) {
       alert('같은 거래처의 매출만 선택해주세요.')
       return

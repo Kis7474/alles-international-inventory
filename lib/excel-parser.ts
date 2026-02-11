@@ -202,9 +202,23 @@ export async function parseTransactionExcel(file: File): Promise<TransactionRow[
         const purchaseVendorName = String(cells[14] || '').trim()
         
         // Auto-calculate if not provided
-        const calculatedSupplyAmount = supplyAmount > 0 ? supplyAmount : Math.round(unitPrice * parseNumberValue(cells[5]) / 1.1)
-        const calculatedVatAmount = vatAmount > 0 ? vatAmount : Math.round(calculatedSupplyAmount * 0.1)
-        const calculatedTotalWithVat = totalWithVat > 0 ? totalWithVat : calculatedSupplyAmount + calculatedVatAmount
+        // If totalWithVat is provided, calculate supply amount from it
+        // Otherwise calculate from unit price and quantity (which are supply prices)
+        let calculatedSupplyAmount: number
+        let calculatedVatAmount: number
+        let calculatedTotalWithVat: number
+        
+        if (totalWithVat > 0) {
+          // Total is provided, back-calculate supply amount
+          calculatedSupplyAmount = supplyAmount > 0 ? supplyAmount : Math.round(totalWithVat / 1.1)
+          calculatedVatAmount = vatAmount > 0 ? vatAmount : (totalWithVat - calculatedSupplyAmount)
+          calculatedTotalWithVat = totalWithVat
+        } else {
+          // Calculate from unit price and quantity
+          calculatedSupplyAmount = supplyAmount > 0 ? supplyAmount : Math.round(unitPrice * parseNumberValue(cells[5]))
+          calculatedVatAmount = vatAmount > 0 ? vatAmount : Math.round(calculatedSupplyAmount * 0.1)
+          calculatedTotalWithVat = calculatedSupplyAmount + calculatedVatAmount
+        }
         
         transactionRow = {
           date: parseDateValue(cells[0]),
