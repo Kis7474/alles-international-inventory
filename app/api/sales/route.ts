@@ -134,16 +134,13 @@ export async function POST(request: NextRequest) {
         const { getProductCurrentCost } = await import('@/lib/product-cost')
         const costData = await getProductCurrentCost(parseInt(productId))
         
-        // 총 원가 = 수량 × 단위원가
-        const serverCalculatedCost = quantity * costData.cost
-        
         // costSource 설정
         if (costData.source === 'CURRENT') {
           costSource = 'PRODUCT_CURRENT'
-          finalCost = serverCalculatedCost
+          finalCost = costData.cost  // 단위당 원가만 저장
         } else if (costData.source === 'DEFAULT') {
           costSource = 'PRODUCT_DEFAULT'
-          finalCost = serverCalculatedCost
+          finalCost = costData.cost  // 단위당 원가만 저장
         } else {
           // cost가 제공되었으면 MANUAL, 아니면 0
           costSource = cost ? 'MANUAL' : 'PRODUCT_CURRENT'
@@ -157,7 +154,8 @@ export async function POST(request: NextRequest) {
     }
     
     // 마진 계산 (매출일 경우만)
-    const margin = type === 'SALES' ? amount - finalCost : 0
+    const totalCost = finalCost * quantity
+    const margin = type === 'SALES' ? amount - totalCost : 0
     const marginRate = type === 'SALES' && amount > 0 ? (margin / amount) * 100 : 0
 
     const salesRecord = await prisma.salesRecord.create({
@@ -267,16 +265,13 @@ export async function PUT(request: NextRequest) {
         const { getProductCurrentCost } = await import('@/lib/product-cost')
         const costData = await getProductCurrentCost(parseInt(productId))
         
-        // 총 원가 = 수량 × 단위원가
-        const serverCalculatedCost = quantity * costData.cost
-        
         // costSource 설정
         if (costData.source === 'CURRENT') {
           costSource = 'PRODUCT_CURRENT'
-          finalCost = serverCalculatedCost
+          finalCost = costData.cost  // 단위당 원가만 저장
         } else if (costData.source === 'DEFAULT') {
           costSource = 'PRODUCT_DEFAULT'
-          finalCost = serverCalculatedCost
+          finalCost = costData.cost  // 단위당 원가만 저장
         } else {
           // cost가 제공되었으면 MANUAL, 아니면 0
           costSource = cost ? 'MANUAL' : 'PRODUCT_CURRENT'
@@ -290,7 +285,8 @@ export async function PUT(request: NextRequest) {
     }
     
     // 마진 계산 (매출일 경우만)
-    const margin = type === 'SALES' ? amount - finalCost : 0
+    const totalCost = finalCost * quantity
+    const margin = type === 'SALES' ? amount - totalCost : 0
     const marginRate = type === 'SALES' && amount > 0 ? (margin / amount) * 100 : 0
 
     const salesRecord = await prisma.salesRecord.update({
