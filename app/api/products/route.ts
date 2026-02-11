@@ -11,6 +11,7 @@ export async function GET(request: Request) {
     const includeCostInfo = searchParams.get('includeCostInfo') === 'true'
     const type = searchParams.get('type') // 품목 타입 필터 추가
     
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: any = {}
     
     if (categoryId) {
