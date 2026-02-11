@@ -211,7 +211,7 @@ export async function POST(request: NextRequest) {
         })
 
         if (productForPurchase?.purchaseVendorId) {
-          const purchasePrice = productForPurchase.defaultPurchasePrice || unitCostValue
+          const purchasePrice = productForPurchase.defaultPurchasePrice ?? unitCostValue
           
           if (purchasePrice > 0) {
             const purchaseAmount = quantity * purchasePrice

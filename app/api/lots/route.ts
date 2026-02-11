@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { calculateUnitCost } from '@/lib/utils'
+import { createAutoPurchaseRecord } from '@/lib/purchase-auto'
+
+// Constants
+const DEFAULT_SALESPERSON_ID = 1 // 입고에는 담당자가 없으므로 기본값
 
 // GET - LOT 목록 조회
 export async function GET(request: NextRequest) {
@@ -199,15 +203,13 @@ export async function POST(request: NextRequest) {
       })
       
       if (product && product.purchaseVendorId) {
-        const purchasePrice = product.defaultPurchasePrice || unitCost
+        const purchasePrice = product.defaultPurchasePrice ?? unitCost
         
         if (purchasePrice > 0) {
-          const { createAutoPurchaseRecord } = await import('@/lib/purchase-auto')
-          
           await createAutoPurchaseRecord({
             productId: product.id,
             vendorId: product.purchaseVendorId,
-            salespersonId: 1,  // 입고에는 담당자가 없으므로 기본값
+            salespersonId: DEFAULT_SALESPERSON_ID,
             categoryId: product.categoryId || 1,
             quantity: quantityReceived,
             unitPrice: purchasePrice,
