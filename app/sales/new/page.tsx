@@ -135,6 +135,11 @@ export default function NewSalesPage() {
         // Set default purchase price override
         const defaultPurchasePrice = product.defaultPurchasePrice || 0
         
+        // Set default unit price based on transaction type
+        const defaultPrice = formData.type === 'PURCHASE' 
+          ? (product.defaultPurchasePrice || 0)
+          : (product.defaultSalesPrice || 0)
+        
         setFormData((prev) => ({ 
           ...prev, 
           productId, 
@@ -142,30 +147,18 @@ export default function NewSalesPage() {
           categoryId: categoryId,
           cost: cost.toString(),
           purchasePriceOverride: defaultPurchasePrice.toString(),
+          unitPrice: defaultPrice.toString(),
         }))
         
-        // Fetch vendor-specific price if vendor is selected
+        // Fetch vendor-specific price if vendor is selected (will override the default price)
         if (formData.vendorId) {
           fetchVendorPrice(parseInt(productId), parseInt(formData.vendorId), formData.date, formData.type)
         } else {
-          // Use product's default price based on transaction type
-          const defaultPrice = formData.type === 'PURCHASE' 
-            ? (product.defaultPurchasePrice || 0)
-            : (product.defaultSalesPrice || 0)
-          // Phase 5: Show warning if price is 0
+          // Show warning if price is 0 and no vendor is selected
           if (defaultPrice === 0) {
             const priceType = formData.type === 'PURCHASE' ? '매입단가' : '매출단가'
             alert(`⚠️ ${priceType}가 설정되지 않았습니다. 수동으로 입력해주세요.`)
           }
-          setFormData((prev) => ({ 
-            ...prev, 
-            productId, 
-            itemName: product.name, 
-            categoryId: categoryId,
-            unitPrice: defaultPrice.toString(),
-            cost: cost.toString(),
-            purchasePriceOverride: defaultPurchasePrice.toString(),
-          }))
         }
       }
     } else {
