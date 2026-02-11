@@ -78,6 +78,8 @@ export default function SalesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [modalData, setModalData] = useState<{
     vendorName: string
+    vendorPhone?: string
+    vendorFax?: string
     items: Array<{
       productName: string
       quantity: number
@@ -275,9 +277,28 @@ export default function SalesPage() {
       amount: s.amount,
     }))
     
+    // 거래처 상세 정보 가져오기 (phone 자동 채움용)
+    const firstVendor = selectedSales.find(s => s.vendor)?.vendor
+    let vendorPhone = ''
+    
+    if (firstVendor) {
+      try {
+        // Fetch vendor details by searching for exact name match
+        const vendorRes = await fetch(`/api/vendors?searchName=${encodeURIComponent(firstVendor.name)}`)
+        const vendorData = await vendorRes.json()
+        if (vendorData && vendorData.length > 0) {
+          vendorPhone = vendorData[0].phone || ''
+        }
+      } catch (error) {
+        console.error('Error fetching vendor details:', error)
+      }
+    }
+    
     // 모달 데이터 설정 및 모달 열기
     setModalData({
       vendorName: vendorNames[0],
+      vendorPhone: vendorPhone,
+      vendorFax: '', // Fax field doesn't exist in Vendor schema
       items: items,
     })
     setIsModalOpen(true)
@@ -298,8 +319,8 @@ export default function SalesPage() {
           deliveryDate: deliveryDate,
           recipientName: modalData.vendorName,
           recipientRef: '',
-          recipientPhone: '',
-          recipientFax: '',
+          recipientPhone: modalData.vendorPhone || '',
+          recipientFax: modalData.vendorFax || '',
           paymentTerms: '납품 후 익월 현금결제',
           bankAccount: '하나은행 586-910007-02104 (예금주: 알레스인터네셔날 주식회사)',
           receiverName: '',
