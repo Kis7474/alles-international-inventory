@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { formatNumber } from '@/lib/utils'
 import Link from 'next/link'
 import Autocomplete from '@/components/ui/Autocomplete'
+import TransactionStatementModal from '@/components/TransactionStatementModal'
 
 interface Salesperson {
   id: number
@@ -72,6 +73,18 @@ export default function SalesPage() {
   // 다중 선택 상태
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [selectAll, setSelectAll] = useState(false)
+  
+  // 거래명세서 모달 상태
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [modalData, setModalData] = useState<{
+    vendorName: string
+    items: Array<{
+      productName: string
+      quantity: number
+      unitPrice: number
+      amount: number
+    }>
+  } | null>(null)
 
   // Phase 5: 페이지네이션 상태
   const [page, setPage] = useState(1)
@@ -224,7 +237,7 @@ export default function SalesPage() {
     }
   }
 
-  // 선택한 매출 내역으로 거래명세서 생성
+  // 선택한 매출 내역으로 거래명세서 생성 - 미리보기 모달 표시
   const handleCreateTransactionStatement = async () => {
     if (selectedIds.length === 0) {
       alert('거래명세서를 생성할 매출 내역을 선택해주세요.')
@@ -242,7 +255,8 @@ export default function SalesPage() {
     }
     
     // 모든 선택된 레코드의 거래처가 같은지 확인
-    const vendorNames = [...new Set(selectedSales.map(s => s.vendor?.name).filter(Boolean))]
+    const vendorNamesSet = new Set(selectedSales.map(s => s.vendor?.name).filter((name): name is string => Boolean(name)))
+    const vendorNames = Array.from(vendorNamesSet)
     if (vendorNames.length > 1) {
       alert('같은 거래처의 매출만 선택해주세요.')
       return
@@ -253,32 +267,49 @@ export default function SalesPage() {
       return
     }
 
+    // 거래명세서 아이템 준비
+    const items = selectedSales.map(s => ({
+      productName: s.itemName,
+      quantity: s.quantity,
+      unitPrice: s.unitPrice,
+      amount: s.amount,
+    }))
+    
+    // 모달 데이터 설정 및 모달 열기
+    setModalData({
+      vendorName: vendorNames[0],
+      items: items,
+    })
+    setIsModalOpen(true)
+  }
+  
+  // 거래명세서 생성 확정 (모달에서 확인 버튼 클릭 시)
+  const handleConfirmTransactionStatement = async (deliveryDate: string) => {
+    if (!modalData) return
+
     try {
       setLoading(true)
-      
-      // 거래명세서 아이템 생성
-      const items = selectedSales.map(s => ({
-        productName: s.itemName,
-        specification: '',
-        quantity: s.quantity,
-        unitPrice: s.unitPrice,
-        amount: s.amount,
-      }))
       
       // 거래명세서 생성 API 호출
       const response = await fetch('/api/documents/transaction-statement', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          deliveryDate: new Date().toISOString().split('T')[0],
-          recipientName: vendorNames[0],
+          deliveryDate: deliveryDate,
+          recipientName: modalData.vendorName,
           recipientRef: '',
           recipientPhone: '',
           recipientFax: '',
           paymentTerms: '납품 후 익월 현금결제',
           bankAccount: '하나은행 586-910007-02104 (예금주: 알레스인터네셔날 주식회사)',
           receiverName: '',
-          items,
+          items: modalData.items.map(item => ({
+            productName: item.productName,
+            specification: '',
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            amount: item.amount,
+          })),
           salesRecordIds: selectedIds, // 매출 레코드 ID 전달
         }),
       })
@@ -290,6 +321,8 @@ export default function SalesPage() {
       }
 
       const statement = await response.json()
+      setIsModalOpen(false)
+      setModalData(null)
       alert('거래명세서가 생성되었습니다.')
       router.push(`/documents/transaction-statement/${statement.id}`)
     } catch (error) {
@@ -814,6 +847,21 @@ export default function SalesPage() {
           </div>
         )}
       </div>
+      
+      {/* Transaction Statement Modal */}
+      {modalData && (
+        <TransactionStatementModal
+          isOpen={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false)
+            setModalData(null)
+          }}
+          onConfirm={handleConfirmTransactionStatement}
+          vendorName={modalData.vendorName}
+          items={modalData.items}
+          loading={loading}
+        />
+      )}
     </div>
   )
 }
