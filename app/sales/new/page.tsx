@@ -148,10 +148,12 @@ export default function NewSalesPage() {
         if (formData.vendorId) {
           fetchVendorPrice(parseInt(productId), parseInt(formData.vendorId), formData.date, formData.type)
         } else {
-          // Use product's default sales price if available
-          const salesPrice = product.defaultSalesPrice || 0
+          // Use product's default price based on transaction type
+          const defaultPrice = formData.type === 'PURCHASE' 
+            ? (product.defaultPurchasePrice || 0)
+            : (product.defaultSalesPrice || 0)
           // Phase 5: Show warning if price is 0
-          if (salesPrice === 0) {
+          if (defaultPrice === 0) {
             alert('⚠️ 단가가 설정되지 않았습니다. 수동으로 입력해주세요.')
           }
           setFormData((prev) => ({ 
@@ -159,7 +161,7 @@ export default function NewSalesPage() {
             productId, 
             itemName: product.name, 
             categoryId: categoryId,
-            unitPrice: salesPrice.toString(),
+            unitPrice: defaultPrice.toString(),
             cost: cost.toString(),
             purchasePriceOverride: defaultPurchasePrice.toString(),
           }))
@@ -239,25 +241,29 @@ export default function NewSalesPage() {
         }
       }
       
-      // Phase 5: Fall back to product's default price and show warning if 0
+      // Phase 5: Fall back to product's default price based on transaction type
       const product = products.find((p) => p.id === productId)
       if (product) {
-        const salesPrice = product.defaultSalesPrice || 0
-        if (salesPrice === 0) {
+        const defaultPrice = type === 'PURCHASE' 
+          ? (product.defaultPurchasePrice || 0)
+          : (product.defaultSalesPrice || 0)
+        if (defaultPrice === 0) {
           alert('⚠️ 단가가 설정되지 않았습니다. 수동으로 입력해주세요.')
         }
-        setFormData((prev) => ({ ...prev, unitPrice: salesPrice.toString() }))
+        setFormData((prev) => ({ ...prev, unitPrice: defaultPrice.toString() }))
       }
     } catch (error) {
       console.error('Error fetching vendor price:', error)
-      // Fall back to product's default price
+      // Fall back to product's default price based on transaction type
       const product = products.find((p) => p.id === productId)
       if (product) {
-        const salesPrice = product.defaultSalesPrice || 0
-        if (salesPrice === 0) {
+        const defaultPrice = type === 'PURCHASE' 
+          ? (product.defaultPurchasePrice || 0)
+          : (product.defaultSalesPrice || 0)
+        if (defaultPrice === 0) {
           alert('⚠️ 단가 조회 중 오류가 발생했습니다. 수동으로 입력해주세요.')
         }
-        setFormData((prev) => ({ ...prev, unitPrice: salesPrice.toString() }))
+        setFormData((prev) => ({ ...prev, unitPrice: defaultPrice.toString() }))
       }
     }
   }
@@ -272,8 +278,10 @@ export default function NewSalesPage() {
       } else {
         const product = products.find((p) => p.id === parseInt(formData.productId))
         if (product) {
-          const salesPrice = product.defaultSalesPrice || 0
-          setFormData((prev) => ({ ...prev, date, unitPrice: salesPrice.toString() }))
+          const defaultPrice = formData.type === 'PURCHASE' 
+            ? (product.defaultPurchasePrice || 0)
+            : (product.defaultSalesPrice || 0)
+          setFormData((prev) => ({ ...prev, date, unitPrice: defaultPrice.toString() }))
         }
       }
     }
@@ -543,7 +551,7 @@ export default function NewSalesPage() {
 
             <div>
               <label className="block text-sm font-medium mb-1 text-gray-700">
-                단가 * {formData.productId && <span className="text-xs text-blue-600">(품목 단가 자동 적용됨)</span>}
+                {formData.type === 'PURCHASE' ? '매입단가' : '매출단가'} * {formData.productId && <span className="text-xs text-blue-600">(품목 단가 자동 적용됨)</span>}
               </label>
               <input
                 type="number"
@@ -561,7 +569,7 @@ export default function NewSalesPage() {
             {formData.type === 'SALES' && (
               <div>
                 <label className="block text-sm font-medium mb-1 text-gray-700">
-                  단위원가 {formData.productId && <span className="text-xs text-blue-600">(품목에서 자동 설정됨)</span>}
+                  원가 {formData.productId && <span className="text-xs text-blue-600">(품목에서 자동 설정됨, 수정 가능)</span>}
                 </label>
                 <input
                   type="number"
@@ -572,7 +580,6 @@ export default function NewSalesPage() {
                   }
                   className="w-full px-3 py-2 border rounded-lg text-gray-900"
                   placeholder="0"
-                  disabled={!!formData.productId}
                 />
               </div>
             )}
@@ -605,7 +612,7 @@ export default function NewSalesPage() {
             <h3 className="font-medium mb-3 text-gray-900">계산 결과</h3>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
-                <div className="text-sm text-gray-600">금액</div>
+                <div className="text-sm text-gray-600">공급가액</div>
                 <div className="text-lg font-bold text-gray-900">
                   ₩{calculateAmount().toLocaleString()}
                 </div>
