@@ -1,41 +1,53 @@
 # 무역 재고관리 시스템 (알레스인터네셔날)
 
-해외에서 물건을 수입해서 국내에 판매하는 무역업체를 위한 원가계산 및 재고관리 웹 애플리케이션입니다.
+해외에서 물건을 수입해서 국내에 판매하는 무역업체를 위한 통합 ERP 시스템입니다.
+매입/매출, 수입/수출, 재고, 프로젝트, 문서 관리 등 무역업 전반의 업무를 지원합니다.
 
 ## 주요 기능
 
-### 1. 품목 관리
-- 품목 등록, 수정, 삭제
-- 품목 코드, 이름, 단위, 비고 관리
-- 중복 코드 방지
+### 1. 매입/매출 관리
+- 거래 내역 등록, 수정, 삭제
+- 다중 필터링 (거래유형, 담당자, 카테고리, 거래처, 품목, 날짜)
+- 페이지네이션 (50건 단위)
+- 마진 및 마진율 자동 계산
+- 월별/연도별 리포트
+- 엑셀 업로드/다운로드
+- 거래명세서 자동 생성
 
-### 2. 입고 관리 (LOT 관리)
-- LOT 단위 입고 등록
-- 원가 자동 계산: `(물품대금 + 수입통관료 + 입고운송료 + 기타비용) / 입고수량`
-- LOT 코드(BL번호, 참조번호 등) 관리
-- 입고일, 입고수량, 잔량 추적
+### 2. 수입/수출 관리
+- 수입/수출 건별 관리
+- 품목별 수량, 단가, 금액 관리
+- 환율 자동 적용 및 수동 입력
+- 통관 추적 (UNI-PASS API 연동)
+- B/L 번호 기반 화물 진행 상황 조회
+- 수입신고 정보 자동 조회
 
-### 3. 출고 관리 (FIFO)
-- **FIFO(선입선출) 자동 처리**: 가장 오래된 LOT부터 자동 차감
-- 출고 시 LOT별 원가 및 출고 내역 표시
-- 재고 부족 시 자동 방지
-- 출고 이력 조회
+### 3. 재고 관리
+- LOT 단위 입고 관리
+- FIFO(선입선출) 자동 출고 처리
+- 품목별 재고 현황 조회
+- 창고료 관리 및 배분
+- 원가 자동 계산
+- 월별 원가 이력 추적
 
-### 4. 재고 조회
-- 품목별 현재 재고 수량 조회
-- LOT별 상세 정보 (입고일, 잔량, 단가)
-- 품목별 평균 단가 및 재고 가치 계산
-- 오래된 순으로 LOT 정렬
+### 4. 프로젝트 관리
+- 프로젝트별 품목 관리
+- 프로젝트 진행 상황 추적
+- 프로젝트 리포트
 
-### 5. 창고료 관리
-- 월별 창고료 입력 (기간비용으로 처리)
-- 창고료는 재고 원가에 포함하지 않음
-- 기간별 집계 및 조회
+### 5. 문서 관리
+- 견적서 생성 및 관리
+- 거래명세서 생성 및 관리
+- PDF/엑셀 다운로드
+- 매출 내역 연동
 
-### 6. 대시보드
-- 전체 재고 현황 요약
-- 최근 출고 내역
-- 총 재고 가치 표시
+### 6. 마스터 데이터 관리
+- 거래처 관리 (국내/해외, 매입/매출)
+- 품목 관리 (제품/자재/부품)
+- 서비스 관리
+- 카테고리 관리
+- 담당자 관리
+- 거래처별 특별가 관리
 
 ## 기술 스택
 
@@ -46,12 +58,13 @@
 
 ### 데이터베이스
 - **Prisma ORM**
-- **PostgreSQL** (Neon - 클라우드 배포용)
-- **SQLite** (로컬 개발용, 선택사항)
+- **PostgreSQL** (Supabase)
 
-### 기타
-- date-fns (날짜 처리)
-- React Hooks (상태 관리)
+### 라이브러리
+- **ExcelJS** - 엑셀 파일 파싱 및 생성
+- **date-fns** - 날짜 처리
+- **jsPDF** - PDF 생성
+- **UNI-PASS API** - 관세청 통관 정보 조회
 
 ## 설치 및 실행 방법
 
@@ -220,50 +233,159 @@ git push
 
 ## 데이터베이스 스키마
 
-### Item (품목 마스터)
-- 품목 코드, 이름, 단위, 비고
-- 품목별 LOT 및 입출고 이력 관리
+시스템은 총 27개의 모델로 구성되어 있습니다:
 
-### InventoryLot (LOT/입고 관리)
-- 품목별 입고 배치 관리
-- 입고수량, 현재 잔량
-- 물품대금, 수입통관료, 입고운송료, 기타비용
-- 자동 계산된 단가
+### 통합 마스터 데이터 (5개)
+1. **Product** - 통합 품목 마스터
+   - 품목코드, 이름, 단위, 유형(PRODUCT/MATERIAL/PART)
+   - 카테고리, 매입거래처
+   - 기본 매입가/매출가
+   - 현재 원가 (창고료 포함)
 
-### InventoryMovement (입출고 이력)
-- 입고(IN), 출고(OUT), 조정(ADJUST) 타입
-- LOT별 수량, 단가, 총액 기록
-- 날짜별 이력 추적
+2. **Vendor** - 거래처
+   - 거래처코드, 이름
+   - 유형 (DOMESTIC_PURCHASE/SALES, INTERNATIONAL_PURCHASE/SALES)
+   - 연락처, 통화(KRW/USD)
 
-### StorageExpense (창고료/기간비용)
-- 월별 창고료 관리
-- 기간, 금액, 메모
+3. **Category** - 카테고리
+   - 카테고리코드, 이름, 한글명
+
+4. **Salesperson** - 담당자
+   - 담당자코드, 이름, 수수료율
+
+5. **VendorProductPrice** - 거래처별 특별가
+   - 거래처별 매입가/매출가
+   - 적용일자
+
+### 매입매출 (1개)
+6. **SalesRecord** - 매입매출 기록
+   - 일자, 유형(PURCHASE/SALES)
+   - 담당자, 카테고리, 품목, 거래처
+   - 수량, 단가, 금액, 원가, 마진, 마진율
+   - 연동 매출/수입수출 ID
+
+### 수입/수출 (4개)
+7. **ImportExport** - 수입/수출 건
+8. **ImportExportItem** - 수입/수출 품목 상세
+9. **ExchangeRate** - 환율
+10. **SystemSetting** - 시스템 설정
+
+### 창고 관리 (6개)
+11. **Item** - 품목 (하위호환용)
+12. **InventoryLot** - 재고 LOT
+13. **InventoryMovement** - 입출고 이력
+14. **StorageExpense** - 창고료
+15. **WarehouseFee** - 창고료 청구
+16. **WarehouseFeeDistribution** - 창고료 배분
+
+### 품목 분리 (3개)
+17. **Material** - 자재
+18. **Part** - 부품
+19. **Service** - 서비스
+
+### 프로젝트 (2개)
+20. **Project** - 프로젝트
+21. **ProjectItem** - 프로젝트 품목
+
+### 통관 관리 (1개)
+22. **CustomsTracking** - 통관 추적 (UNI-PASS 연동)
+
+### 문서 관리 (4개)
+23. **Quotation** - 견적서
+24. **QuotationItem** - 견적서 품목
+25. **TransactionStatement** - 거래명세서
+26. **TransactionStatementItem** - 거래명세서 품목
+
+### 하위 호환 (3개)
+27. **ProductPriceHistory** - 품목 가격 이력
+28. **ProductMonthlyCost** - 품목 월별 원가
+29. **SalesProduct** - 매출 품목 (레거시)
+
+## 페이지 구조
+
+### 매입/매출
+- `/` - 대시보드
+- `/sales` - 상세내역
+- `/sales/new` - 거래 등록
+- `/sales/report/monthly` - 월별 리포트
+- `/sales/report/yearly` - 연도별 리포트
+
+### 수입/수출
+- `/import-export` - 수입/수출 내역
+- `/import-export/new` - 수입/수출 등록
+- `/customs/tracking` - 통관 추적
+- `/exchange-rates` - 환율 관리
+
+### 재고 관리
+- `/warehouse/lots` - 입고 관리
+- `/warehouse/outbound` - 출고 관리
+- `/warehouse/inventory` - 재고 조회
+- `/warehouse/warehouse-fee` - 창고료 관리
+
+### 프로젝트
+- `/projects` - 프로젝트 목록
+- `/projects/new` - 프로젝트 등록
+- `/projects/report` - 프로젝트 리포트
+
+### 문서 관리
+- `/documents` - 문서 대시보드
+- `/documents/quotation` - 견적서
+- `/documents/transaction-statement` - 거래명세서
+
+### 설정
+- `/sales/vendors` - 거래처
+- `/master/products` - 품목관리
+- `/master/services` - 서비스
+- `/categories` - 카테고리
+- `/salesperson` - 담당자
+- `/master/vendor-prices` - 가격
+- `/settings/unipass` - 유니패스 설정
+- `/master/upload` - 엑셀 업로드
 
 ## API 엔드포인트
 
-### 품목 API (`/api/items`)
-- `GET` - 품목 목록 조회
-- `POST` - 품목 등록
-- `PUT` - 품목 수정
-- `DELETE` - 품목 삭제
+### 매입/매출
+- `/api/sales` - 매입매출 CRUD
+- `/api/sales/export` - 엑셀 다운로드
+- `/api/sales/report/monthly` - 월별 리포트
+- `/api/sales/report/yearly` - 연도별 리포트
 
-### 입고 API (`/api/lots`)
-- `GET` - LOT 목록 조회
-- `POST` - 입고 등록 (단가 자동 계산)
+### 마스터 데이터
+- `/api/products` - 품목 CRUD
+- `/api/vendors` - 거래처 CRUD
+- `/api/categories` - 카테고리 CRUD
+- `/api/salesperson` - 담당자 CRUD
+- `/api/vendor-product-prices` - 거래처별 가격
 
-### 출고 API (`/api/outbound`)
-- `GET` - 출고 이력 조회
-- `POST` - FIFO 출고 처리
+### 수입/수출
+- `/api/import-export` - 수입/수출 CRUD
+- `/api/exchange-rates` - 환율 CRUD
 
-### 재고 API (`/api/inventory`)
-- `GET` - 전체 재고 현황 조회
-- `GET?itemId={id}` - 품목별 LOT 상세 조회
+### 재고
+- `/api/lots` - 입고 관리
+- `/api/outbound` - 출고 관리
+- `/api/inventory` - 재고 조회
+- `/api/warehouse-fee` - 창고료
+- `/api/storage-expenses` - 창고비용
 
-### 창고료 API (`/api/storage-expenses`)
-- `GET` - 창고료 목록 조회
-- `POST` - 창고료 등록
-- `PUT` - 창고료 수정
-- `DELETE` - 창고료 삭제
+### 프로젝트
+- `/api/projects` - 프로젝트 CRUD
+- `/api/projects/report` - 프로젝트 리포트
+
+### 문서
+- `/api/documents/quotation` - 견적서 CRUD
+- `/api/documents/transaction-statement` - 거래명세서 CRUD
+
+### 통관
+- `/api/customs/tracking` - 통관 추적
+- `/api/unipass/*` - UNI-PASS API 연동
+
+### 기타
+- `/api/materials` - 자재
+- `/api/parts` - 부품
+- `/api/services` - 서비스
+- `/api/upload/excel` - 엑셀 업로드
+- `/api/items` - 품목 (하위호환)
 
 ## 핵심 구현 로직
 
@@ -277,43 +399,91 @@ git push
 4. 출고된 LOT 목록 및 원가 반환
 ```
 
-### 단가 계산
+### 원가 계산
 ```typescript
-단가 = (물품대금 + 수입통관료 + 입고운송료 + 기타비용) / 입고수량
+기본 원가 = (물품대금 + 수입통관료 + 입고운송료 + 기타비용) / 입고수량
+최종 원가 = 기본 원가 + 창고료 배분액
 ```
-- 소수점 6자리까지 정밀도 유지
-- 입고 시 자동 계산 및 저장
+
+### 마진 계산
+```typescript
+마진 = 매출액 - 매입원가
+마진율 = (마진 / 매출액) × 100
+```
+
+### 환율 적용
+```typescript
+원화금액 = 외화금액 × 환율
+환율은 ExchangeRate 테이블에서 조회하거나 수동 입력
+```
+
+### 엑셀 업로드 처리
+```typescript
+1. 엑셀 파일 파싱 (14컬럼 또는 16컬럼 자동 감지)
+2. 거래처/품목/담당자/카테고리 자동 생성 (옵션)
+3. 거래 내역 일괄 등록
+4. 품목 기본가격 자동 업데이트
+5. 거래처별 특별가 자동 생성
+```
+
+## 엑셀 업로드 양식
+
+### 새 양식 (16컬럼) - 권장
+```
+날짜 | 구분 | 카테고리 | 품목명 | 단위 | 수량 | 단가 | 공급가액 | 부가세 | 합계(VAT포함) | 거래처 | 거래처유형 | 담당자 | 매입가 | 매입처 | 비고
+```
+
+**주요 특징:**
+- 단위 입력 가능 (EA, BOX, kg 등)
+- 공급가액/부가세 분리 입력
+- 거래처유형 명시 가능 (DOMESTIC_SALES, DOMESTIC_PURCHASE, INTERNATIONAL_SALES, INTERNATIONAL_PURCHASE)
+- 비고 입력 가능
+- 미입력 항목 자동 계산
+
+### 구 양식 (14컬럼) - 하위 호환
+```
+날짜 | 구분 | 판매처 | 품목명 | 수량 | 판매단가 | 금액(부가세포함) | 금액 | 담당자 | 카테고리 | 마진 | 마진율 | 매입처 | 매입가
+```
+
+**참고:**
+- 두 양식 모두 지원 (자동 감지)
+- 새 양식 사용 권장
 
 ## 프로젝트 구조
 
 ```
 alles-international-inventory/
 ├── app/
-│   ├── api/                    # API 라우트
-│   │   ├── items/              # 품목 CRUD
-│   │   ├── lots/               # 입고 관리
-│   │   ├── outbound/           # 출고 관리 (FIFO)
-│   │   ├── inventory/          # 재고 조회
-│   │   └── storage-expenses/   # 창고료 관리
-│   ├── items/                  # 품목 관리 페이지
-│   ├── lots/                   # 입고 관리 페이지
-│   ├── outbound/               # 출고 관리 페이지
-│   ├── inventory/              # 재고 조회 페이지
-│   ├── storage-expenses/       # 창고료 관리 페이지
-│   ├── layout.tsx              # 루트 레이아웃
-│   └── page.tsx                # 대시보드
+│   ├── api/                          # API 라우트
+│   │   ├── sales/                    # 매입매출 API
+│   │   ├── import-export/            # 수입/수출 API
+│   │   ├── products/                 # 품목 API
+│   │   ├── vendors/                  # 거래처 API
+│   │   ├── warehouse/                # 재고 API
+│   │   ├── projects/                 # 프로젝트 API
+│   │   ├── documents/                # 문서 API
+│   │   ├── customs/                  # 통관 API
+│   │   └── upload/                   # 업로드 API
+│   ├── sales/                        # 매입매출 페이지
+│   ├── import-export/                # 수입/수출 페이지
+│   ├── warehouse/                    # 재고 페이지
+│   ├── projects/                     # 프로젝트 페이지
+│   ├── documents/                    # 문서 페이지
+│   ├── master/                       # 마스터 데이터 페이지
+│   ├── layout.tsx                    # 루트 레이아웃
+│   └── page.tsx                      # 대시보드
 ├── components/
-│   └── Sidebar.tsx             # 네비게이션 사이드바
+│   ├── Sidebar.tsx                   # 네비게이션 사이드바
+│   └── ui/                           # UI 컴포넌트
 ├── lib/
-│   ├── prisma.ts               # Prisma 클라이언트
-│   └── utils.ts                # 유틸리티 함수
+│   ├── prisma.ts                     # Prisma 클라이언트
+│   ├── utils.ts                      # 유틸리티 함수
+│   └── excel-parser.ts               # 엑셀 파서
 ├── prisma/
-│   └── schema.prisma           # 데이터베이스 스키마
-├── .env                        # 환경 변수
-├── .env.example                # 환경 변수 예시
+│   └── schema.prisma                 # 데이터베이스 스키마
+├── .env                              # 환경 변수
 ├── package.json
 ├── tsconfig.json
-├── tailwind.config.ts
 └── README.md
 ```
 
@@ -321,16 +491,18 @@ alles-international-inventory/
 
 ### 레이아웃
 - 좌측 고정 사이드바 네비게이션
-- 반응형 디자인 (모바일에서 햄버거 메뉴)
+- 반응형 디자인 (모바일 햄버거 메뉴)
 - 깔끔한 비즈니스 UI
 
 ### 주요 페이지
-1. **홈 (/)** - 대시보드
-2. **/items** - 품목 관리
-3. **/lots** - 입고 관리
-4. **/outbound** - 출고 관리
-5. **/inventory** - 재고 조회
-6. **/storage-expenses** - 창고료 관리
+1. **대시보드 (/)** - 매출/마진 현황 요약
+2. **/sales** - 매입매출 상세내역
+3. **/import-export** - 수입/수출 관리
+4. **/warehouse/lots** - 입고 관리
+5. **/warehouse/outbound** - 출고 관리
+6. **/warehouse/inventory** - 재고 조회
+7. **/projects** - 프로젝트 관리
+8. **/documents** - 문서 관리
 
 ## 데이터 무결성
 
@@ -339,6 +511,7 @@ alles-international-inventory/
 - 재고 부족 시 출고 자동 차단
 - 품목 코드 중복 방지
 - 입고 이력이 있는 품목 삭제 차단
+- 트랜잭션 처리로 데이터 일관성 유지
 
 ## 개발 명령어
 
@@ -362,16 +535,24 @@ npx prisma db push
 npx prisma generate
 ```
 
-## 향후 확장 가능 기능
+## 특수 기능
 
-- 창고료를 재고 단가에 배분
-- 여러 창고 관리
-- 거래처 관리
-- 판매 관리 및 손익계산서
-- 환율 관리 및 외화 처리
-- 사용자 인증 및 권한 관리
-- 엑셀 내보내기/가져오기
-- 대시보드 차트 및 분석
+### UNI-PASS 통관 정보 연동
+- 관세청 UNI-PASS API를 통한 실시간 통관 정보 조회
+- B/L 번호 기반 화물 진행 상황 추적
+- 수입신고 정보 자동 조회
+- 통관 단계별 상태 표시
+
+### 자동 원가 계산
+- 수입 비용 자동 집계
+- 창고료 재고 배분
+- 월별 원가 이력 추적
+- FIFO 기반 출고 원가 계산
+
+### 거래명세서 자동 생성
+- 매출 내역 선택 → 거래명세서 자동 생성
+- PDF/엑셀 다운로드
+- 품목/금액 자동 집계
 
 ## 배포 가이드 (Vercel + Supabase PostgreSQL)
 
@@ -389,7 +570,9 @@ npx prisma generate
 2. 환경 변수 설정:
    ```
    DATABASE_URL=postgresql://postgres.[project-ref]:[password]@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres
+   DIRECT_URL=postgresql://postgres.[project-ref]:[password]@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres
    KOREAEXIM_API_KEY=your_api_key (선택사항)
+   UNIPASS_API_KEY=your_unipass_key (선택사항)
    ```
 3. 배포 실행
 
@@ -416,17 +599,21 @@ npx prisma db push
 - [ ] 대시보드 페이지가 정상적으로 로드되는지 확인
 - [ ] API 엔드포인트가 정상적으로 응답하는지 확인
 - [ ] 데이터베이스 연결이 정상적으로 작동하는지 확인
+- [ ] 엑셀 업로드 기능이 정상 작동하는지 확인
 
 ### 5. 로컬 개발 환경 설정
 
 ```bash
+# 저장소 클론
+git clone https://github.com/Kis7474/alles-international-inventory.git
+cd alles-international-inventory
+
 # 의존성 설치
 npm install
 
 # 환경변수 설정 (.env 파일 생성)
 DATABASE_URL="postgresql://localhost:5432/alles_inventory"
-# 또는 로컬 SQLite 사용
-# DATABASE_URL="file:./dev.db"
+DIRECT_URL="postgresql://localhost:5432/alles_inventory"
 
 # Prisma 클라이언트 생성
 npx prisma generate
@@ -449,10 +636,27 @@ npm run dev
 - `package.json`의 build 스크립트에 `prisma generate`가 포함되어 있는지 확인
 - Node.js 버전 호환성 확인 (Node.js 18 이상 권장)
 
-**API 에러 처리**
-- 개발 모드에서는 상세한 에러 메시지 확인 가능
-- 프로덕션 모드에서는 일반적인 에러 메시지만 표시됨
-- 서버 로그에서 상세 에러 확인
+**엑셀 업로드 타임아웃**
+- Vercel의 serverless function timeout은 기본 10초
+- 대량 데이터 업로드 시 Vercel Pro 플랜 필요 (최대 60초)
+- 또는 데이터를 청크 단위로 분할 업로드
+
+**UNI-PASS API 오류**
+- API 키가 올바른지 확인
+- 환경 변수에 UNIPASS_API_KEY 설정 확인
+- API 사용량 제한 확인
+
+## 환경 변수
+
+```bash
+# 필수
+DATABASE_URL="postgresql://..."          # Supabase connection string (pooler)
+DIRECT_URL="postgresql://..."            # Supabase direct connection (for migrations)
+
+# 선택사항
+KOREAEXIM_API_KEY="your_api_key"        # 한국수출입은행 환율 API
+UNIPASS_API_KEY="your_api_key"          # 관세청 UNI-PASS API
+```
 
 ## 라이선스
 
