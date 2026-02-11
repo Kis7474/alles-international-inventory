@@ -129,9 +129,10 @@ export async function POST(request: NextRequest) {
           throw new Error('품목 정보를 찾을 수 없습니다.')
         }
 
-        // 원가 계산: 총 출고 원가 (수량 × currentCost)
+        // 원가 계산: 단위당 원가 및 총 원가
         const costData = await getProductCurrentCost(productId)
-        const totalCost = quantity * costData.cost
+        const unitCostValue = costData.cost  // 단위당 원가
+        const totalCost = unitCostValue * quantity  // 마진 계산용
 
         // Phase 4: 매출가 조회 - unitPriceOverride 우선 사용
         let unitPrice = 0
@@ -188,7 +189,7 @@ export async function POST(request: NextRequest) {
             quantity,
             unitPrice,
             amount,
-            cost: totalCost,
+            cost: unitCostValue,  // 단위당 원가만 저장
             margin,
             marginRate,
             costSource: 'OUTBOUND_AUTO',
@@ -197,6 +198,45 @@ export async function POST(request: NextRequest) {
         })
 
         salesRecordId = salesRecord.id
+
+        // 판매출고 시 매입(PURCHASE) 자동 생성
+        // 품목의 purchaseVendorId와 매입가 조회
+        const productForPurchase = await tx.product.findUnique({
+          where: { id: productId },
+          select: {
+            purchaseVendorId: true,
+            defaultPurchasePrice: true,
+            name: true,
+          },
+        })
+
+        if (productForPurchase?.purchaseVendorId) {
+          const purchasePrice = productForPurchase.defaultPurchasePrice ?? unitCostValue
+          
+          if (purchasePrice > 0) {
+            const purchaseAmount = quantity * purchasePrice
+            await tx.salesRecord.create({
+              data: {
+                date: new Date(outboundDate),
+                type: 'PURCHASE',
+                salespersonId: parseInt(salespersonId),
+                categoryId: product.categoryId || 1,
+                productId,
+                vendorId: productForPurchase.purchaseVendorId,
+                itemName: product.name,
+                quantity,
+                unitPrice: purchasePrice,
+                amount: purchaseAmount,
+                cost: 0,
+                margin: 0,
+                marginRate: 0,
+                costSource: 'OUTBOUND_AUTO',
+                linkedSalesId: salesRecordId,
+                notes: `출고 매출 ${salesRecordId}에서 자동생성`,
+              },
+            })
+          }
+        }
       }
 
       // FIFO 출고 처리

@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { calculateUnitCost } from '@/lib/utils'
+import { createAutoPurchaseRecord } from '@/lib/purchase-auto'
+
+// Constants
+const DEFAULT_SALESPERSON_ID = 1 // 입고에는 담당자가 없으므로 기본값
 
 // GET - LOT 목록 조회
 export async function GET(request: NextRequest) {
@@ -189,6 +193,34 @@ export async function POST(request: NextRequest) {
 
       return newLot
     })
+
+    // 입고 등록 시 매입(PURCHASE) 자동 생성
+    // 중복 방지: importExportId가 없는 경우(수동 입고)만 매입 자동 생성
+    if (productId && lot && !lot.importExportId) {
+      const product = await prisma.product.findUnique({
+        where: { id: productId },
+        include: { category: true },
+      })
+      
+      if (product && product.purchaseVendorId) {
+        const purchasePrice = product.defaultPurchasePrice ?? unitCost
+        
+        if (purchasePrice > 0) {
+          await createAutoPurchaseRecord({
+            productId: product.id,
+            vendorId: product.purchaseVendorId,
+            salespersonId: DEFAULT_SALESPERSON_ID,
+            categoryId: product.categoryId || 1,
+            quantity: quantityReceived,
+            unitPrice: purchasePrice,
+            date: new Date(receivedDate),
+            itemName: product.name,
+            costSource: 'INBOUND_AUTO',
+            notes: `입고 LOT ${lot.id}에서 자동생성`,
+          })
+        }
+      }
+    }
 
     return NextResponse.json(lot, { status: 201 })
   } catch (error) {
