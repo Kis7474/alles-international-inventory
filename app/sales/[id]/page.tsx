@@ -378,7 +378,14 @@ export default function EditSalesPage() {
                 type="date"
                 required
                 value={formData.date}
-                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                onChange={(e) => {
+                  const newDate = e.target.value
+                  setFormData({ ...formData, date: newDate })
+                  // 날짜 변경 시 품목이 선택되어 있으면 단가 재조회
+                  if (formData.productId && formData.vendorId) {
+                    fetchVendorPrice(parseInt(formData.productId), parseInt(formData.vendorId), newDate, formData.type)
+                  }
+                }}
                 className="w-full px-3 py-2 border rounded-lg text-gray-900"
               />
             </div>
@@ -390,7 +397,19 @@ export default function EditSalesPage() {
               <select
                 required
                 value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                onChange={(e) => {
+                  const newType = e.target.value
+                  // 거래유형 변경 시 연관 데이터 초기화
+                  setFormData({ 
+                    ...formData, 
+                    type: newType,
+                    vendorId: '', // 거래처 리셋
+                    productId: '', // 품목 리셋
+                    itemName: '', // 품목명 리셋
+                    unitPrice: '', // 단가 리셋
+                  })
+                  setAvailableProducts([]) // 품목 목록 초기화
+                }}
                 className="w-full px-3 py-2 border rounded-lg text-gray-900"
               >
                 <option value="SALES">매출</option>
