@@ -154,7 +154,8 @@ export default function NewSalesPage() {
             : (product.defaultSalesPrice || 0)
           // Phase 5: Show warning if price is 0
           if (defaultPrice === 0) {
-            alert('⚠️ 단가가 설정되지 않았습니다. 수동으로 입력해주세요.')
+            const priceType = formData.type === 'PURCHASE' ? '매입단가' : '매출단가'
+            alert(`⚠️ ${priceType}가 설정되지 않았습니다. 수동으로 입력해주세요.`)
           }
           setFormData((prev) => ({ 
             ...prev, 
@@ -258,7 +259,8 @@ export default function NewSalesPage() {
           ? (product.defaultPurchasePrice || 0)
           : (product.defaultSalesPrice || 0)
         if (defaultPrice === 0) {
-          alert('⚠️ 단가가 설정되지 않았습니다. 수동으로 입력해주세요.')
+          const priceType = type === 'PURCHASE' ? '매입단가' : '매출단가'
+          alert(`⚠️ ${priceType}가 설정되지 않았습니다. 수동으로 입력해주세요.`)
         }
         setFormData((prev) => ({ ...prev, unitPrice: defaultPrice.toString() }))
       }
@@ -271,7 +273,8 @@ export default function NewSalesPage() {
           ? (product.defaultPurchasePrice || 0)
           : (product.defaultSalesPrice || 0)
         if (defaultPrice === 0) {
-          alert('⚠️ 단가 조회 중 오류가 발생했습니다. 수동으로 입력해주세요.')
+          const priceType = type === 'PURCHASE' ? '매입단가' : '매출단가'
+          alert(`⚠️ ${priceType} 조회 중 오류가 발생했습니다. 수동으로 입력해주세요.`)
         }
         setFormData((prev) => ({ ...prev, unitPrice: defaultPrice.toString() }))
       }

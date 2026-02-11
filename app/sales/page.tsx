@@ -277,20 +277,17 @@ export default function SalesPage() {
       amount: s.amount,
     }))
     
-    // 거래처 상세 정보 가져오기 (phone, fax 자동 채움용)
+    // 거래처 상세 정보 가져오기 (phone 자동 채움용)
     const firstVendor = selectedSales.find(s => s.vendor)?.vendor
     let vendorPhone = ''
-    let vendorFax = ''
     
     if (firstVendor) {
       try {
-        // Fetch full vendor details including phone
+        // Fetch vendor details by searching for exact name match
         const vendorRes = await fetch(`/api/vendors?searchName=${encodeURIComponent(firstVendor.name)}`)
         const vendorData = await vendorRes.json()
         if (vendorData && vendorData.length > 0) {
           vendorPhone = vendorData[0].phone || ''
-          // Note: fax field doesn't exist in Vendor schema, leaving empty
-          vendorFax = ''
         }
       } catch (error) {
         console.error('Error fetching vendor details:', error)
@@ -301,7 +298,7 @@ export default function SalesPage() {
     setModalData({
       vendorName: vendorNames[0],
       vendorPhone: vendorPhone,
-      vendorFax: vendorFax,
+      vendorFax: '', // Fax field doesn't exist in Vendor schema
       items: items,
     })
     setIsModalOpen(true)

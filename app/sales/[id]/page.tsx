@@ -272,13 +272,15 @@ export default function EditSalesPage() {
           ? (product.defaultPurchasePrice || 0)
           : (product.defaultSalesPrice || 0)
         if (defaultPrice === 0) {
-          alert('⚠️ 단가가 설정되지 않았습니다. 수동으로 입력해주세요.')
+          const priceType = type === 'PURCHASE' ? '매입단가' : '매출단가'
+          alert(`⚠️ ${priceType}가 설정되지 않았습니다. 수동으로 입력해주세요.`)
         }
         setFormData(prev => ({ ...prev, unitPrice: defaultPrice.toString() }))
       }
     } catch (error) {
       console.error('Error fetching vendor price:', error)
-      alert('⚠️ 단가 조회 중 오류가 발생했습니다.')
+      const priceType = type === 'PURCHASE' ? '매입단가' : '매출단가'
+      alert(`⚠️ ${priceType} 조회 중 오류가 발생했습니다.`)
     }
   }
 
@@ -417,6 +419,7 @@ export default function EditSalesPage() {
                     productId: '', // 품목 리셋
                     itemName: '', // 품목명 리셋
                     unitPrice: '', // 단가 리셋
+                    cost: '', // 원가 리셋 (매출 전용 필드)
                   })
                   setAvailableProducts([]) // 품목 목록 초기화
                 }}
