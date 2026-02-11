@@ -190,6 +190,36 @@ export async function POST(request: NextRequest) {
       return newLot
     })
 
+    // 입고 등록 시 매입(PURCHASE) 자동 생성
+    // 중복 방지: importExportId가 없는 경우(수동 입고)만 매입 자동 생성
+    if (productId && lot && !lot.importExportId) {
+      const product = await prisma.product.findUnique({
+        where: { id: productId },
+        include: { category: true },
+      })
+      
+      if (product && product.purchaseVendorId) {
+        const purchasePrice = product.defaultPurchasePrice || unitCost
+        
+        if (purchasePrice > 0) {
+          const { createAutoPurchaseRecord } = await import('@/lib/purchase-auto')
+          
+          await createAutoPurchaseRecord({
+            productId: product.id,
+            vendorId: product.purchaseVendorId,
+            salespersonId: 1,  // 입고에는 담당자가 없으므로 기본값
+            categoryId: product.categoryId || 1,
+            quantity: quantityReceived,
+            unitPrice: purchasePrice,
+            date: new Date(receivedDate),
+            itemName: product.name,
+            costSource: 'INBOUND_AUTO',
+            notes: `입고 LOT ${lot.id}에서 자동생성`,
+          })
+        }
+      }
+    }
+
     return NextResponse.json(lot, { status: 201 })
   } catch (error) {
     console.error('Error creating lot:', error)
