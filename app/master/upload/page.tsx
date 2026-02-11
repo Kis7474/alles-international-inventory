@@ -127,9 +127,9 @@ export default function ExcelUploadPage() {
   }
 
   const downloadTemplate = () => {
-    // Create a simple CSV template with new format including purchase price
-    const headers = ['날짜', '구분', '판매처', '품목명', '수량', '판매단가', '금액(부가세포함)', '금액', '담당자', '카테고리', '마진', '마진율', '매입처', '매입가']
-    const exampleRow = ['2024-01-15', '매출', 'ABC상사', '품목A', '10', '1000', '11000', '10000', '홍길동', '전자제품', '2000', '20%', 'XYZ공급', '800']
+    // Create a simple CSV template with new 16-column format
+    const headers = ['날짜', '구분', '카테고리', '품목명', '단위', '수량', '단가', '공급가액', '부가세', '합계(VAT포함)', '거래처', '거래처유형', '담당자', '매입가', '매입처', '비고']
+    const exampleRow = ['2024-01-15', '매출', '전자제품', '품목A', 'EA', '10', '10000', '100000', '10000', '110000', 'ABC상사', 'DOMESTIC_SALES', '홍길동', '8000', 'XYZ공급', '']
     
     const csvContent = [
       headers.join(','),
@@ -140,7 +140,7 @@ export default function ExcelUploadPage() {
     const link = document.createElement('a')
     const url = URL.createObjectURL(blob)
     link.setAttribute('href', url)
-    link.setAttribute('download', 'transaction_template.csv')
+    link.setAttribute('download', 'transaction_template_new.csv')
     link.style.visibility = 'hidden'
     document.body.appendChild(link)
     link.click()
@@ -263,27 +263,42 @@ export default function ExcelUploadPage() {
           <div className="bg-gray-50 p-4 rounded-md">
             {uploadMode === 'transactions' ? (
               <div className="text-sm text-gray-700 space-y-2">
-                <div className="font-medium">거래 내역 엑셀 파일 구조:</div>
+                <div className="font-medium">거래 내역 엑셀 파일 구조 (새 양식 - 16컬럼):</div>
                 <pre className="bg-white p-3 rounded border border-gray-200 overflow-x-auto text-xs">
-{`날짜         | 구분  | 판매처  | 품목명 | 수량 | 판매단가 | 금액(부가세포함) | 금액  | 담당자 | 카테고리 | 마진 | 마진율 | 매입처  | 매입가
-2024-01-15  | 매출  | ABC상사 | 품목A  | 10   | 1000    | 11000           | 10000 | 홍길동 | 전자제품 | 2000 | 20%   | XYZ공급 | 800`}
+{`날짜       | 구분 | 카테고리 | 품목명 | 단위 | 수량 | 단가  | 공급가액 | 부가세 | 합계(VAT포함) | 거래처  | 거래처유형        | 담당자 | 매입가 | 매입처  | 비고
+2024-01-15 | 매출 | 전자제품 | 품목A  | EA   | 10   | 10000 | 100000  | 10000  | 110000       | ABC상사 | DOMESTIC_SALES   | 홍길동 | 8000  | XYZ공급 |     `}
                 </pre>
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded">
+                  <p className="text-blue-800 text-xs font-medium mb-2">
+                    ✨ <strong>새 양식 (16컬럼) 개선사항:</strong>
+                  </p>
+                  <ul className="text-xs text-blue-700 space-y-1 list-disc list-inside">
+                    <li><strong>카테고리</strong>가 3번째 컬럼으로 이동 (더 논리적인 순서)</li>
+                    <li><strong>단위</strong> 컬럼 추가 (EA, BOX, kg 등 입력 가능, 미입력 시 EA)</li>
+                    <li><strong>공급가액/부가세/합계</strong> 컬럼 분리 (더 정확한 세금 계산)</li>
+                    <li><strong>거래처</strong> 컬럼으로 통합 (매출/매입에 따라 자동 처리)</li>
+                    <li><strong>거래처유형</strong> 명시 가능 (DOMESTIC_SALES, DOMESTIC_PURCHASE, INTERNATIONAL_SALES, INTERNATIONAL_PURCHASE)</li>
+                    <li><strong>비고</strong> 컬럼 추가 (메모 입력 가능)</li>
+                    <li>공급가액/부가세/합계 미입력 시 단가와 수량으로 자동 계산</li>
+                    <li>거래처유형 미입력 시 자동 결정 (매출→DOMESTIC_SALES, 매입→DOMESTIC_PURCHASE)</li>
+                  </ul>
+                </div>
                 <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded">
                   <p className="text-yellow-800 text-xs font-medium mb-2">
-                    💡 <strong>중요 변경사항:</strong>
+                    ⚠️ <strong>구 양식 (14컬럼) 호환성:</strong>
                   </p>
                   <ul className="text-xs text-yellow-700 space-y-1 list-disc list-inside">
-                    <li><strong>매입처</strong> 열은 필수입니다. 품목 생성 시 매입처가 연결됩니다.</li>
-                    <li><strong>매입가</strong> 열이 새로 추가되었습니다. 입력 시 품목의 기본 매입가로 자동 저장됩니다.</li>
-                    <li><strong>판매처</strong>는 매출 거래처로, <strong>매입처</strong>는 매입 거래처로 자동 등록됩니다.</li>
-                    <li>마진율은 백분율(20%) 또는 소수(0.2) 형식 모두 지원합니다.</li>
+                    <li>기존 14컬럼 양식으로 업로드해도 정상 작동합니다</li>
+                    <li>양식은 자동 감지되며 적절히 처리됩니다</li>
+                    <li>새 양식 사용을 권장하나 기존 파일도 계속 사용 가능합니다</li>
                   </ul>
                 </div>
                 <div className="text-xs text-gray-600 mt-3">
                   * 날짜 형식: 2024-01-15, 2024.01.15, 2024/01/15 모두 지원<br />
                   * 구분: 매출 또는 매입<br />
-                  * 판매단가: 매출 시 판매 단가<br />
-                  * 매입가: 품목의 기본 매입가로 자동 저장 (선택 사항)<br />
+                  * 거래처유형: DOMESTIC_SALES, DOMESTIC_PURCHASE, INTERNATIONAL_SALES, INTERNATIONAL_PURCHASE<br />
+                  * 단위: EA, BOX, kg 등 (미입력 시 EA)<br />
+                  * 공급가액/부가세/합계: 자동 계산 가능 (단가×수량 기준)<br />
                   * 템플릿 다운로드 버튼을 클릭하여 예제 파일을 받을 수 있습니다
                 </div>
               </div>

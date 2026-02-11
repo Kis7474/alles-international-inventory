@@ -14,18 +14,26 @@ export interface ParsedData {
 export interface TransactionRow {
   date: string              // 날짜
   type: string              // 구분 (매출/매입)
-  salesVendorName: string   // 판매처 (변경: vendorName → salesVendorName)
+  category: string          // 카테고리 (컬럼 C로 이동)
   productName: string       // 품목명
+  unit: string              // 단위 (새로 추가)
   quantity: number          // 수량
-  unitPrice: number         // 판매단가
-  totalWithVat: number      // 금액(부가세포함)
-  totalAmount: number       // 금액
+  unitPrice: number         // 단가
+  supplyAmount: number      // 공급가액 (새로 추가)
+  vatAmount: number         // 부가세 (새로 추가)
+  totalWithVat: number      // 합계(VAT포함)
+  vendorName: string        // 거래처 (매출/매입에 따라 판매처/매입처)
+  vendorType: string        // 거래처유형 (새로 추가)
   salesperson: string       // 담당자
-  category: string          // 카테고리
-  margin: number            // 마진
-  marginRate: string        // 마진율
-  purchaseVendorName: string // 매입처
-  purchasePrice: number     // 매입가 (새로 추가)
+  purchasePrice: number     // 매입가
+  purchaseVendorName: string // 매입처 (매출 시에만 사용)
+  notes: string             // 비고 (새로 추가)
+  
+  // Legacy fields for backward compatibility
+  salesVendorName?: string  // 구버전 호환용
+  totalAmount?: number      // 구버전 호환용
+  margin?: number           // 구버전 호환용
+  marginRate?: string       // 구버전 호환용
 }
 
 /**
@@ -119,14 +127,22 @@ export async function parseExcelFile(file: File): Promise<ParsedData> {
 
 /**
  * Parse Excel/CSV file for transaction data
- * Expected format:
+ * 
+ * Supports two formats:
+ * 
+ * NEW FORMAT (16 columns):
+ * Row 1: 날짜 | 구분 | 카테고리 | 품목명 | 단위 | 수량 | 단가 | 공급가액 | 부가세 | 합계(VAT포함) | 거래처 | 거래처유형 | 담당자 | 매입가 | 매입처 | 비고
+ * 
+ * OLD FORMAT (14 columns) - backward compatible:
  * Row 1: 날짜 | 구분 | 판매처 | 품목명 | 수량 | 판매단가 | 금액(부가세포함) | 금액 | 담당자 | 카테고리 | 마진 | 마진율 | 매입처 | 매입가
- * Row 2+: Data rows
  * 
  * Note: 
- * - 금액(부가세포함): Total amount including VAT
- * - 금액: Supply amount excluding VAT
- * - 매입가: Purchase price for updating product base purchase price
+ * - Format is auto-detected based on column count
+ * - 구분=매출: 거래처→판매처, 매입처→매입처
+ * - 구분=매입: 거래처→매입처
+ * - 단위 미입력 시 기본값 EA
+ * - 거래처유형 미입력 시 자동 결정 (매출→DOMESTIC_SALES, 매입→DOMESTIC_PURCHASE)
+ * - 공급가액/부가세/합계 미입력 시 자동 계산
  */
 export async function parseTransactionExcel(file: File): Promise<TransactionRow[]> {
   const buffer = await file.arrayBuffer()
@@ -144,19 +160,26 @@ export async function parseTransactionExcel(file: File): Promise<TransactionRow[
   
   const rows: TransactionRow[] = []
   let isFirstRow = true
+  let isNewFormat = false
   
   // Convert worksheet to array format
   worksheet.eachRow((row, rowNumber) => {
-    // Skip header row
-    if (isFirstRow) {
-      isFirstRow = false
-      return
-    }
-    
     const cells: (Date | number | string | null | undefined)[] = []
     row.eachCell({ includeEmpty: true }, (cell) => {
       cells.push(cell.value as Date | number | string | null | undefined)
     })
+    
+    // Detect format from header row
+    if (isFirstRow) {
+      isFirstRow = false
+      // Check if this is the new 16-column format
+      // New format has "카테고리" in column C (index 2) and "단위" in column E (index 4)
+      const colC = String(cells[2] || '').trim()
+      const colE = String(cells[4] || '').trim()
+      isNewFormat = colC.includes('카테고리') && colE.includes('단위')
+      console.log(`Detected format: ${isNewFormat ? 'NEW (16 columns)' : 'OLD (14 columns)'}`)
+      return
+    }
     
     // Skip empty rows
     if (cells.every(cell => !cell)) {
@@ -164,21 +187,79 @@ export async function parseTransactionExcel(file: File): Promise<TransactionRow[
     }
     
     try {
-      const transactionRow: TransactionRow = {
-        date: parseDateValue(cells[0]),
-        type: parseType(cells[1]),
-        salesVendorName: String(cells[2] || '').trim(),
-        productName: String(cells[3] || '').trim(),
-        quantity: parseNumberValue(cells[4]),
-        unitPrice: parseNumberValue(cells[5]),
-        totalWithVat: parseNumberValue(cells[6]),
-        totalAmount: parseNumberValue(cells[7]),
-        salesperson: String(cells[8] || '').trim(),
-        category: String(cells[9] || '').trim(),
-        margin: parseNumberValue(cells[10]),
-        marginRate: parseMarginRate(cells[11]),
-        purchaseVendorName: String(cells[12] || '').trim(),
-        purchasePrice: parseNumberValue(cells[13]),  // 새로 추가된 매입가 컬럼
+      let transactionRow: TransactionRow
+      
+      if (isNewFormat) {
+        // NEW FORMAT: 날짜 | 구분 | 카테고리 | 품목명 | 단위 | 수량 | 단가 | 공급가액 | 부가세 | 합계 | 거래처 | 거래처유형 | 담당자 | 매입가 | 매입처 | 비고
+        const rowType = parseType(cells[1])
+        const unit = String(cells[4] || '').trim() || 'EA'
+        const unitPrice = parseNumberValue(cells[6])
+        const supplyAmount = parseNumberValue(cells[7])
+        const vatAmount = parseNumberValue(cells[8])
+        const totalWithVat = parseNumberValue(cells[9])
+        const vendorName = String(cells[10] || '').trim()
+        const vendorType = String(cells[11] || '').trim() || (rowType === '매출' ? 'DOMESTIC_SALES' : 'DOMESTIC_PURCHASE')
+        const purchaseVendorName = String(cells[14] || '').trim()
+        
+        // Auto-calculate if not provided
+        const calculatedSupplyAmount = supplyAmount > 0 ? supplyAmount : Math.round(unitPrice * parseNumberValue(cells[5]) / 1.1)
+        const calculatedVatAmount = vatAmount > 0 ? vatAmount : Math.round(calculatedSupplyAmount * 0.1)
+        const calculatedTotalWithVat = totalWithVat > 0 ? totalWithVat : calculatedSupplyAmount + calculatedVatAmount
+        
+        transactionRow = {
+          date: parseDateValue(cells[0]),
+          type: rowType,
+          category: String(cells[2] || '').trim(),
+          productName: String(cells[3] || '').trim(),
+          unit: unit,
+          quantity: parseNumberValue(cells[5]),
+          unitPrice: unitPrice,
+          supplyAmount: calculatedSupplyAmount,
+          vatAmount: calculatedVatAmount,
+          totalWithVat: calculatedTotalWithVat,
+          vendorName: vendorName,
+          vendorType: vendorType,
+          salesperson: String(cells[12] || '').trim(),
+          purchasePrice: parseNumberValue(cells[13]),
+          purchaseVendorName: purchaseVendorName,
+          notes: String(cells[15] || '').trim(),
+          // Map to legacy fields for backward compatibility
+          salesVendorName: rowType === '매출' ? vendorName : '',
+          totalAmount: calculatedSupplyAmount,
+          margin: 0,
+          marginRate: '0',
+        }
+      } else {
+        // OLD FORMAT: 날짜 | 구분 | 판매처 | 품목명 | 수량 | 판매단가 | 금액(부가세포함) | 금액 | 담당자 | 카테고리 | 마진 | 마진율 | 매입처 | 매입가
+        const rowType = parseType(cells[1])
+        const salesVendorName = String(cells[2] || '').trim()
+        const totalWithVat = parseNumberValue(cells[6])
+        const totalAmount = parseNumberValue(cells[7])
+        const purchaseVendorName = String(cells[12] || '').trim()
+        
+        transactionRow = {
+          date: parseDateValue(cells[0]),
+          type: rowType,
+          category: String(cells[9] || '').trim(),
+          productName: String(cells[3] || '').trim(),
+          unit: 'EA',
+          quantity: parseNumberValue(cells[4]),
+          unitPrice: parseNumberValue(cells[5]),
+          supplyAmount: totalAmount,
+          vatAmount: totalWithVat - totalAmount,
+          totalWithVat: totalWithVat,
+          vendorName: salesVendorName,
+          vendorType: rowType === '매출' ? 'DOMESTIC_SALES' : 'DOMESTIC_PURCHASE',
+          salesperson: String(cells[8] || '').trim(),
+          purchasePrice: parseNumberValue(cells[13]),
+          purchaseVendorName: purchaseVendorName,
+          notes: '',
+          // Legacy fields
+          salesVendorName: salesVendorName,
+          totalAmount: totalAmount,
+          margin: parseNumberValue(cells[10]),
+          marginRate: parseMarginRate(cells[11]),
+        }
       }
       
       rows.push(transactionRow)

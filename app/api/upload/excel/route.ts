@@ -108,6 +108,7 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
     rows.forEach(row => {
       if (row.purchaseVendorName) uniqueVendorNames.add(row.purchaseVendorName)
       if (row.salesVendorName) uniqueVendorNames.add(row.salesVendorName)
+      if (row.vendorName) uniqueVendorNames.add(row.vendorName)
       if (row.productName) uniqueProductNames.add(row.productName)
       if (row.category) uniqueCategoryNames.add(row.category)
       if (row.salesperson) uniqueSalespersonNames.add(row.salesperson)
@@ -151,6 +152,12 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
           // Determine vendor type based on usage in rows
           let type = 'DOMESTIC_PURCHASE'
           for (const row of rows) {
+            // Check vendorType from new format
+            if (row.vendorName === name && row.vendorType) {
+              type = row.vendorType
+              break
+            }
+            // Fallback to old format logic
             if (row.purchaseVendorName === name) {
               type = 'DOMESTIC_PURCHASE'
               break
@@ -236,6 +243,7 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
             let purchaseVendorId = null
             let categoryId = undefined
             let unitPrice = 0
+            let unit = 'EA' // Default unit
             
             for (const row of rows) {
               if (row.productName === name) {
@@ -248,6 +256,7 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
                   if (category) categoryId = category.id
                 }
                 if (row.unitPrice) unitPrice = row.unitPrice
+                if (row.unit) unit = row.unit // Use unit from row
                 break
               }
             }
@@ -257,7 +266,7 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
               productsToCreate.push({
                 code: `P${Date.now().toString().slice(-8)}-${codeCounter.toString().padStart(4, '0')}`,
                 name,
-                unit: 'EA',
+                unit: unit,
                 categoryId,
                 purchaseVendorId,
                 defaultPurchasePrice: unitPrice,
@@ -335,6 +344,7 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
             // Get entities from cache
             const purchaseVendor = row.purchaseVendorName ? vendorMap.get(row.purchaseVendorName) : null
             const salesVendor = row.salesVendorName ? vendorMap.get(row.salesVendorName) : null
+            const mainVendor = row.vendorName ? vendorMap.get(row.vendorName) : null
             const category = row.category ? categoryMap.get(row.category) : null
             const product = productMap.get(row.productName)
             const salesperson = row.salesperson ? salespersonMap.get(row.salesperson) : null
@@ -361,10 +371,11 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
             }
             
             // Queue VendorProductPrice entries for sales vendors
-            if (product && salesVendor) {
+            const effectiveSalesVendor = salesVendor || (transactionType === 'SALES' ? mainVendor : null)
+            if (product && effectiveSalesVendor) {
               vendorProductPricesToCreate.push({
                 productId: product.id,
-                vendorId: salesVendor.id,
+                vendorId: effectiveSalesVendor.id,
                 salesPrice: row.unitPrice || 0,
                 effectiveDate: new Date(),
               })
@@ -376,18 +387,31 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
               throw new Error(`날짜 형식 오류: ${row.date}`)
             }
             
-            // Calculate VAT amounts
-            const totalWithVat = row.totalWithVat || row.totalAmount * 1.1
-            const supplyAmount = Math.round(totalWithVat / 1.1)
-            const vatAmount = totalWithVat - supplyAmount
+            // Calculate VAT amounts - use provided values or calculate
+            const totalWithVat = row.totalWithVat || (row.totalAmount ? row.totalAmount * 1.1 : 0)
+            const supplyAmount = row.supplyAmount || (row.totalAmount || Math.round(totalWithVat / 1.1))
+            const vatAmount = row.vatAmount || (totalWithVat - supplyAmount)
             
-            // Ensure required vendor exists
-            const vendorForTransaction = transactionType === 'SALES' ? salesVendor : purchaseVendor
+            // Ensure required vendor exists - handle both old and new format
+            let vendorForTransaction = null
+            let vendorNameForTransaction = ''
+            
+            if (transactionType === 'SALES') {
+              vendorForTransaction = salesVendor || mainVendor
+              vendorNameForTransaction = row.salesVendorName || row.vendorName
+            } else {
+              vendorForTransaction = purchaseVendor || mainVendor
+              vendorNameForTransaction = row.purchaseVendorName || row.vendorName
+            }
+            
             if (!vendorForTransaction) {
               const vendorType = transactionType === 'SALES' ? '판매처' : '매입처'
               throw new Error(`${vendorType}가 필요합니다.`)
             }
-            const vendorNameForTransaction = transactionType === 'SALES' ? row.salesVendorName : row.purchaseVendorName
+            
+            // Calculate margin for legacy format or new format
+            const margin = row.margin || (transactionType === 'SALES' ? (supplyAmount - (row.purchasePrice * row.quantity)) : 0)
+            const marginRate = row.marginRate ? parseFloat(row.marginRate) : (supplyAmount > 0 ? (margin / supplyAmount * 100) : 0)
             
             // Queue sales record for bulk insert
             salesRecordsToCreate.push({
@@ -401,15 +425,15 @@ async function handleTransactionUpload(file: File, options: UploadOptions) {
               customer: vendorNameForTransaction,
               quantity: row.quantity,
               unitPrice: row.unitPrice,
-              amount: row.totalAmount,
-              cost: transactionType === 'SALES' ? (row.totalAmount - row.margin) : 0,
-              margin: row.margin,
-              marginRate: parseFloat(row.marginRate) || 0,
+              amount: supplyAmount,
+              cost: transactionType === 'SALES' ? (supplyAmount - margin) : 0,
+              margin: margin,
+              marginRate: marginRate,
               vatIncluded: true,
               supplyAmount: supplyAmount,
               vatAmount: vatAmount,
               totalAmount: totalWithVat,
-              notes: `엑셀 업로드 (마진: ${row.margin}, 마진율: ${row.marginRate}%)`,
+              notes: row.notes || `엑셀 업로드 (마진: ${margin}, 마진율: ${marginRate.toFixed(2)}%)`,
             })
             
             summary.successRows++
