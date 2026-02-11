@@ -44,21 +44,21 @@ async function main() {
       const currentTotalCost = record.cost
       const unitCost = currentTotalCost / record.quantity
       
-      // Recalculate margin and marginRate
+      // Recalculate margin and marginRate based on unit cost
       const newTotalCost = unitCost * record.quantity
       const newMargin = record.amount - newTotalCost
       const newMarginRate = record.amount > 0 ? (newMargin / record.amount) * 100 : 0
       
       // Check if the cost value appears to already be a unit cost
-      // If converting from total cost to unit cost doesn't change the margin significantly,
-      // it might already be stored as unit cost
-      const currentCalculatedMargin = record.amount - record.cost
-      const newCalculatedMargin = record.amount - newTotalCost
-      const marginDifference = Math.abs(currentCalculatedMargin - newCalculatedMargin)
+      // If cost is already unit cost, then margin should equal amount - (cost × quantity)
+      // If cost is total cost, then margin should equal amount - cost
+      const marginIfUnitCost = record.amount - (record.cost * record.quantity)
+      const marginDifference = Math.abs(record.margin - marginIfUnitCost)
       const marginThreshold = Math.abs(record.amount) * 0.01 // 1% of amount threshold
       
       if (marginDifference <= marginThreshold) {
-        // Margin doesn't change significantly, likely already unit cost
+        // Margin matches what it would be if cost is already unit cost
+        // This record likely already has unit cost, skip it
         skippedCount++
         continue
       }
