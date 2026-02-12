@@ -59,6 +59,7 @@ interface FlowResponse {
     code: string | null
   }
   flows: FlowItem[]
+  unlinkedSales: SalesFlow[]
   summary: {
     totalPurchaseQuantity: number
     totalPurchaseAmount: number
@@ -312,6 +313,31 @@ export default function SalesFlowPage() {
                   )}
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Unlinked Sales Section */}
+          {flowData.unlinkedSales && flowData.unlinkedSales.length > 0 && (
+            <div className="mt-8 border-t pt-6">
+              <h3 className="text-lg font-bold text-gray-700 mb-2">🔸 미연동 매출</h3>
+              <p className="text-sm text-gray-500 mb-4">매입과 직접 연동되지 않은 매출 내역입니다.</p>
+              <div className="space-y-4">
+                {flowData.unlinkedSales.map((sale) => (
+                  <div key={sale.id} className="bg-green-50 p-4 rounded-lg border-l-4 border-green-400">
+                    <div className="font-bold text-green-900 mb-2">
+                      {formatDate(sale.date)} - 매출 (미연동)
+                    </div>
+                    <div className="text-sm text-gray-700">
+                      <div>거래처: {sale.vendorName}</div>
+                      {sale.customer && <div>고객: {sale.customer}</div>}
+                      <div>수량: {formatNumber(sale.quantity, 2)}개 × ₩{formatNumber(sale.unitPrice, 0)} = ₩{formatNumber(sale.amount, 0)}</div>
+                      <div className="text-green-700 font-semibold">
+                        마진: ₩{formatNumber(sale.margin, 0)} ({sale.marginRate.toFixed(1)}%)
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
