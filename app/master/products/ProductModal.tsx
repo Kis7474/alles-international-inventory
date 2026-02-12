@@ -307,7 +307,7 @@ export default function ProductModal({ productId, isOpen, onClose, onSave }: Pro
                     value={formData.code}
                     onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                     className="w-full border rounded px-3 py-2"
-                    placeholder="자동생성 가능"
+                    placeholder="비워두면 자동생성 (예: PRD-202602-0001)"
                   />
                 ) : (
                   <p className="px-3 py-2 bg-gray-50 rounded">{product?.code || '-'}</p>
