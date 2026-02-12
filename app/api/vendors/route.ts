@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { generateVendorCode } from '@/lib/code-generator'
 
 // GET /api/vendors - 거래처 목록 조회
 export async function GET(request: NextRequest) {
@@ -61,9 +62,12 @@ export async function POST(request: NextRequest) {
       notes
     } = body
 
+    // code가 비어있으면 타입에 따라 자동 생성
+    const finalCode = code || await generateVendorCode(prisma, type || 'DOMESTIC')
+
     const vendor = await prisma.vendor.create({
       data: {
-        code: code || `V${Date.now()}`, // 자동 생성
+        code: finalCode,
         name,
         type: type || 'DOMESTIC',
         contactPerson: contactPerson || contact || null,

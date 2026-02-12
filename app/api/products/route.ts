@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { generateProductCode } from '@/lib/code-generator'
 
 // GET /api/products - 통합 품목 목록 조회
 export async function GET(request: Request) {
@@ -144,9 +145,12 @@ export async function POST(request: Request) {
       }
     }
     
+    // code가 비어있으면 자동 생성
+    const finalCode = code || await generateProductCode(prisma)
+
     const product = await prisma.product.create({
       data: {
-        code: code || null,
+        code: finalCode,
         name,
         unit: unit || 'EA',
         type: type || 'PRODUCT', // 기본값 PRODUCT
