@@ -233,7 +233,7 @@ export default function SalesFlowPage() {
                 <div key={index} className="border-l-4 border-blue-400 pl-6 relative">
                   {/* Purchase Node */}
                   <div className="mb-4">
-                    <div className="absolute -left-3 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs">
+                    <div className="absolute -left-3 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs" aria-label="매입 노드">
                       🔵
                     </div>
                     <div className="bg-blue-50 p-4 rounded-lg">
@@ -253,7 +253,7 @@ export default function SalesFlowPage() {
                   {/* Inventory Node */}
                   {flow.inventory && (
                     <div className="mb-4 ml-6">
-                      <div className="absolute -left-3 w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center text-white text-xs">
+                      <div className="absolute -left-3 w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center text-white text-xs" aria-label="재고 노드">
                         📦
                       </div>
                       <div className="bg-orange-50 p-4 rounded-lg">
@@ -275,7 +275,7 @@ export default function SalesFlowPage() {
                     <div className="ml-6 space-y-4">
                       {flow.sales.map((sale) => (
                         <div key={sale.id} className="mb-4">
-                          <div className="absolute -left-3 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-xs">
+                          <div className="absolute -left-3 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-xs" aria-label="매출 노드">
                             🟢
                           </div>
                           <div className="bg-green-50 p-4 rounded-lg">
@@ -299,7 +299,7 @@ export default function SalesFlowPage() {
                   {/* Remaining Stock */}
                   {flow.inventory && flow.inventory.quantityRemaining > 0 && (
                     <div className="ml-6 mt-4">
-                      <div className="absolute -left-3 w-6 h-6 bg-gray-400 rounded-full flex items-center justify-center text-white text-xs">
+                      <div className="absolute -left-3 w-6 h-6 bg-gray-400 rounded-full flex items-center justify-center text-white text-xs" aria-label="잔여 재고 노드">
                         📊
                       </div>
                       <div className="bg-gray-50 p-4 rounded-lg">

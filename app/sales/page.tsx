@@ -773,7 +773,7 @@ export default function SalesPage() {
                         <span 
                           className="cursor-help" 
                           title={`연동 매입: ${record.linkedPurchases.map(p => 
-                            `${p.vendor?.name || '알수없음'} - ₩${formatNumber(p.unitPrice, 0)} × ${formatNumber(p.quantity, 2)}`
+                            `${p.vendor?.name || '알 수 없음'} - ₩${formatNumber(p.unitPrice, 0)} × ${formatNumber(p.quantity, 2)}`
                           ).join(', ')}`}
                         >
                           🔗

@@ -144,8 +144,9 @@ export default function NewSalesPage() {
             if (prices.length > 0) {
               // Get the most recent purchase price before or on the transaction date
               const transactionDate = new Date(formData.date)
+              const transactionTime = transactionDate.getTime()
               const applicablePrice = prices
-                .filter((p: VendorPrice) => new Date(p.effectiveDate) <= transactionDate && p.purchasePrice !== null)
+                .filter((p: VendorPrice) => new Date(p.effectiveDate).getTime() <= transactionTime && p.purchasePrice !== null)
                 .sort((a: VendorPrice, b: VendorPrice) => new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime())[0]
               
               if (applicablePrice && applicablePrice.purchasePrice) {
