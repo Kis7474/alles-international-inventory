@@ -75,6 +75,18 @@ export async function GET(request: NextRequest) {
         category: true,
         product: true,
         vendor: true,
+        linkedPurchases: {
+          select: {
+            id: true,
+            vendorId: true,
+            vendor: { select: { name: true } },
+            unitPrice: true,
+            amount: true,
+            costSource: true,
+            quantity: true,
+            date: true,
+          }
+        },
       },
       orderBy: { date: 'desc' },
       skip: (page - 1) * limit,

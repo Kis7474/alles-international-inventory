@@ -25,6 +25,17 @@ interface Vendor {
   name: string
 }
 
+interface LinkedPurchase {
+  id: number
+  vendorId: number | null
+  vendor: { name: string } | null
+  unitPrice: number
+  amount: number
+  costSource: string | null
+  quantity: number
+  date: string
+}
+
 interface SalesRecord {
   id: number
   date: string
@@ -43,6 +54,9 @@ interface SalesRecord {
   vatIncluded: boolean
   totalAmount: number | null
   notes: string | null
+  costSource?: string | null
+  linkedPurchases?: LinkedPurchase[]
+  linkedSalesId?: number | null
 }
 
 type SortField = 'date' | 'amount' | 'marginRate'
@@ -741,11 +755,32 @@ export default function SalesPage() {
                     }`}>
                       {record.type === 'SALES' ? '매출' : '매입'}
                     </span>
+                    {/* P1: Auto-generated purchase badge */}
+                    {record.type === 'PURCHASE' && record.costSource === 'SALES_AUTO' && (
+                      <span className="ml-1 px-2 py-1 rounded text-xs bg-purple-100 text-purple-800" title={`매출 #${record.linkedSalesId}에서 자동생성`}>
+                        [자동생성]
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-gray-900">
                     {record.vendor?.name || record.customer || '-'}
                   </td>
-                  <td className="px-4 py-3 text-gray-900">{record.itemName}</td>
+                  <td className="px-4 py-3 text-gray-900">
+                    <div className="flex items-center gap-2">
+                      <span>{record.itemName}</span>
+                      {/* P1: Linked purchase indicator for SALES records */}
+                      {record.type === 'SALES' && record.linkedPurchases && record.linkedPurchases.length > 0 && (
+                        <span 
+                          className="cursor-help" 
+                          title={`연동 매입: ${record.linkedPurchases.map(p => 
+                            `${p.vendor?.name || '알수없음'} - ₩${formatNumber(p.unitPrice, 0)} × ${formatNumber(p.quantity, 2)}`
+                          ).join(', ')}`}
+                        >
+                          🔗
+                        </span>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-4 py-3 text-right text-gray-900">
                     {formatNumber(record.quantity, 2)}
                   </td>
