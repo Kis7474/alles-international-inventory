@@ -89,7 +89,7 @@ export async function GET(request: NextRequest) {
       },
       include: {
         vendor: { select: { name: true } },
-        linkedPurchases: {
+        linkedSalesRecord: {
           include: {
             vendor: { select: { name: true } }
           }
@@ -163,19 +163,54 @@ export async function GET(request: NextRequest) {
 
       // Find related sales (linked to this purchase)
       const linkedSales: SalesFlow[] = []
-      if (purchase.linkedPurchases && purchase.linkedPurchases.length > 0) {
-        for (const linkedSale of purchase.linkedPurchases) {
-          linkedSales.push({
-            id: linkedSale.id,
-            date: linkedSale.date.toISOString(),
-            quantity: linkedSale.quantity,
-            unitPrice: linkedSale.unitPrice,
-            amount: linkedSale.amount,
-            vendorName: linkedSale.vendor?.name || '알 수 없음',
-            customer: linkedSale.customer,
-            margin: linkedSale.margin,
-            marginRate: linkedSale.marginRate
-          })
+      const linkedSalesIds = new Set<number>()
+      
+      // Path 1: Direct linked sales via linkedSalesRecord
+      if (purchase.linkedSalesRecord) {
+        linkedSales.push({
+          id: purchase.linkedSalesRecord.id,
+          date: purchase.linkedSalesRecord.date.toISOString(),
+          quantity: purchase.linkedSalesRecord.quantity,
+          unitPrice: purchase.linkedSalesRecord.unitPrice,
+          amount: purchase.linkedSalesRecord.amount,
+          vendorName: purchase.linkedSalesRecord.vendor?.name || '알 수 없음',
+          customer: purchase.linkedSalesRecord.customer,
+          margin: purchase.linkedSalesRecord.margin,
+          marginRate: purchase.linkedSalesRecord.marginRate
+        })
+        linkedSalesIds.add(purchase.linkedSalesRecord.id)
+      }
+      
+      // Path 2: LOT-based sales via InventoryMovement
+      if (inventoryFlow) {
+        const outboundMovements = await prisma.inventoryMovement.findMany({
+          where: {
+            lotId: inventoryFlow.lotId,
+            type: 'OUT',
+            salesRecordId: { not: null }
+          },
+          include: {
+            salesRecord: {
+              include: { vendor: { select: { name: true } } }
+            }
+          }
+        })
+        
+        for (const movement of outboundMovements) {
+          if (movement.salesRecord && !linkedSalesIds.has(movement.salesRecord.id)) {
+            linkedSales.push({
+              id: movement.salesRecord.id,
+              date: movement.salesRecord.date.toISOString(),
+              quantity: movement.salesRecord.quantity,
+              unitPrice: movement.salesRecord.unitPrice,
+              amount: movement.salesRecord.amount,
+              vendorName: movement.salesRecord.vendor?.name || '알 수 없음',
+              customer: movement.salesRecord.customer,
+              margin: movement.salesRecord.margin,
+              marginRate: movement.salesRecord.marginRate
+            })
+            linkedSalesIds.add(movement.salesRecord.id)
+          }
         }
       }
 
@@ -185,6 +220,28 @@ export async function GET(request: NextRequest) {
         sales: linkedSales
       })
     }
+
+    // Path 3: Collect unlinked sales (independent sales not linked to any purchase)
+    const allLinkedSalesIds = new Set<number>()
+    for (const flow of flows) {
+      for (const sale of flow.sales) {
+        allLinkedSalesIds.add(sale.id)
+      }
+    }
+    
+    const unlinkedSales: SalesFlow[] = sales
+      .filter(s => !allLinkedSalesIds.has(s.id))
+      .map(s => ({
+        id: s.id,
+        date: s.date.toISOString(),
+        quantity: s.quantity,
+        unitPrice: s.unitPrice,
+        amount: s.amount,
+        vendorName: s.vendor?.name || '알 수 없음',
+        customer: s.customer,
+        margin: s.margin,
+        marginRate: s.marginRate
+      }))
 
     // Calculate summary
     const totalPurchaseQuantity = purchases.reduce((sum, p) => sum + p.quantity, 0)
@@ -204,6 +261,7 @@ export async function GET(request: NextRequest) {
         code: product.code
       },
       flows,
+      unlinkedSales,
       summary: {
         totalPurchaseQuantity,
         totalPurchaseAmount,
