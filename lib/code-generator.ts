@@ -4,6 +4,7 @@
  * 예: PRD-202602-0001, LOT-202602-0001, SVC-202602-0001
  */
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function generateProductCode(prisma: any): Promise<string> {
   const prefix = 'PRD'
   const dateStr = getDateString()
@@ -15,6 +16,7 @@ export async function generateProductCode(prisma: any): Promise<string> {
   return `${prefix}-${dateStr}-${seq.toString().padStart(4, '0')}`
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function generateLotCode(prisma: any): Promise<string> {
   const prefix = 'LOT'
   const dateStr = getDateString()
@@ -26,6 +28,7 @@ export async function generateLotCode(prisma: any): Promise<string> {
   return `${prefix}-${dateStr}-${seq.toString().padStart(4, '0')}`
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function generateServiceCode(prisma: any): Promise<string> {
   const prefix = 'SVC'
   const dateStr = getDateString()
@@ -37,6 +40,7 @@ export async function generateServiceCode(prisma: any): Promise<string> {
   return `${prefix}-${dateStr}-${seq.toString().padStart(4, '0')}`
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function generateVendorCode(prisma: any, type: string): Promise<string> {
   // PURCHASE → VND, SALES → CST, BOTH → VND
   const prefix = type === 'SALES' ? 'CST' : 'VND'
