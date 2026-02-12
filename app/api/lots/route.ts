@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { calculateUnitCost } from '@/lib/utils'
 import { createAutoPurchaseRecord } from '@/lib/purchase-auto'
+import { generateLotCode } from '@/lib/code-generator'
 
 // Constants
 const DEFAULT_SALESPERSON_ID = 1 // 입고에는 담당자가 없으므로 기본값
@@ -151,11 +152,14 @@ export async function POST(request: NextRequest) {
 
     // LOT 생성과 입고 이력 생성을 트랜잭션으로 처리
     const lot = await prisma.$transaction(async (tx) => {
+      // lotCode가 비어있으면 자동 생성
+      const finalLotCode = lotCode || await generateLotCode(tx)
+
       const newLot = await tx.inventoryLot.create({
         data: {
           itemId: itemId || null,
           productId: productId || null,
-          lotCode: lotCode || null,
+          lotCode: finalLotCode,
           receivedDate: new Date(receivedDate),
           quantityReceived,
           quantityRemaining: quantityReceived,

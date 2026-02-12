@@ -249,9 +249,9 @@ export default function ImportExportPage() {
       {/* 목록 */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         {/* Desktop Table View */}
-        <div className="hidden md:block overflow-x-auto">
+        <div className="hidden md:block overflow-x-auto max-h-[calc(100vh-300px)] overflow-y-auto">
           <table className="min-w-full">
-            <thead className="bg-gray-50 border-b">
+            <thead className="bg-gray-50 border-b sticky top-0 z-10 shadow-sm">
               <tr>
                 <th className="px-4 py-3 w-12">
                   <input

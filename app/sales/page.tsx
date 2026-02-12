@@ -692,10 +692,9 @@ export default function SalesPage() {
       </div>
 
       {/* 매입매출 목록 */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full">
-            <thead className="bg-gray-50">
+      <div className="bg-white rounded-lg shadow overflow-x-auto max-h-[calc(100vh-300px)] overflow-y-auto">
+        <table className="min-w-full">
+          <thead className="bg-gray-50 sticky top-0 z-10 shadow-sm">
               <tr>
                 <th className="px-4 py-3 w-12">
                   <input
@@ -838,11 +837,11 @@ export default function SalesPage() {
               )}
             </tbody>
           </table>
-        </div>
+        
 
         {/* Phase 5: 페이지네이션 UI */}
         {total > 0 && (
-          <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+          <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 sticky bottom-0">
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
               {/* 아이템 표시 정보 */}
               <div className="text-sm text-gray-700">

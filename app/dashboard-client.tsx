@@ -177,38 +177,26 @@ export default function DashboardClient({
         </div>
       </div>
 
-      {/* 빠른 액세스 */}
-      <div className="bg-white rounded-lg shadow p-4 md:p-6 mb-6 md:mb-8">
-        <h2 className="text-lg md:text-xl font-bold mb-3 md:mb-4 text-gray-900">빠른 액세스</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-          <a 
-            href="/sales"
-            className="flex flex-col items-center p-3 md:p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors group min-h-[88px] justify-center"
-          >
-            <span className="text-2xl md:text-3xl mb-2 group-hover:scale-110 transition-transform">➕</span>
-            <span className="text-xs md:text-sm text-center text-gray-700 group-hover:text-blue-700">매출/매입 등록</span>
-          </a>
-          <a 
-            href="/import-export/new"
-            className="flex flex-col items-center p-3 md:p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors group min-h-[88px] justify-center"
-          >
-            <span className="text-2xl md:text-3xl mb-2 group-hover:scale-110 transition-transform">🌍</span>
-            <span className="text-xs md:text-sm text-center text-gray-700 group-hover:text-blue-700">수입/수출 등록</span>
-          </a>
-          <a 
-            href="/warehouse/lots"
-            className="flex flex-col items-center p-3 md:p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors group min-h-[88px] justify-center"
-          >
-            <span className="text-2xl md:text-3xl mb-2 group-hover:scale-110 transition-transform">📥</span>
-            <span className="text-xs md:text-sm text-center text-gray-700 group-hover:text-blue-700">입고 등록</span>
-          </a>
-          <a 
-            href="/warehouse/inventory"
-            className="flex flex-col items-center p-3 md:p-4 bg-gray-50 rounded-lg hover:bg-blue-50 transition-colors group min-h-[88px] justify-center"
-          >
-            <span className="text-2xl md:text-3xl mb-2 group-hover:scale-110 transition-transform">📊</span>
-            <span className="text-xs md:text-sm text-center text-gray-700 group-hover:text-blue-700">재고 조회</span>
-          </a>
+      {/* 빠른 액션 */}
+      <div className="mb-6">
+        <h2 className="text-lg font-bold text-gray-900 mb-3">빠른 액션</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <Link href="/sales" className="bg-white p-4 rounded-lg shadow hover:shadow-md transition-shadow text-center border-l-4 border-green-500">
+            <span className="text-2xl">💰</span>
+            <p className="text-sm font-medium mt-1 text-gray-700">매출 등록</p>
+          </Link>
+          <Link href="/import-export/new" className="bg-white p-4 rounded-lg shadow hover:shadow-md transition-shadow text-center border-l-4 border-blue-500">
+            <span className="text-2xl">🌐</span>
+            <p className="text-sm font-medium mt-1 text-gray-700">수입/수출 등록</p>
+          </Link>
+          <Link href="/warehouse/lots" className="bg-white p-4 rounded-lg shadow hover:shadow-md transition-shadow text-center border-l-4 border-orange-500">
+            <span className="text-2xl">📥</span>
+            <p className="text-sm font-medium mt-1 text-gray-700">입고 등록</p>
+          </Link>
+          <Link href="/warehouse/outbound" className="bg-white p-4 rounded-lg shadow hover:shadow-md transition-shadow text-center border-l-4 border-purple-500">
+            <span className="text-2xl">📤</span>
+            <p className="text-sm font-medium mt-1 text-gray-700">출고 등록</p>
+          </Link>
         </div>
       </div>
 

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { generateServiceCode } from '@/lib/code-generator'
 
 // GET /api/services - 서비스 목록 조회
 export async function GET(request: Request) {
@@ -57,9 +58,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '서비스명을 입력해주세요.' }, { status: 400 })
     }
 
+    // code가 비어있으면 자동 생성
+    const finalCode = code || await generateServiceCode(prisma)
+
     const service = await prisma.service.create({
       data: {
-        code,
+        code: finalCode,
         name,
         description,
         serviceHours: serviceHours ? parseFloat(serviceHours) : null,

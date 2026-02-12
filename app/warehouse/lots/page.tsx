@@ -585,7 +585,7 @@ export default function LotsPage() {
                     setFormData({ ...formData, lotCode: e.target.value })
                   }
                   className="w-full px-3 py-2 border rounded-lg"
-                  placeholder="BL번호, 참조번호 등"
+                  placeholder="비워두면 자동생성 (예: LOT-202602-0001)"
                 />
               </div>
               <div>
@@ -735,9 +735,9 @@ export default function LotsPage() {
       )}
 
       {/* LOT 목록 */}
-      <div className="bg-white rounded-lg shadow overflow-x-auto">
+      <div className="bg-white rounded-lg shadow overflow-x-auto max-h-[calc(100vh-300px)] overflow-y-auto">
         <table className="min-w-full">
-          <thead className="bg-gray-50">
+          <thead className="bg-gray-50 sticky top-0 z-10 shadow-sm">
             <tr>
               <th className="px-4 py-3 w-12">
                 <input

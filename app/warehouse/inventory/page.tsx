@@ -175,9 +175,9 @@ export default function InventoryPage() {
           </div>
           
           {/* Desktop Table View */}
-          <div className="hidden md:block overflow-x-auto">
+          <div className="hidden md:block overflow-x-auto max-h-[calc(100vh-300px)] overflow-y-auto">
             <table className="min-w-full">
-              <thead className="bg-gray-50">
+              <thead className="bg-gray-50 sticky top-0 z-10 shadow-sm">
                 <tr>
                   <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
                     품목
