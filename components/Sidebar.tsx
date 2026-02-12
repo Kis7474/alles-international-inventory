@@ -18,6 +18,7 @@ const menuItems: MenuItem[] = [
     submenu: [
       { href: '/', label: '대시보드', icon: '📊' },
       { href: '/sales', label: '상세내역', icon: '📝' },
+      { href: '/sales/flow', label: '매입매출 흐름', icon: '🔄' },
       {
         label: '리포트',
         icon: '📈',

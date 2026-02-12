@@ -122,7 +122,7 @@ export default function NewSalesPage() {
     }
   }
 
-  const handleProductChange = (productId: string) => {
+  const handleProductChange = async (productId: string) => {
     if (productId) {
       const product = products.find((p) => p.id === parseInt(productId))
       if (product) {
@@ -133,7 +133,31 @@ export default function NewSalesPage() {
         const cost = product.currentCost || 0
         
         // Set default purchase price override
-        const defaultPurchasePrice = product.defaultPurchasePrice || 0
+        let defaultPurchasePrice = product.defaultPurchasePrice || 0
+        
+        // P0: For SALES mode, fetch purchase vendor price if purchaseVendorId exists
+        if (formData.type === 'SALES' && product.purchaseVendorId) {
+          try {
+            const res = await fetch(`/api/vendor-product-prices?productId=${productId}&vendorId=${product.purchaseVendorId}`)
+            const prices: VendorPrice[] = await res.json()
+            
+            if (prices.length > 0) {
+              // Get the most recent purchase price before or on the transaction date
+              const transactionDate = new Date(formData.date)
+              const transactionTime = transactionDate.getTime()
+              const applicablePrice = prices
+                .filter((p: VendorPrice) => new Date(p.effectiveDate).getTime() <= transactionTime && p.purchasePrice !== null)
+                .sort((a: VendorPrice, b: VendorPrice) => new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime())[0]
+              
+              if (applicablePrice && applicablePrice.purchasePrice) {
+                defaultPurchasePrice = applicablePrice.purchasePrice
+              }
+            }
+          } catch (error) {
+            console.error('Error fetching purchase vendor price:', error)
+            // Fall back to defaultPurchasePrice
+          }
+        }
         
         // Set default unit price based on transaction type
         const defaultPrice = formData.type === 'PURCHASE' 
