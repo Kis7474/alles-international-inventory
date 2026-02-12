@@ -113,14 +113,24 @@ export default function Sidebar() {
 
   // localStorage에서 상태 복원
   useEffect(() => {
-    const saved = localStorage.getItem('sidebar-collapsed')
-    if (saved) setCollapsed(saved === 'true')
+    try {
+      const saved = localStorage.getItem('sidebar-collapsed')
+      if (saved) setCollapsed(saved === 'true')
+    } catch (error) {
+      // localStorage not available (SSR) or disabled
+      console.warn('localStorage not available:', error)
+    }
   }, [])
 
   const toggleCollapse = () => {
     const newState = !collapsed
     setCollapsed(newState)
-    localStorage.setItem('sidebar-collapsed', String(newState))
+    try {
+      localStorage.setItem('sidebar-collapsed', String(newState))
+    } catch (error) {
+      // localStorage not available or disabled
+      console.warn('Failed to save sidebar state:', error)
+    }
   }
 
   return (
