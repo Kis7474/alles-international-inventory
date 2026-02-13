@@ -96,6 +96,19 @@ DATABASE_URL="file:./dev.db"
 DATABASE_URL="postgresql://username:password@host/database?sslmode=require"
 ```
 
+### 오프라인/NAS 파일 저장소 설정 (선택)
+PDF 첨부파일은 기본적으로 `public/uploads`에 저장되며, 아래 환경 변수를 사용하면 NAS 마운트 경로로 바로 저장할 수 있습니다.
+
+```bash
+FILE_STORAGE_ROOT="/mnt/nas/alles-inventory/uploads"
+FILE_PUBLIC_BASE_URL="/uploads"
+```
+
+- `FILE_STORAGE_ROOT`: 실제 파일이 저장되는 경로
+- `FILE_PUBLIC_BASE_URL`: DB에 저장될 공개 URL prefix
+
+> NAS 전환 시에는 서버에서 NAS를 마운트한 뒤 `FILE_STORAGE_ROOT`만 교체하면 동일 코드로 운영할 수 있습니다.
+
 ### 4. 데이터베이스 초기화
 ```bash
 npx prisma generate
@@ -680,3 +693,24 @@ MIT
 ## 문의
 
 이슈가 있거나 문의사항이 있으시면 GitHub Issues를 이용해주세요.
+
+
+## 보안/권한 고도화 진행 상태
+
+다음 항목을 단계적으로 확장할 수 있도록 기반을 추가했습니다.
+
+- 파일 업로드 보안 강화
+  - MIME 타입 + PDF 시그니처(`%PDF-`) 이중 검증
+  - UUID 기반 파일명 사용
+  - 업로드 디렉토리 자동 생성
+- 웹 보안 헤더 기본 적용
+  - `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy` 등
+- 사용자/권한 모델(Prisma) 추가
+  - `User`, `UserSession`, `AuditLog`, `UserRole`, `UserStatus`
+
+향후 권장 순서:
+1. 로그인 API(비밀번호 해시 + 세션 발급)
+2. 역할 기반 접근 제어(RBAC) 미들웨어
+3. 주요 API 감사로그(AuditLog) 적재
+4. NAS 이중화/백업 정책 적용
+

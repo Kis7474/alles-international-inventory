@@ -11,6 +11,69 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+
+// ============================================
+// 사용자 인증/권한 관리
+// ============================================
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  STAFF
+  VIEWER
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+model User {
+  id            Int        @id @default(autoincrement())
+  email         String     @unique
+  passwordHash  String
+  name          String
+  role          UserRole   @default(STAFF)
+  status        UserStatus @default(ACTIVE)
+  lastLoginAt   DateTime?
+
+  sessions      UserSession[]
+  auditLogs     AuditLog[]
+
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([role, status])
+}
+
+model UserSession {
+  id         String   @id @default(cuid())
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String   @unique
+  expiresAt  DateTime
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId, expiresAt])
+}
+
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  userId      Int?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action      String
+  resource    String
+  resourceId  String?
+  ipAddress   String?
+  metadata    String?
+  createdAt   DateTime @default(now())
+
+  @@index([action, createdAt])
+  @@index([resource, createdAt])
+}
+
 // ============================================
 // 통합 마스터 데이터
 // ============================================
