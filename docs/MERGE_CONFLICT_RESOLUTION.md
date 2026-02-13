@@ -43,3 +43,15 @@ git push
   - `.env.example`: 새 환경변수 누락 여부
   - `app/api/upload/route.ts`: 인증 가드/파일 검증 로직 누락 여부
   - `prisma/schema.prisma`: 모델/enum 충돌 여부
+
+
+## 빠른 해결(요청 대응용)
+
+충돌 상태에서 아래 한 줄로 바로 처리할 수 있습니다.
+
+```bash
+./scripts/git/fix-pr-conflict-now.sh
+```
+
+- 대상 파일: `.env.example`, `app/api/upload/route.ts`, `prisma/schema.prisma`
+- 전략: 현재 작업 브랜치(ours) 선택 후 자동 커밋

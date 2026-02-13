@@ -94,3 +94,16 @@ sudo APP_DB=alles_inventory APP_USER=alles_app APP_PASSWORD='StrongPass!' ./scri
 ```bash
 NAS_MOUNT=/mnt/nas/alles-inventory/uploads ./scripts/onprem/nas-precheck.sh
 ```
+
+## Git 충돌 즉시 해결 스크립트
+
+### scripts/git/fix-pr-conflict-now.sh
+PR 머지 중 충돌이 난 상태에서 아래 3개 파일을 현재 브랜치 기준으로 즉시 정리하고 커밋합니다.
+
+- `.env.example`
+- `app/api/upload/route.ts`
+- `prisma/schema.prisma`
+
+```bash
+./scripts/git/fix-pr-conflict-now.sh
+```
