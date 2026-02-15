@@ -78,3 +78,32 @@ npx ts-node --compiler-options '{"module":"CommonJS"}' scripts/migrate-materials
 - [ ] SalesRecord의 productId가 설정되었는지 확인
 - [ ] 가격 이력이 정상적으로 마이그레이션되었는지 확인
 - [ ] 기존 데이터와 마이그레이션된 데이터의 일관성 검증
+
+## 온프레/NAS 운영 스크립트
+
+### scripts/onprem/setup-postgres.sh
+온프레 PostgreSQL 서버 1대 초기 설치/기본 보안 설정 자동화 스크립트입니다.
+
+```bash
+sudo APP_DB=alles_inventory APP_USER=alles_app APP_PASSWORD='StrongPass!' ./scripts/onprem/setup-postgres.sh
+```
+
+### scripts/onprem/nas-precheck.sh
+앱 서버에서 NAS 마운트 경로의 쓰기 가능 여부 및 권한/용량을 점검합니다.
+
+```bash
+NAS_MOUNT=/mnt/nas/alles-inventory/uploads ./scripts/onprem/nas-precheck.sh
+```
+
+## Git 충돌 즉시 해결 스크립트
+
+### scripts/git/fix-pr-conflict-now.sh
+PR 머지 중 충돌이 난 상태에서 아래 3개 파일을 현재 브랜치 기준으로 즉시 정리하고 커밋합니다.
+
+- `.env.example`
+- `app/api/upload/route.ts`
+- `prisma/schema.prisma`
+
+```bash
+./scripts/git/fix-pr-conflict-now.sh
+```

@@ -686,6 +686,23 @@ KOREAEXIM_API_KEY="your_api_key"        # 한국수출입은행 환율 API
 UNIPASS_API_KEY="your_api_key"          # 관세청 UNI-PASS API
 ```
 
+## 인증/권한 및 온프레/NAS 실행 문서
+
+최신 확정안(역할 2개, 4계정, 온프레 DB, NAS 후보)은 아래 문서를 참고하세요.
+
+- `docs/ONPREM_NAS_AUTH_PLAN.md`
+- `docs/ROLE_PERMISSION_MATRIX.md`
+
+온프레/NAS 실행 스크립트:
+- `scripts/onprem/setup-postgres.sh`
+- `scripts/onprem/nas-precheck.sh`
+
+기본 인증 API:
+- `POST /api/auth/login`
+- `POST /api/auth/logout`
+- `GET /api/auth/me`
+
+
 ## 라이선스
 
 MIT

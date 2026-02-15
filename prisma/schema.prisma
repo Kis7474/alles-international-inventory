@@ -18,9 +18,7 @@ datasource db {
 
 enum UserRole {
   ADMIN
-  MANAGER
   STAFF
-  VIEWER
 }
 
 enum UserStatus {
@@ -36,6 +34,8 @@ model User {
   role          UserRole   @default(STAFF)
   status        UserStatus @default(ACTIVE)
   lastLoginAt   DateTime?
+  salespersonId Int?       @unique
+  salesperson   Salesperson? @relation(fields: [salespersonId], references: [id])
 
   sessions      UserSession[]
   auditLogs     AuditLog[]
@@ -222,6 +222,7 @@ model Salesperson {
   importExports      ImportExport[]
   inventoryLots      InventoryLot[]
   inventoryMovements InventoryMovement[] // Phase 4: 출고 연동
+  user               User?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
