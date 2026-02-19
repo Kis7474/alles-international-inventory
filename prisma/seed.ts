@@ -1,6 +1,13 @@
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, UserRole } from '@prisma/client'
+import { randomBytes, scryptSync } from 'crypto'
 
 const prisma = new PrismaClient()
+
+function hashPassword(password: string): string {
+  const salt = randomBytes(16).toString('hex')
+  const derived = scryptSync(password, salt, 64).toString('hex')
+  return `${salt}:${derived}`
+}
 
 async function main() {
   console.log('🌱 Starting seed...')
@@ -22,6 +29,46 @@ async function main() {
     })
   }
   console.log('✅ Salespersons created')
+
+  const salespersonMap = new Map(
+    (await prisma.salesperson.findMany({ where: { code: { in: ['BS', 'SJ', 'YR', 'IK'] } } }))
+      .filter((s) => s.code)
+      .map((s) => [s.code as string, s.id])
+  )
+
+  // Seed auth users (2 ADMIN + 2 STAFF)
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD || 'ChangeMeAdmin!123'
+  const staffPassword = process.env.SEED_STAFF_PASSWORD || 'ChangeMeStaff!123'
+
+  const users: Array<{ email: string; name: string; role: UserRole; salespersonCode: string; password: string }> = [
+    { email: 'bs@alles.local', name: 'BS', role: 'ADMIN', salespersonCode: 'BS', password: adminPassword },
+    { email: 'sj@alles.local', name: 'SJ', role: 'ADMIN', salespersonCode: 'SJ', password: adminPassword },
+    { email: 'yr@alles.local', name: 'YR', role: 'STAFF', salespersonCode: 'YR', password: staffPassword },
+    { email: 'ik@alles.local', name: 'IK', role: 'STAFF', salespersonCode: 'IK', password: staffPassword },
+  ]
+
+  console.log('Creating auth users...')
+  for (const user of users) {
+    await prisma.user.upsert({
+      where: { email: user.email },
+      update: {
+        name: user.name,
+        role: user.role,
+        status: 'ACTIVE',
+        passwordHash: hashPassword(user.password),
+        salespersonId: salespersonMap.get(user.salespersonCode),
+      },
+      create: {
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        status: 'ACTIVE',
+        passwordHash: hashPassword(user.password),
+        salespersonId: salespersonMap.get(user.salespersonCode),
+      },
+    })
+  }
+  console.log('✅ Auth users created (4 accounts)')
 
   // Seed Product Categories
   const categories = [

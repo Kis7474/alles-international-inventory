@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireRole } from '@/lib/auth'
 
 // GET /api/settings - Get a system setting by key
 export async function GET(request: NextRequest) {
+  const { error } = await requireRole(request, ['ADMIN'])
+  if (error) return error
+
   try {
     const searchParams = request.nextUrl.searchParams
     const key = searchParams.get('key')
@@ -40,6 +44,9 @@ export async function GET(request: NextRequest) {
 
 // POST /api/settings - Create or update a system setting
 export async function POST(request: NextRequest) {
+  const { error } = await requireRole(request, ['ADMIN'])
+  if (error) return error
+
   try {
     const body = await request.json()
     const { key, value } = body
