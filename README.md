@@ -125,6 +125,150 @@ npm run dev
 http://localhost:3000
 ```
 
+## Windows에서 실행하는 방법 (상세 가이드)
+
+아래는 **Windows 10/11 + PowerShell** 기준입니다. 처음 세팅하는 경우를 가정해, 설치부터 실행/DB/Seed 여부까지 순서대로 정리했습니다.
+
+### 0) 사전 준비
+
+1. **Node.js LTS 설치**
+   - 권장: Node.js 20 LTS
+   - 설치 후 PowerShell에서 확인:
+   ```powershell
+   node -v
+   npm -v
+   ```
+
+2. **Git 설치**
+   - 설치 후 확인:
+   ```powershell
+   git --version
+   ```
+
+3. **PostgreSQL 준비** (로컬 설치 또는 클라우드 DB)
+   - 이 프로젝트의 Prisma datasource는 PostgreSQL 기준입니다.
+   - 로컬 DB를 쓸 경우 DB/계정 생성 후 연결 문자열을 준비합니다.
+
+4. (선택) **Visual Studio Code** 설치
+   - TypeScript/ESLint 확인이 편해집니다.
+
+---
+
+### 1) 저장소 클론
+
+```powershell
+git clone https://github.com/Kis7474/alles-international-inventory.git
+cd alles-international-inventory
+```
+
+---
+
+### 2) 의존성 설치
+
+```powershell
+npm install
+```
+
+> `postinstall`에서 Prisma Client가 자동 생성됩니다.
+
+---
+
+### 3) 환경 변수(.env) 설정
+
+1. `.env.example`을 복사해 `.env` 파일 생성
+2. 최소한 아래 값을 설정
+
+```env
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DB_NAME?schema=public"
+DIRECT_URL="postgresql://USER:PASSWORD@HOST:5432/DB_NAME?schema=public"
+```
+
+#### 인증 Seed를 쓸 경우(권장) 추가 변수
+
+```env
+SEED_ADMIN_PASSWORD="원하는관리자비밀번호"
+SEED_STAFF_PASSWORD="원하는일반사용자비밀번호"
+```
+
+#### (선택) 파일 저장 경로 설정
+
+```env
+FILE_STORAGE_ROOT="C:/alles/uploads"
+FILE_PUBLIC_BASE_URL="/uploads"
+```
+
+> Windows 경로는 `/` 또는 `\\` 형태를 일관되게 사용하세요.
+
+---
+
+### 4) DB 스키마 반영
+
+```powershell
+npx prisma generate
+npx prisma db push
+```
+
+스키마가 정상인지 빠르게 확인하려면:
+
+```powershell
+npx prisma studio
+```
+
+---
+
+### 5) Seed 필요 여부 (중요)
+
+- **필수는 아님**: 빈 DB로도 앱 자체는 실행됩니다.
+- **권장**: 로그인/기초 마스터 데이터(담당자, 계정 등)를 바로 확인하려면 seed 실행을 권장합니다.
+
+```powershell
+npx prisma db seed
+```
+
+---
+
+### 6) 개발 서버 실행
+
+```powershell
+npm run dev
+```
+
+브라우저 접속:
+
+```text
+http://localhost:3000
+```
+
+---
+
+### 7) 최초 구동 체크리스트 (Smoke Check)
+
+1. 로그인 페이지 접근 가능 여부 확인
+2. 기본 목록 페이지(예: 매입매출/품목) 진입 가능 여부 확인
+3. API 에러 없이 초기 데이터 로딩되는지 확인
+
+---
+
+### 8) Windows에서 자주 겪는 이슈
+
+1. **`DATABASE_URL` 오류**
+   - 공백/따옴표 누락, 비밀번호 특수문자 인코딩을 확인하세요.
+
+2. **포트 충돌(3000 사용 중)**
+   ```powershell
+   $env:PORT=3001
+   npm run dev
+   ```
+
+3. **Prisma 연결 실패**
+   - 방화벽, DB host 접근 허용, `DIRECT_URL` 오타를 점검하세요.
+
+4. **권한 문제(파일 저장 경로)**
+   - `FILE_STORAGE_ROOT`를 사용자 쓰기 가능한 경로로 지정하세요.
+
+5. **줄바꿈/인코딩 문제**
+   - `.env`는 UTF-8로 저장하고, 숨김 확장자(`.env.txt`)가 아닌지 확인하세요.
+
 ## 클라우드 배포 (Vercel + Neon PostgreSQL)
 
 여러 컴퓨터에서 2-3명이 동시에 사용하려면 클라우드에 배포하세요.
@@ -730,4 +874,3 @@ MIT
 2. 역할 기반 접근 제어(RBAC) 미들웨어
 3. 주요 API 감사로그(AuditLog) 적재
 4. NAS 이중화/백업 정책 적용
-
