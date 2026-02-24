@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getProductCurrentCost } from '@/lib/product-cost'
+import { jsonSuccess, jsonError } from '@/lib/api-response'
+import { getProductCostForSales } from '@/lib/cost-service'
 
 // Type definitions
 interface LotWhereClause {
@@ -130,7 +131,7 @@ export async function POST(request: NextRequest) {
         }
 
         // 원가 계산: 단위당 원가 및 총 원가
-        const costData = await getProductCurrentCost(productId)
+        const costData = await getProductCostForSales(productId)
         const unitCostValue = costData.cost  // 단위당 원가
         const totalCost = unitCostValue * quantity  // 마진 계산용
 
@@ -321,7 +322,7 @@ export async function POST(request: NextRequest) {
     // 중요: 출고 시에는 updateProductCurrentCost를 호출하지 않음
     // 원가는 월말 창고료 배분 시에만 업데이트됨
 
-    return NextResponse.json({
+    return jsonSuccess({
       success: true,
       totalQuantity: quantity,
       totalCost: totalOutboundCost,
@@ -330,10 +331,7 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('Error processing outbound:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : '출고 처리 중 오류가 발생했습니다.' },
-      { status: 500 }
-    )
+    return jsonError(error instanceof Error ? error.message : '출고 처리 중 오류가 발생했습니다.', 500)
   }
 }
 
@@ -390,13 +388,10 @@ export async function GET(request: NextRequest) {
       ],
     })
 
-    return NextResponse.json(movements)
+    return jsonSuccess(movements)
   } catch (error) {
     console.error('Error fetching outbound history:', error)
-    return NextResponse.json(
-      { error: '출고 이력 조회 중 오류가 발생했습니다.' },
-      { status: 500 }
-    )
+    return jsonError('출고 이력 조회 중 오류가 발생했습니다.', 500)
   }
 }
 
@@ -467,7 +462,7 @@ export async function DELETE(request: NextRequest) {
         }
       })
 
-      return NextResponse.json({ success: true, count: body.ids.length })
+      return jsonSuccess({ success: true, count: body.ids.length })
     }
 
     // Single delete
@@ -533,12 +528,9 @@ export async function DELETE(request: NextRequest) {
       }
     })
 
-    return NextResponse.json({ success: true })
+    return jsonSuccess({ success: true })
   } catch (error) {
     console.error('Error deleting outbound record:', error)
-    return NextResponse.json(
-      { error: '출고 내역 삭제 중 오류가 발생했습니다.' },
-      { status: 500 }
-    )
+    return jsonError('출고 내역 삭제 중 오류가 발생했습니다.', 500)
   }
 }

@@ -1,3 +1,7 @@
+/**
+ * NOTE: Core cost calculation module.
+ * Prefer importing via `@/lib/cost-service` from routes/services for a single entry point.
+ */
 import { prisma } from '@/lib/prisma'
 
 /**
