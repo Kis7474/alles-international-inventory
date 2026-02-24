@@ -1,3 +1,7 @@
+/**
+ * NOTE: Deprecated/estimated storage cost module (kept for compatibility).
+ * Prefer importing via `@/lib/cost-service` from routes/services for a single entry point.
+ */
 import { prisma } from './prisma'
 
 /**

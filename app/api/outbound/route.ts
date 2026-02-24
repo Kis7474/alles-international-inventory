@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { jsonSuccess, jsonError } from '@/lib/api-response'
-import { getProductCurrentCost } from '@/lib/product-cost'
+import { getProductCostForSales } from '@/lib/cost-service'
 
 // Type definitions
 interface LotWhereClause {
@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
         }
 
         // 원가 계산: 단위당 원가 및 총 원가
-        const costData = await getProductCurrentCost(productId)
+        const costData = await getProductCostForSales(productId)
         const unitCostValue = costData.cost  // 단위당 원가
         const totalCost = unitCostValue * quantity  // 마진 계산용
 

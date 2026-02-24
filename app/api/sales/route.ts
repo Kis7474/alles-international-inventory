@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { jsonSuccess, jsonError } from '@/lib/api-response'
+import { getProductCostForSales } from '@/lib/cost-service'
 
 // GET /api/sales - 매입매출 목록 조회
 export async function GET(request: NextRequest) {
@@ -141,8 +142,7 @@ export async function POST(request: NextRequest) {
     if (type === 'SALES') {
       if (productId) {
         // 서버에서 currentCost 조회
-        const { getProductCurrentCost } = await import('@/lib/product-cost')
-        const costData = await getProductCurrentCost(parseInt(productId))
+        const costData = await getProductCostForSales(parseInt(productId))
         
         // costSource 설정
         if (costData.source === 'CURRENT') {
@@ -269,8 +269,7 @@ export async function PUT(request: NextRequest) {
     if (type === 'SALES') {
       if (productId) {
         // 서버에서 currentCost 조회
-        const { getProductCurrentCost } = await import('@/lib/product-cost')
-        const costData = await getProductCurrentCost(parseInt(productId))
+        const costData = await getProductCostForSales(parseInt(productId))
         
         // costSource 설정
         if (costData.source === 'CURRENT') {
