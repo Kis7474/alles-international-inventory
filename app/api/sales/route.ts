@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+<<<<<<< HEAD
 import { enforceStaffSalespersonOwnership, getScopedSalespersonId, requireRole } from '@/lib/auth'
 
 function toInt(value: string | null): number | null {
@@ -7,6 +8,10 @@ function toInt(value: string | null): number | null {
   const parsed = parseInt(value, 10)
   return Number.isNaN(parsed) ? null : parsed
 }
+=======
+import { jsonSuccess, jsonError } from '@/lib/api-response'
+import { getProductCostForSales } from '@/lib/cost-service'
+>>>>>>> 5e02a0b28e16c0bb1f41f77341749aaf1e50ffd3
 
 // GET /api/sales - 매입매출 목록 조회
 export async function GET(request: NextRequest) {
@@ -95,7 +100,7 @@ export async function GET(request: NextRequest) {
 
     const total = await prisma.salesRecord.count({ where })
 
-    return NextResponse.json({
+    return jsonSuccess({
       data: sales,
       pagination: {
         page,
@@ -104,9 +109,15 @@ export async function GET(request: NextRequest) {
         totalPages: Math.ceil(total / limit),
       },
     })
+<<<<<<< HEAD
   } catch (routeError) {
     console.error('Error fetching sales:', routeError)
     return NextResponse.json({ error: '매입매출 조회 중 오류가 발생했습니다.' }, { status: 500 })
+=======
+  } catch (error) {
+    console.error('Error fetching sales:', error)
+    return jsonError('매입매출 조회 중 오류가 발생했습니다.', 500)
+>>>>>>> 5e02a0b28e16c0bb1f41f77341749aaf1e50ffd3
   }
 }
 
@@ -148,9 +159,16 @@ export async function POST(request: NextRequest) {
 
     if (type === 'SALES') {
       if (productId) {
+<<<<<<< HEAD
         const { getProductCurrentCost } = await import('@/lib/product-cost')
         const costData = await getProductCurrentCost(parseInt(productId))
 
+=======
+        // 서버에서 currentCost 조회
+        const costData = await getProductCostForSales(parseInt(productId))
+        
+        // costSource 설정
+>>>>>>> 5e02a0b28e16c0bb1f41f77341749aaf1e50ffd3
         if (costData.source === 'CURRENT') {
           costSource = 'PRODUCT_CURRENT'
           finalCost = costData.cost
@@ -231,9 +249,15 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(salesRecord, { status: 201 })
+<<<<<<< HEAD
   } catch (routeError) {
     console.error('Error creating sales record:', routeError)
     return NextResponse.json({ error: '매입매출 등록 중 오류가 발생했습니다.' }, { status: 500 })
+=======
+  } catch (error) {
+    console.error('Error creating sales record:', error)
+    return jsonError('매입매출 등록 중 오류가 발생했습니다.', 500)
+>>>>>>> 5e02a0b28e16c0bb1f41f77341749aaf1e50ffd3
   }
 }
 
@@ -269,9 +293,16 @@ export async function PUT(request: NextRequest) {
 
     if (type === 'SALES') {
       if (productId) {
+<<<<<<< HEAD
         const { getProductCurrentCost } = await import('@/lib/product-cost')
         const costData = await getProductCurrentCost(parseInt(productId))
 
+=======
+        // 서버에서 currentCost 조회
+        const costData = await getProductCostForSales(parseInt(productId))
+        
+        // costSource 설정
+>>>>>>> 5e02a0b28e16c0bb1f41f77341749aaf1e50ffd3
         if (costData.source === 'CURRENT') {
           costSource = 'PRODUCT_CURRENT'
           finalCost = costData.cost
@@ -321,9 +352,15 @@ export async function PUT(request: NextRequest) {
     })
 
     return NextResponse.json(salesRecord)
+<<<<<<< HEAD
   } catch (routeError) {
     console.error('Error updating sales record:', routeError)
     return NextResponse.json({ error: '매입매출 수정 중 오류가 발생했습니다.' }, { status: 500 })
+=======
+  } catch (error) {
+    console.error('Error updating sales record:', error)
+    return jsonError('매입매출 수정 중 오류가 발생했습니다.', 500)
+>>>>>>> 5e02a0b28e16c0bb1f41f77341749aaf1e50ffd3
   }
 }
 
@@ -382,8 +419,14 @@ export async function DELETE(request: NextRequest) {
     await prisma.salesRecord.delete({ where: { id: parsedId } })
 
     return NextResponse.json({ success: true })
+<<<<<<< HEAD
   } catch (routeError) {
     console.error('Error deleting sales record:', routeError)
     return NextResponse.json({ error: '매입매출 삭제 중 오류가 발생했습니다.' }, { status: 500 })
+=======
+  } catch (error) {
+    console.error('Error deleting sales record:', error)
+    return jsonError('매입매출 삭제 중 오류가 발생했습니다.', 500)
+>>>>>>> 5e02a0b28e16c0bb1f41f77341749aaf1e50ffd3
   }
 }
