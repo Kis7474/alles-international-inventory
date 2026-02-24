@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { jsonSuccess, jsonError } from '@/lib/api-response'
 
 // GET /api/sales - 매입매출 목록 조회
 export async function GET(request: NextRequest) {
@@ -95,7 +96,7 @@ export async function GET(request: NextRequest) {
 
     const total = await prisma.salesRecord.count({ where })
 
-    return NextResponse.json({
+    return jsonSuccess({
       data: sales,
       pagination: {
         page,
@@ -106,10 +107,7 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('Error fetching sales:', error)
-    return NextResponse.json(
-      { error: '매입매출 조회 중 오류가 발생했습니다.' },
-      { status: 500 }
-    )
+    return jsonError('매입매출 조회 중 오류가 발생했습니다.', 500)
   }
 }
 
@@ -237,10 +235,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(salesRecord, { status: 201 })
   } catch (error) {
     console.error('Error creating sales record:', error)
-    return NextResponse.json(
-      { error: '매입매출 등록 중 오류가 발생했습니다.' },
-      { status: 500 }
-    )
+    return jsonError('매입매출 등록 중 오류가 발생했습니다.', 500)
   }
 }
 
@@ -332,10 +327,7 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json(salesRecord)
   } catch (error) {
     console.error('Error updating sales record:', error)
-    return NextResponse.json(
-      { error: '매입매출 수정 중 오류가 발생했습니다.' },
-      { status: 500 }
-    )
+    return jsonError('매입매출 수정 중 오류가 발생했습니다.', 500)
   }
 }
 
@@ -394,9 +386,6 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Error deleting sales record:', error)
-    return NextResponse.json(
-      { error: '매입매출 삭제 중 오류가 발생했습니다.' },
-      { status: 500 }
-    )
+    return jsonError('매입매출 삭제 중 오류가 발생했습니다.', 500)
   }
 }

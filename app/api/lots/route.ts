@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { jsonSuccess, jsonError } from '@/lib/api-response'
 import { calculateUnitCost } from '@/lib/utils'
 import { createAutoPurchaseRecord } from '@/lib/purchase-auto'
 import { generateLotCode } from '@/lib/code-generator'
@@ -77,7 +78,7 @@ export async function GET(request: NextRequest) {
 
     const total = await prisma.inventoryLot.count({ where })
 
-    return NextResponse.json({
+    return jsonSuccess({
       data: lots,
       pagination: {
         page,
@@ -88,10 +89,7 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('Error fetching lots:', error)
-    return NextResponse.json(
-      { error: 'LOT 조회 중 오류가 발생했습니다.' },
-      { status: 500 }
-    )
+    return jsonError('LOT 조회 중 오류가 발생했습니다.', 500)
   }
 }
 
@@ -229,10 +227,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(lot, { status: 201 })
   } catch (error) {
     console.error('Error creating lot:', error)
-    return NextResponse.json(
-      { error: '입고 등록 중 오류가 발생했습니다.' },
-      { status: 500 }
-    )
+    return jsonError('입고 등록 중 오류가 발생했습니다.', 500)
   }
 }
 
@@ -275,10 +270,7 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json(lot)
   } catch (error) {
     console.error('Error updating lot:', error)
-    return NextResponse.json(
-      { error: 'LOT 수정 중 오류가 발생했습니다.' },
-      { status: 500 }
-    )
+    return jsonError('LOT 수정 중 오류가 발생했습니다.', 500)
   }
 }
 

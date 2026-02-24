@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { jsonSuccess, jsonError } from '@/lib/api-response'
 import { 
   createLotsFromItems, 
   createSingleLot, 
@@ -139,7 +140,7 @@ export async function GET(request: NextRequest) {
 
     const total = await prisma.importExport.count({ where })
 
-    return NextResponse.json({
+    return jsonSuccess({
       data: records,
       pagination: {
         page,
@@ -150,10 +151,7 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('Error fetching import/export records:', error)
-    return NextResponse.json(
-      { error: '수입/수출 내역 조회 중 오류가 발생했습니다.' },
-      { status: 500 }
-    )
+    return jsonError('수입/수출 내역 조회 중 오류가 발생했습니다.', 500)
   }
 }
 
@@ -392,10 +390,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(record, { status: 201 })
   } catch (error) {
     console.error('Error creating import/export record:', error)
-    return NextResponse.json(
-      { error: '수입/수출 등록 중 오류가 발생했습니다.' },
-      { status: 500 }
-    )
+    return jsonError('수입/수출 등록 중 오류가 발생했습니다.', 500)
   }
 }
 
@@ -689,10 +684,7 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json(record)
   } catch (error) {
     console.error('Error updating import/export record:', error)
-    return NextResponse.json(
-      { error: '수입/수출 수정 중 오류가 발생했습니다.' },
-      { status: 500 }
-    )
+    return jsonError('수입/수출 수정 중 오류가 발생했습니다.', 500)
   }
 }
 
@@ -830,9 +822,6 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Error deleting import/export record:', error)
-    return NextResponse.json(
-      { error: '수입/수출 삭제 중 오류가 발생했습니다.' },
-      { status: 500 }
-    )
+    return jsonError('수입/수출 삭제 중 오류가 발생했습니다.', 500)
   }
 }
