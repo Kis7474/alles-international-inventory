@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { isAdminOnlyPath } from '@/lib/access-control'
+import { shouldProtectPath, shouldRedirectProjectCreate } from '@/lib/protected-routes'
 
 const PUBLIC_API_PATHS = new Set(['/api/auth/login'])
-const PUBLIC_PAGE_PATHS = new Set(['/login'])
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -12,41 +12,15 @@ export function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-<<<<<<< HEAD
-  const sessionToken = request.cookies.get('session_token')?.value
-
-=======
->>>>>>> b9c362aca80a27619e8a3efd45531a38a11ee930
   if (PUBLIC_API_PATHS.has(pathname)) {
     return NextResponse.next()
   }
 
-<<<<<<< HEAD
-  if (PUBLIC_PAGE_PATHS.has(pathname)) {
-    if (sessionToken) {
-      return NextResponse.redirect(new URL('/', request.url))
-    }
+  if (!shouldProtectPath(pathname)) {
     return NextResponse.next()
   }
 
-  const shouldProtect = pathname.startsWith('/api/') || !pathname.startsWith('/api/')
-=======
-  const shouldProtect =
-    pathname.startsWith('/api/') ||
-    pathname.startsWith('/sales') ||
-    pathname.startsWith('/import-export') ||
-    pathname.startsWith('/warehouse') ||
-    pathname.startsWith('/master') ||
-    pathname.startsWith('/projects') ||
-    pathname.startsWith('/services') ||
-    pathname.startsWith('/documents') ||
-    pathname.startsWith('/settings')
->>>>>>> b9c362aca80a27619e8a3efd45531a38a11ee930
-
-  if (!shouldProtect) {
-    return NextResponse.next()
-  }
-
+  const sessionToken = request.cookies.get('session_token')?.value
   if (!sessionToken) {
     if (pathname.startsWith('/api/')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -57,7 +31,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  if (pathname.startsWith('/projects/new')) {
+  if (shouldRedirectProjectCreate(pathname)) {
     return NextResponse.redirect(new URL('/projects', request.url))
   }
 
