@@ -1,16 +1,26 @@
 'use client'
 
 import Link from 'next/link'
+<<<<<<< HEAD
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 
 type UserRole = 'ADMIN' | 'STAFF'
+=======
+import { usePathname } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { canAccessMenu, type UserRole } from '@/lib/access-control'
+>>>>>>> b9c362aca80a27619e8a3efd45531a38a11ee930
 
 interface MenuItem {
   href?: string
   label: string
   icon: string
+<<<<<<< HEAD
   allowedRoles?: UserRole[]
+=======
+  adminOnly?: boolean
+>>>>>>> b9c362aca80a27619e8a3efd45531a38a11ee930
   submenu?: MenuItem[]
 }
 
@@ -53,11 +63,11 @@ const menuItems: MenuItem[] = [
     ],
   },
   {
-    label: '프로젝트',
-    icon: '🚀',
+    label: '서비스',
+    icon: '🛠️',
     submenu: [
+      { href: '/services', label: '서비스', icon: '🔧' },
       { href: '/projects', label: '프로젝트 목록', icon: '📋' },
-      { href: '/projects/new', label: '프로젝트 등록', icon: '➕' },
       { href: '/projects/report', label: '프로젝트 리포트', icon: '📊' },
     ],
   },
@@ -68,6 +78,7 @@ const menuItems: MenuItem[] = [
       { href: '/documents', label: '문서 대시보드', icon: '📊' },
       { href: '/documents/quotation', label: '견적서', icon: '📝' },
       { href: '/documents/transaction-statement', label: '거래명세서', icon: '📋' },
+      { href: '/documents/monthly-vendor', label: '거래처 월합명세서', icon: '🗓️' },
     ],
   },
   {
@@ -76,13 +87,17 @@ const menuItems: MenuItem[] = [
     submenu: [
       { href: '/sales/vendors', label: '거래처', icon: '🏢' },
       { href: '/master/products', label: '품목관리', icon: '📦' },
-      { href: '/master/services', label: '서비스', icon: '🔧' },
       { href: '/categories', label: '카테고리', icon: '📋' },
       { href: '/salesperson', label: '담당자', icon: '👤' },
       { href: '/master/vendor-prices', label: '가격', icon: '💰' },
+<<<<<<< HEAD
       { href: '/settings/unipass', label: '유니패스 설정', icon: '🔐', allowedRoles: ['ADMIN'] },
       { href: '/master/upload', label: '엑셀 업로드', icon: '📤' },
       { href: '/account/password', label: '비밀번호 변경', icon: '🔑' },
+=======
+      { href: '/settings/unipass', label: '유니패스 설정', icon: '🔐', adminOnly: true },
+      { href: '/master/upload', label: '엑셀 업로드', icon: '📤', adminOnly: true },
+>>>>>>> b9c362aca80a27619e8a3efd45531a38a11ee930
     ],
   },
 ]
@@ -103,6 +118,7 @@ export default function Sidebar() {
   const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
+<<<<<<< HEAD
   const [salesOpen, setSalesOpen] = useState(pathname.startsWith('/sales'))
   const [importExportOpen, setImportExportOpen] = useState(
     pathname.startsWith('/import-export') || pathname.startsWith('/exchange-rates') || pathname.startsWith('/customs')
@@ -130,6 +146,31 @@ export default function Sidebar() {
     }
 
     loadSession()
+=======
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
+    '매입/매출': pathname.startsWith('/sales'),
+    '수입/수출': pathname.startsWith('/import-export') || pathname.startsWith('/exchange-rates') || pathname.startsWith('/customs'),
+    '재고 관리': pathname.startsWith('/warehouse'),
+    '서비스': pathname.startsWith('/services') || pathname.startsWith('/projects'),
+    '문서 관리': pathname.startsWith('/documents'),
+    '설정': pathname.startsWith('/sales/vendors') || pathname.startsWith('/salesperson') || pathname.startsWith('/categories') || pathname.startsWith('/master/') || pathname.startsWith('/settings/'),
+  })
+  const [userRole, setUserRole] = useState<UserRole | null>(null)
+
+  useEffect(() => {
+    const loadUserRole = async () => {
+      try {
+        const res = await fetch('/api/auth/me')
+        if (!res.ok) return
+        const data = await res.json()
+        setUserRole(data?.user?.role ?? null)
+      } catch {
+        setUserRole(null)
+      }
+    }
+
+    loadUserRole()
+>>>>>>> b9c362aca80a27619e8a3efd45531a38a11ee930
   }, [])
 
   useEffect(() => {
@@ -142,15 +183,23 @@ export default function Sidebar() {
   }, [])
 
   const toggleCollapse = () => {
+<<<<<<< HEAD
     const nextState = !collapsed
     setCollapsed(nextState)
     try {
       localStorage.setItem('sidebar-collapsed', String(nextState))
+=======
+    const next = !collapsed
+    setCollapsed(next)
+    try {
+      localStorage.setItem('sidebar-collapsed', String(next))
+>>>>>>> b9c362aca80a27619e8a3efd45531a38a11ee930
     } catch {
       // noop
     }
   }
 
+<<<<<<< HEAD
   const scopedMenuItems = useMemo(() => filterMenuByRole(menuItems, role), [role])
 
   const onLogout = async () => {
@@ -158,6 +207,9 @@ export default function Sidebar() {
     router.push('/login')
     router.refresh()
   }
+=======
+  const isVisible = (item: MenuItem) => canAccessMenu(userRole, item.adminOnly)
+>>>>>>> b9c362aca80a27619e8a3efd45531a38a11ee930
 
   return (
     <>
@@ -170,11 +222,15 @@ export default function Sidebar() {
       </button>
 
       <aside
+<<<<<<< HEAD
         className={`
           fixed inset-y-0 left-0 z-40 overflow-y-auto bg-gray-800 text-white transition-all duration-300 ease-in-out md:static
           ${collapsed ? 'w-16' : 'w-64'}
           ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
         `}
+=======
+        className={`fixed md:static inset-y-0 left-0 z-40 ${collapsed ? 'w-16' : 'w-64'} bg-gray-800 text-white overflow-y-auto transform transition-all duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
+>>>>>>> b9c362aca80a27619e8a3efd45531a38a11ee930
       >
         <div className="p-4 md:p-6">
           <div className="mb-6 md:mb-8">
@@ -184,14 +240,22 @@ export default function Sidebar() {
               </div>
             ) : (
               <>
+<<<<<<< HEAD
                 <h1 className="text-xl font-bold text-white md:text-2xl">알레스인터네셔날</h1>
                 <p className="mt-1 text-xs text-gray-400">ERP 시스템</p>
                 {displayName && <p className="mt-2 text-xs text-blue-200">로그인: {displayName} ({role})</p>}
+=======
+                <h1 className="text-xl md:text-2xl font-bold text-white">알레스인터네셔날</h1>
+                <p className="text-xs text-gray-400 mt-1">ERP 시스템</p>
+                <p className="text-[11px] mt-1 text-blue-300">권한: {userRole ?? 'GUEST'}</p>
+>>>>>>> b9c362aca80a27619e8a3efd45531a38a11ee930
               </>
             )}
           </div>
+
           <nav>
             <ul className="space-y-2">
+<<<<<<< HEAD
               {scopedMenuItems.map((item) => {
                 if (item.submenu) {
                   const isSales = item.label === '매입/매출'
@@ -233,6 +297,16 @@ export default function Sidebar() {
                       <button
                         onClick={toggleFunc}
                         className="flex w-full items-center justify-between rounded-lg px-4 py-3 text-white transition-colors duration-150 hover:bg-gray-700"
+=======
+              {menuItems.filter(isVisible).map((item) => {
+                if (item.submenu) {
+                  const expanded = !!openGroups[item.label]
+                  return (
+                    <li key={item.label}>
+                      <button
+                        onClick={() => setOpenGroups((prev) => ({ ...prev, [item.label]: !expanded }))}
+                        className="w-full flex items-center justify-between px-4 py-3 rounded-lg hover:bg-gray-700 transition-colors duration-150 text-white"
+>>>>>>> b9c362aca80a27619e8a3efd45531a38a11ee930
                         title={collapsed ? item.label : undefined}
                       >
                         {collapsed ? (
@@ -243,13 +317,22 @@ export default function Sidebar() {
                               <span className="text-xl">{item.icon}</span>
                               <span>{item.label}</span>
                             </div>
+<<<<<<< HEAD
                             <span className="text-sm">{isExpanded ? '▼' : '▶'}</span>
+=======
+                            <span className="text-sm">{expanded ? '▼' : '▶'}</span>
+>>>>>>> b9c362aca80a27619e8a3efd45531a38a11ee930
                           </>
                         )}
                       </button>
-                      {isExpanded && !collapsed && (
+
+                      {expanded && !collapsed && (
                         <ul className="ml-4 mt-2 space-y-1">
+<<<<<<< HEAD
                           {item.submenu.map((subItem) => {
+=======
+                          {item.submenu.filter(isVisible).map((subItem) => {
+>>>>>>> b9c362aca80a27619e8a3efd45531a38a11ee930
                             if (subItem.submenu) {
                               return (
                                 <li key={subItem.label} className="mt-2">
@@ -257,17 +340,21 @@ export default function Sidebar() {
                                     {subItem.label} {subItem.icon}
                                   </div>
                                   <ul className="ml-2 mt-1 space-y-1">
-                                    {subItem.submenu.map((nestedItem) => {
+                                    {subItem.submenu.filter(isVisible).map((nestedItem) => {
                                       if (!nestedItem.href) return null
-                                      const isActive = pathname === nestedItem.href
+                                      const active = pathname === nestedItem.href
                                       return (
                                         <li key={nestedItem.href}>
                                           <Link
                                             href={nestedItem.href}
+<<<<<<< HEAD
                                             className={`
                                               flex items-center gap-3 rounded-lg px-4 py-2 text-sm transition-colors duration-150
                                               ${isActive ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}
                                             `}
+=======
+                                            className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-colors duration-150 text-sm ${active ? 'bg-blue-600 text-white' : 'hover:bg-gray-700 text-gray-300'}`}
+>>>>>>> b9c362aca80a27619e8a3efd45531a38a11ee930
                                             onClick={() => setIsOpen(false)}
                                           >
                                             <span>{nestedItem.icon}</span>
@@ -282,15 +369,19 @@ export default function Sidebar() {
                             }
 
                             if (!subItem.href) return null
-                            const isActive = pathname === subItem.href
+                            const active = pathname === subItem.href
                             return (
                               <li key={subItem.href}>
                                 <Link
                                   href={subItem.href}
+<<<<<<< HEAD
                                   className={`
                                     flex items-center gap-3 rounded-lg px-4 py-2 text-sm transition-colors duration-150
                                     ${isActive ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}
                                   `}
+=======
+                                  className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-colors duration-150 text-sm ${active ? 'bg-blue-600 text-white' : 'hover:bg-gray-700 text-gray-300'}`}
+>>>>>>> b9c362aca80a27619e8a3efd45531a38a11ee930
                                   onClick={() => setIsOpen(false)}
                                 >
                                   <span>{subItem.icon}</span>
@@ -306,11 +397,16 @@ export default function Sidebar() {
                 }
 
                 if (!item.href) return null
+<<<<<<< HEAD
                 const isActive = pathname === item.href
+=======
+                const active = pathname === item.href
+>>>>>>> b9c362aca80a27619e8a3efd45531a38a11ee930
                 return (
                   <li key={item.href}>
                     <Link
                       href={item.href}
+<<<<<<< HEAD
                       className={`
                         flex items-center rounded-lg px-4 py-3 transition-colors duration-150
                         ${collapsed ? 'justify-center' : 'gap-3'}
@@ -329,11 +425,20 @@ export default function Sidebar() {
                       )}
                     </Link>
                     {item.href === '/' && !collapsed && <hr className="my-2 border-gray-600" />}
+=======
+                      className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-150 ${active ? 'bg-blue-600 text-white' : 'hover:bg-gray-700 text-gray-300'}`}
+                      onClick={() => setIsOpen(false)}
+                    >
+                      <span className="text-xl">{item.icon}</span>
+                      {!collapsed && <span>{item.label}</span>}
+                    </Link>
+>>>>>>> b9c362aca80a27619e8a3efd45531a38a11ee930
                   </li>
                 )
               })}
             </ul>
           </nav>
+<<<<<<< HEAD
         </div>
 
         <div className="border-t border-gray-700 p-3">
@@ -354,6 +459,19 @@ export default function Sidebar() {
       </aside>
 
       {isOpen && <div className="fixed inset-0 z-30 bg-black/50 md:hidden" onClick={() => setIsOpen(false)} aria-hidden="true" />}
+=======
+
+          <div className="mt-6 hidden md:block">
+            <button
+              onClick={toggleCollapse}
+              className="w-full text-xs text-gray-300 hover:text-white border border-gray-600 rounded px-2 py-1"
+            >
+              {collapsed ? '사이드바 펼치기' : '사이드바 접기'}
+            </button>
+          </div>
+        </div>
+      </aside>
+>>>>>>> b9c362aca80a27619e8a3efd45531a38a11ee930
     </>
   )
 }

@@ -61,6 +61,28 @@ export default function DocumentsPage() {
             </Link>
           </div>
         </div>
+      
+        {/* 거래처 월합명세서 카드 */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+              <span className="text-3xl">🗓️</span>
+              거래처 월합명세서
+            </h2>
+          </div>
+          <p className="text-gray-600 mb-6">
+            기간/카테고리 조건으로 거래처별 매입·매출 월합명세서를 자동 생성합니다.
+          </p>
+          <div className="flex gap-3">
+            <Link
+              href="/documents/monthly-vendor"
+              className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors text-center"
+            >
+              월합명세서 생성
+            </Link>
+          </div>
+        </div>
+
       </div>
 
       {/* 안내 */}
