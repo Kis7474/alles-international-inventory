@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { jsonSuccess, jsonError } from '@/lib/api-response'
 import { getProductCostForSales } from '@/lib/cost-service'
+import { allocateFifoLots } from '@/lib/outbound-fifo'
 
 // Type definitions
 interface LotWhereClause {
@@ -101,17 +102,6 @@ export async function POST(request: NextRequest) {
         ],
       })
 
-      // 총 재고 확인
-      const totalAvailable = availableLots.reduce(
-        (sum, lot) => sum + lot.quantityRemaining,
-        0
-      )
-
-      if (totalAvailable < quantity) {
-        throw new Error(
-          `재고가 부족합니다. 현재 재고: ${totalAvailable}, 요청 수량: ${quantity}`
-        )
-      }
 
       let salesRecordId: number | undefined = undefined
 
@@ -240,8 +230,17 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // FIFO 출고 처리
-      let remainingQuantity = quantity
+      // FIFO 출고 처리 (핵심 로직은 lib/outbound-fifo.ts로 분리)
+      const allocations = allocateFifoLots(
+        availableLots.map((lot) => ({
+          id: lot.id,
+          quantityRemaining: lot.quantityRemaining,
+          unitCost: lot.unitCost,
+          warehouseFee: lot.warehouseFee || 0,
+        })),
+        quantity
+      )
+
       const outboundDetails: Array<{
         lotId: number
         lotCode: string | null
@@ -251,34 +250,24 @@ export async function POST(request: NextRequest) {
         totalCost: number
       }> = []
 
-      for (const lot of availableLots) {
-        if (remainingQuantity <= 0) break
+      for (const allocation of allocations) {
+        const lot = availableLots.find((item) => item.id === allocation.lotId)
+        if (!lot) continue
 
-        const quantityToDeduct = Math.min(remainingQuantity, lot.quantityRemaining)
-        
-        // 창고료 포함 원가 계산: (lot.unitCost * lot.quantityRemaining + lot.warehouseFee) / lot.quantityRemaining
-        // 즉, lot.unitCost + (lot.warehouseFee / lot.quantityRemaining)
-        const unitCostWithWarehouseFee = lot.quantityRemaining > 0 
-          ? lot.unitCost + (lot.warehouseFee || 0) / lot.quantityRemaining 
-          : lot.unitCost
-        const totalCost = quantityToDeduct * unitCostWithWarehouseFee
-
-        // LOT 잔량 감소
         await tx.inventoryLot.update({
           where: { id: lot.id },
           data: {
-            quantityRemaining: lot.quantityRemaining - quantityToDeduct,
+            quantityRemaining: lot.quantityRemaining - allocation.quantity,
           },
         })
 
-        // 출고 이력 생성 (productId 기반)
         const movementData: MovementCreateData = {
           movementDate: new Date(outboundDate),
           lot: { connect: { id: lot.id } },
           type: 'OUT',
-          quantity: quantityToDeduct,
-          unitCost: unitCostWithWarehouseFee,
-          totalCost,
+          quantity: allocation.quantity,
+          unitCost: allocation.unitCostWithWarehouseFee,
+          totalCost: allocation.totalCost,
         }
 
         if (productId) {
@@ -287,27 +276,22 @@ export async function POST(request: NextRequest) {
           movementData.item = { connect: { id: itemId } }
         }
 
-        // Phase 4 추가 필드
         if (vendorId) movementData.vendor = { connect: { id: parseInt(vendorId) } }
         if (salespersonId) movementData.salesperson = { connect: { id: parseInt(salespersonId) } }
         if (salesRecordId) movementData.salesRecord = { connect: { id: salesRecordId } }
         if (outboundType) movementData.outboundType = outboundType
         if (notes) movementData.notes = notes
 
-        await tx.inventoryMovement.create({
-          data: movementData,
-        })
+        await tx.inventoryMovement.create({ data: movementData })
 
         outboundDetails.push({
           lotId: lot.id,
           lotCode: lot.lotCode,
           receivedDate: lot.receivedDate,
-          quantity: quantityToDeduct,
-          unitCost: unitCostWithWarehouseFee,
-          totalCost,
+          quantity: allocation.quantity,
+          unitCost: allocation.unitCostWithWarehouseFee,
+          totalCost: allocation.totalCost,
         })
-
-        remainingQuantity -= quantityToDeduct
       }
 
       return { outboundDetails, salesRecordId }
