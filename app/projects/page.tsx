@@ -171,12 +171,6 @@ export default function ProjectsPage() {
           >
             프로젝트 리포트
           </Link>
-          <Link
-            href="/projects/new"
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            + 프로젝트 등록
-          </Link>
         </div>
       </div>
 

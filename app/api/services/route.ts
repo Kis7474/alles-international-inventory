@@ -45,7 +45,6 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
     const {
-      code,
       name,
       description,
       serviceHours,
@@ -58,8 +57,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '서비스명을 입력해주세요.' }, { status: 400 })
     }
 
-    // code가 비어있으면 자동 생성
-    const finalCode = code || await generateServiceCode(prisma)
+        // 코드 입력은 UI에서 제거, 서버에서 자동 생성
+    const finalCode = await generateServiceCode(prisma)
 
     const service = await prisma.service.create({
       data: {
@@ -89,7 +88,6 @@ export async function PUT(request: Request) {
     const body = await request.json()
     const {
       id,
-      code,
       name,
       description,
       serviceHours,
@@ -104,7 +102,6 @@ export async function PUT(request: Request) {
     const service = await prisma.service.update({
       where: { id: parseInt(id) },
       data: {
-        code,
         name,
         description,
         serviceHours: serviceHours ? parseFloat(serviceHours) : null,
