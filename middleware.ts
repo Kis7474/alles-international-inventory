@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { isAdminOnlyPath } from '@/lib/access-control'
+import { shouldProtectPath, shouldRedirectProjectCreate } from '@/lib/protected-routes'
 
 const PUBLIC_API_PATHS = new Set(['/api/auth/login'])
 
@@ -15,18 +16,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  const shouldProtect =
-    pathname.startsWith('/api/') ||
-    pathname.startsWith('/sales') ||
-    pathname.startsWith('/import-export') ||
-    pathname.startsWith('/warehouse') ||
-    pathname.startsWith('/master') ||
-    pathname.startsWith('/projects') ||
-    pathname.startsWith('/services') ||
-    pathname.startsWith('/documents') ||
-    pathname.startsWith('/settings')
-
-  if (!shouldProtect) {
+  if (!shouldProtectPath(pathname)) {
     return NextResponse.next()
   }
 
@@ -41,7 +31,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  if (pathname.startsWith('/projects/new')) {
+  if (shouldRedirectProjectCreate(pathname)) {
     return NextResponse.redirect(new URL('/projects', request.url))
   }
 
