@@ -49,12 +49,14 @@ export default function ImportExportNewPage() {
     productId: string
     quantity: string
     unitPrice: string
+    palletQuantities: string
   }
   const [items, setItems] = useState<ItemEntry[]>([])
   const [currentItem, setCurrentItem] = useState<ItemEntry>({
     productId: '',
     quantity: '',
-    unitPrice: ''
+    unitPrice: '',
+    palletQuantities: ''
   })
   
   // Product registration modal state
@@ -275,12 +277,27 @@ export default function ImportExportNewPage() {
       alert('품목, 수량, 단가를 모두 입력해주세요.')
       return
     }
-    
+
+    const parsedPalletQuantities = currentItem.palletQuantities
+      .split(',')
+      .map((value) => parseFloat(value.trim()))
+      .filter((value) => Number.isFinite(value) && value > 0)
+
+    if (parsedPalletQuantities.length > 0) {
+      const quantity = parseFloat(currentItem.quantity)
+      const palletTotal = parsedPalletQuantities.reduce((sum, value) => sum + value, 0)
+      if (Math.abs(palletTotal - quantity) > 0.0001) {
+        alert('파레트 수량 합계가 품목 수량과 일치해야 합니다.')
+        return
+      }
+    }
+
     setItems([...items, currentItem])
     setCurrentItem({
       productId: '',
       quantity: '',
-      unitPrice: ''
+      unitPrice: '',
+      palletQuantities: ''
     })
   }
   
@@ -306,7 +323,18 @@ export default function ImportExportNewPage() {
     setSubmitting(true)
     
     try {
-      const payload = { ...formData, items }
+      const payload = {
+        ...formData,
+        items: items.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          palletQuantities: item.palletQuantities
+            .split(',')
+            .map((value) => parseFloat(value.trim()))
+            .filter((value) => Number.isFinite(value) && value > 0),
+        })),
+      }
       
       const res = await fetch('/api/import-export', {
         method: 'POST',
@@ -427,7 +455,7 @@ export default function ImportExportNewPage() {
           </p>
           
           {/* 품목 추가 폼 */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 품목
@@ -486,6 +514,19 @@ export default function ImportExportNewPage() {
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
+                파레트 분할 (선택)
+              </label>
+              <input
+                type="text"
+                value={currentItem.palletQuantities}
+                onChange={(e) => setCurrentItem({ ...currentItem, palletQuantities: e.target.value })}
+                placeholder="예: 30,30,40"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 &nbsp;
               </label>
               <button
@@ -506,6 +547,7 @@ export default function ImportExportNewPage() {
                   <tr className="bg-gray-50">
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">품목</th>
                     <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">수량</th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">파레트 분할</th>
                     <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">단가</th>
                     <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">금액</th>
                     <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">원화 금액</th>
@@ -525,6 +567,9 @@ export default function ImportExportNewPage() {
                         </td>
                         <td className="px-4 py-2 text-sm text-gray-900 text-right">
                           {parseFloat(item.quantity).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-700">
+                          {item.palletQuantities || '-'}
                         </td>
                         <td className="px-4 py-2 text-sm text-gray-900 text-right">
                           {currencySymbol}{parseFloat(item.unitPrice).toFixed(2)}
@@ -548,7 +593,7 @@ export default function ImportExportNewPage() {
                     )
                   })}
                   <tr className="bg-gray-50 font-semibold">
-                    <td colSpan={3} className="px-4 py-2 text-sm text-gray-900 text-right">
+                    <td colSpan={4} className="px-4 py-2 text-sm text-gray-900 text-right">
                       합계:
                     </td>
                     <td className="px-4 py-2 text-sm text-gray-900 text-right">

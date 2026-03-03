@@ -13,7 +13,6 @@ export const sidebarMenuItems: SidebarMenuItem[] = [
     icon: '💰',
     submenu: [
       { href: '/sales', label: '상세내역', icon: '📝' },
-      { href: '/sales/flow', label: '매입매출 흐름', icon: '🔄' },
       {
         label: '리포트',
         icon: '📈',
@@ -41,6 +40,7 @@ export const sidebarMenuItems: SidebarMenuItem[] = [
       { href: '/warehouse/lots', label: '입고 관리', icon: '📥' },
       { href: '/warehouse/outbound', label: '출고 관리', icon: '📤' },
       { href: '/warehouse/inventory', label: '재고 조회', icon: '📊' },
+      { href: '/warehouse/flow', label: '입출고 흐름', icon: '🔄' },
       { href: '/warehouse/warehouse-fee', label: '창고료 관리', icon: '💰' },
     ],
   },
