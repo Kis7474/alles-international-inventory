@@ -85,7 +85,7 @@ export default function SalesFlowPage() {
 
   const fetchProducts = async () => {
     try {
-      const res = await fetch('/api/products')
+      const res = await fetch('/api/products', { cache: 'no-store' })
       const data = await res.json()
       setProducts(data)
     } catch (error) {
@@ -106,7 +106,7 @@ export default function SalesFlowPage() {
       if (startDate) params.append('startDate', startDate)
       if (endDate) params.append('endDate', endDate)
 
-      const res = await fetch(`/api/sales/flow?${params.toString()}`)
+      const res = await fetch(`/api/sales/flow?${params.toString()}`, { cache: 'no-store' })
       if (!res.ok) {
         const error = await res.json()
         throw new Error(error.error || '흐름 조회에 실패했습니다.')

@@ -113,7 +113,7 @@ export default function OutboundPage() {
 
   const fetchData = async () => {
     try {
-      const historyRes = await fetch('/api/outbound')
+      const historyRes = await fetch('/api/outbound', { cache: 'no-store' })
       const historyData = await historyRes.json()
       setHistory(Array.isArray(historyData) ? historyData : [])
     } catch (error) {
@@ -132,7 +132,7 @@ export default function OutboundPage() {
         params.append('storageLocation', selectedStorageLocation)
       }
       
-      const res = await fetch(`/api/inventory?${params.toString()}`)
+      const res = await fetch(`/api/inventory?${params.toString()}`, { cache: 'no-store' })
       const responseData = await res.json()
       
       // API returns { data: [...], pagination: {...} } format
@@ -150,7 +150,7 @@ export default function OutboundPage() {
 
   const fetchVendors = async () => {
     try {
-      const res = await fetch('/api/vendors')
+      const res = await fetch('/api/vendors', { cache: 'no-store' })
       const data = await res.json()
       setVendors(data || [])
     } catch (error) {
@@ -161,7 +161,7 @@ export default function OutboundPage() {
 
   const fetchSalespersons = async () => {
     try {
-      const res = await fetch('/api/salesperson')
+      const res = await fetch('/api/salesperson', { cache: 'no-store' })
       const data = await res.json()
       setSalespersons(data || [])
     } catch (error) {
@@ -278,7 +278,7 @@ export default function OutboundPage() {
       if (filterEndDate) params.append('endDate', filterEndDate)
       if (filterProductId) params.append('productId', filterProductId)
 
-      const res = await fetch(`/api/outbound?${params.toString()}`)
+      const res = await fetch(`/api/outbound?${params.toString()}`, { cache: 'no-store' })
       const data = await res.json()
       setHistory(Array.isArray(data) ? data : [])
       setSelectedIds([])

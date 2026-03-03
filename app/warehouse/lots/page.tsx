@@ -76,6 +76,7 @@ export default function LotsPage() {
     lotCode: '',
     receivedDate: new Date().toISOString().split('T')[0],
     quantityReceived: '',
+    palletQuantities: '',
     goodsAmount: '',
     dutyAmount: '',
     domesticFreight: '',
@@ -95,8 +96,8 @@ export default function LotsPage() {
   const fetchData = async () => {
     try {
       const [lotsRes, productsRes] = await Promise.all([
-        fetch('/api/lots'),
-        fetch('/api/products'),
+        fetch('/api/lots', { cache: 'no-store' }),
+        fetch('/api/products', { cache: 'no-store' }),
       ])
       const [lotsResponse, productsResponse] = await Promise.all([
         lotsRes.json(),
@@ -163,7 +164,7 @@ export default function LotsPage() {
       if (filterImportExportId) params.append('importExportId', filterImportExportId)
       if (activeTab !== 'ALL') params.append('storageLocation', activeTab)
 
-      const res = await fetch(`/api/lots?${params.toString()}`)
+      const res = await fetch(`/api/lots?${params.toString()}`, { cache: 'no-store' })
       const response = await res.json()
       
       // 하위 호환성: 배열이면 그대로 사용, 객체면 data 속성 사용
@@ -195,6 +196,10 @@ export default function LotsPage() {
       lotCode: formData.lotCode || null,
       receivedDate: formData.receivedDate,
       quantityReceived: parseFloat(formData.quantityReceived),
+      palletQuantities: formData.palletQuantities
+        .split(',')
+        .map((value) => parseFloat(value.trim()))
+        .filter((value) => Number.isFinite(value) && value > 0),
       goodsAmount: parseFloat(formData.goodsAmount) || 0,
       dutyAmount: parseFloat(formData.dutyAmount) || 0,
       domesticFreight: parseFloat(formData.domesticFreight) || 0,
@@ -216,13 +221,17 @@ export default function LotsPage() {
         return
       }
 
-      alert('입고가 등록되었습니다.')
+      const createdCount = typeof result.count === 'number' ? result.count : 1
+      alert(createdCount > 1
+        ? `입고가 등록되었습니다. (${createdCount}개 파레트 LOT로 분할)`
+        : '입고가 등록되었습니다.')
       setShowForm(false)
       setFormData({
         productId: '',
         lotCode: '',
         receivedDate: new Date().toISOString().split('T')[0],
         quantityReceived: '',
+        palletQuantities: '',
         goodsAmount: '',
         dutyAmount: '',
         domesticFreight: '',
@@ -620,6 +629,23 @@ export default function LotsPage() {
                   }
                   className="w-full px-3 py-2 border rounded-lg"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  파레트 수량 분할 (선택)
+                </label>
+                <input
+                  type="text"
+                  value={formData.palletQuantities}
+                  onChange={(e) =>
+                    setFormData({ ...formData, palletQuantities: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border rounded-lg"
+                  placeholder="예: 30,30,30,30,40,40"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  쉼표로 구분해 입력하면 파레트별 LOT로 자동 분할됩니다 (합계=입고 수량).
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">
