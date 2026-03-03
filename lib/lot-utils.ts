@@ -4,6 +4,7 @@ interface ItemInput {
   productId: string
   quantity: string
   unitPrice: string
+  palletQuantities?: number[]
 }
 
 interface CreateLotsOptions {
@@ -47,36 +48,56 @@ export async function createLotsFromItems(
   // 부대비용 단가 = 총 부대비용 / 총 수량
   const additionalCostPerUnit = totalQuantity > 0 ? totalAdditionalCosts / totalQuantity : 0
 
-  // 각 item별로 LOT 생성
-  return Promise.all(items.map((item, index) => {
+  const lotCreatePromises = []
+
+  for (let index = 0; index < items.length; index += 1) {
+    const item = items[index]
     const quantity = parseFloat(item.quantity)
     const unitPrice = parseFloat(item.unitPrice)
-    
+
     // 품목별 외화 금액 (원화 환산)
     const itemGoodsAmountKrw = unitPrice * exchangeRate * quantity
-    
+
     // 품목별 입고 단가 = (외화 단가 × 환율) + (부대비용 / 총 수량)
     const itemUnitCost = (unitPrice * exchangeRate) + additionalCostPerUnit
-    
-    return prisma.inventoryLot.create({
-      data: {
-        productId: parseInt(item.productId),
-        vendorId,
-        salespersonId: salespersonId || null,
-        lotCode: `IE-${importExportId}-${index + 1}-${Date.now().toString().slice(-4)}`,
-        receivedDate: date,
-        quantityReceived: quantity,
-        quantityRemaining: quantity,
-        goodsAmount: itemGoodsAmountKrw,
-        dutyAmount: (dutyAmount || 0) * (quantity / totalQuantity),
-        domesticFreight: (shippingCost || 0) * (quantity / totalQuantity),
-        otherCost: (otherCost || 0) * (quantity / totalQuantity),
-        unitCost: itemUnitCost,
-        storageLocation: storageType,
-        importExportId,
-      },
-    })
-  }))
+
+    const parsedPalletQuantities = Array.isArray(item.palletQuantities)
+      ? item.palletQuantities
+          .map((palletQty) => Number(palletQty))
+          .filter((palletQty) => Number.isFinite(palletQty) && palletQty > 0)
+      : []
+
+    const lotQuantities = parsedPalletQuantities.length > 0 ? parsedPalletQuantities : [quantity]
+
+    for (let palletIndex = 0; palletIndex < lotQuantities.length; palletIndex += 1) {
+      const lotQuantity = lotQuantities[palletIndex]
+      const ratio = quantity > 0 ? lotQuantity / quantity : 0
+      const lotCodeSuffix = lotQuantities.length > 1 ? `-P${palletIndex + 1}` : ''
+
+      lotCreatePromises.push(
+        prisma.inventoryLot.create({
+          data: {
+            productId: parseInt(item.productId),
+            vendorId,
+            salespersonId: salespersonId || null,
+            lotCode: `IE-${importExportId}-${index + 1}-${Date.now().toString().slice(-4)}${lotCodeSuffix}`,
+            receivedDate: date,
+            quantityReceived: lotQuantity,
+            quantityRemaining: lotQuantity,
+            goodsAmount: itemGoodsAmountKrw * ratio,
+            dutyAmount: ((dutyAmount || 0) * (quantity / totalQuantity)) * ratio,
+            domesticFreight: ((shippingCost || 0) * (quantity / totalQuantity)) * ratio,
+            otherCost: ((otherCost || 0) * (quantity / totalQuantity)) * ratio,
+            unitCost: itemUnitCost,
+            storageLocation: storageType,
+            importExportId,
+          },
+        })
+      )
+    }
+  }
+
+  return Promise.all(lotCreatePromises)
 }
 
 /**

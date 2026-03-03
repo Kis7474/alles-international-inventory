@@ -122,7 +122,7 @@ export default function SalesPage() {
       params.append('limit', limit.toString())
 
       const [salesRes, salespersonsRes, categoriesRes, vendorsRes] = await Promise.all([
-        fetch(`/api/sales?${params.toString()}`),
+        fetch(`/api/sales?${params.toString()}`, { cache: 'no-store' }),
         fetch('/api/salesperson'),
         fetch('/api/categories'),
         fetch('/api/vendors'), // Phase 4
@@ -165,7 +165,7 @@ export default function SalesPage() {
       if (filterStartDate) params.append('startDate', filterStartDate)
       if (filterEndDate) params.append('endDate', filterEndDate)
 
-      const res = await fetch(`/api/sales?${params.toString()}`)
+      const res = await fetch(`/api/sales?${params.toString()}`, { cache: 'no-store' })
       const response = await res.json()
       
       // Phase 5: 페이지네이션 정보 저장
@@ -430,7 +430,7 @@ export default function SalesPage() {
         if (filterStartDate) params.append('startDate', filterStartDate)
         if (filterEndDate) params.append('endDate', filterEndDate)
 
-        const res = await fetch(`/api/sales?${params.toString()}`)
+        const res = await fetch(`/api/sales?${params.toString()}`, { cache: 'no-store' })
         const response = await res.json()
         
         setSales(response.data || [])

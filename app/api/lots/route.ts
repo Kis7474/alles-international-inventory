@@ -103,6 +103,7 @@ export async function POST(request: NextRequest) {
       lotCode,
       receivedDate,
       quantityReceived,
+      palletQuantities,
       goodsAmount,
       dutyAmount,
       domesticFreight,
@@ -139,6 +140,22 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const parsedPalletQuantities = Array.isArray(palletQuantities)
+      ? palletQuantities
+          .map((qty: unknown) => Number(qty))
+          .filter((qty: number) => Number.isFinite(qty) && qty > 0)
+      : []
+
+    if (parsedPalletQuantities.length > 0) {
+      const palletTotal = parsedPalletQuantities.reduce((sum: number, qty: number) => sum + qty, 0)
+      if (Math.abs(palletTotal - quantityReceived) > 0.0001) {
+        return NextResponse.json(
+          { error: '파레트 수량 합계가 입고수량과 일치해야 합니다.' },
+          { status: 400 }
+        )
+      }
+    }
+
     // 단가 계산 (소수점 6자리까지 정밀도 유지)
     const unitCost = calculateUnitCost(
       goodsAmount || 0,
@@ -149,56 +166,68 @@ export async function POST(request: NextRequest) {
     )
 
     // LOT 생성과 입고 이력 생성을 트랜잭션으로 처리
-    const lot = await prisma.$transaction(async (tx) => {
+    const lots = await prisma.$transaction(async (tx) => {
       // lotCode가 비어있으면 자동 생성
       const finalLotCode = lotCode || await generateLotCode(tx)
+      const lotQuantities = parsedPalletQuantities.length > 0 ? parsedPalletQuantities : [quantityReceived]
+      const createdLots = []
 
-      const newLot = await tx.inventoryLot.create({
-        data: {
-          itemId: itemId || null,
-          productId: productId || null,
-          lotCode: finalLotCode,
-          receivedDate: new Date(receivedDate),
-          quantityReceived,
-          quantityRemaining: quantityReceived,
-          goodsAmount: goodsAmount || 0,
-          dutyAmount: dutyAmount || 0,
-          domesticFreight: domesticFreight || 0,
-          otherCost: otherCost || 0,
-          unitCost,
-          storageLocation,
-        },
-        include: {
-          item: true,
-          product: {
-            include: {
-              category: true,
+      for (let index = 0; index < lotQuantities.length; index += 1) {
+        const lotQuantity = lotQuantities[index]
+        const ratio = quantityReceived > 0 ? lotQuantity / quantityReceived : 0
+        const splitLotCode = lotQuantities.length > 1
+          ? `${finalLotCode}-P${index + 1}`
+          : finalLotCode
+
+        const newLot = await tx.inventoryLot.create({
+          data: {
+            itemId: itemId || null,
+            productId: productId || null,
+            lotCode: splitLotCode,
+            receivedDate: new Date(receivedDate),
+            quantityReceived: lotQuantity,
+            quantityRemaining: lotQuantity,
+            goodsAmount: (goodsAmount || 0) * ratio,
+            dutyAmount: (dutyAmount || 0) * ratio,
+            domesticFreight: (domesticFreight || 0) * ratio,
+            otherCost: (otherCost || 0) * ratio,
+            unitCost,
+            storageLocation,
+          },
+          include: {
+            item: true,
+            product: {
+              include: {
+                category: true,
+              },
             },
           },
-        },
-      })
-
-      // Only create movement if itemId exists (for backward compatibility)
-      if (itemId) {
-        await tx.inventoryMovement.create({
-          data: {
-            movementDate: new Date(receivedDate),
-            itemId,
-            lotId: newLot.id,
-            type: 'IN',
-            quantity: quantityReceived,
-            unitCost,
-            totalCost: quantityReceived * unitCost,
-          },
         })
+
+        // Only create movement if itemId exists (for backward compatibility)
+        if (itemId) {
+          await tx.inventoryMovement.create({
+            data: {
+              movementDate: new Date(receivedDate),
+              itemId,
+              lotId: newLot.id,
+              type: 'IN',
+              quantity: lotQuantity,
+              unitCost,
+              totalCost: lotQuantity * unitCost,
+            },
+          })
+        }
+
+        createdLots.push(newLot)
       }
 
-      return newLot
+      return createdLots
     })
 
     // 입고 등록 시 매입(PURCHASE) 자동 생성
     // 중복 방지: importExportId가 없는 경우(수동 입고)만 매입 자동 생성
-    if (productId && lot && !lot.importExportId) {
+    if (productId && lots.length > 0 && !lots[0].importExportId) {
       const product = await prisma.product.findUnique({
         where: { id: productId },
         include: { category: true },
@@ -218,13 +247,19 @@ export async function POST(request: NextRequest) {
             date: new Date(receivedDate),
             itemName: product.name,
             costSource: 'INBOUND_AUTO',
-            notes: `입고 LOT ${lot.id}에서 자동생성`,
+            notes: lots.length > 1
+              ? `입고 LOT ${lots[0].id} 외 ${lots.length - 1}건에서 자동생성`
+              : `입고 LOT ${lots[0].id}에서 자동생성`,
           })
         }
       }
     }
 
-    return NextResponse.json(lot, { status: 201 })
+    return NextResponse.json({
+      lots,
+      count: lots.length,
+      splitByPallet: parsedPalletQuantities.length > 0,
+    }, { status: 201 })
   } catch (error) {
     console.error('Error creating lot:', error)
     return jsonError('입고 등록 중 오류가 발생했습니다.', 500)
