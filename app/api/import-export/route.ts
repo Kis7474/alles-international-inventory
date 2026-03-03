@@ -14,6 +14,7 @@ interface ItemInput {
   productId: string
   quantity: string
   unitPrice: string
+  palletQuantities?: number[]
 }
 
 /**
@@ -180,6 +181,32 @@ export async function POST(request: NextRequest) {
 
     // Check if using multi-item mode
     const isMultiItem = items && Array.isArray(items) && items.length > 0
+
+    // 파레트 분할 검증 (수입등록 자동입고용)
+    if (isMultiItem) {
+      for (const item of items as ItemInput[]) {
+        if (!item.palletQuantities || !Array.isArray(item.palletQuantities) || item.palletQuantities.length === 0) {
+          continue
+        }
+
+        const itemQuantity = parseFloat(item.quantity)
+        const parsedPallets = item.palletQuantities
+          .map((qty) => Number(qty))
+          .filter((qty) => Number.isFinite(qty) && qty > 0)
+
+        if (parsedPallets.length === 0) {
+          continue
+        }
+
+        const palletTotal = parsedPallets.reduce((sum, qty) => sum + qty, 0)
+        if (Math.abs(palletTotal - itemQuantity) > 0.0001) {
+          return NextResponse.json(
+            { error: '품목별 파레트 수량 합계가 품목 수량과 일치해야 합니다.' },
+            { status: 400 }
+          )
+        }
+      }
+    }
 
     // Calculate total foreign amount
     let totalForeignAmount = 0
@@ -420,6 +447,32 @@ export async function PUT(request: NextRequest) {
 
     // Check if using multi-item mode
     const isMultiItem = items && Array.isArray(items) && items.length > 0
+
+    // 파레트 분할 검증 (수입등록 자동입고용)
+    if (isMultiItem) {
+      for (const item of items as ItemInput[]) {
+        if (!item.palletQuantities || !Array.isArray(item.palletQuantities) || item.palletQuantities.length === 0) {
+          continue
+        }
+
+        const itemQuantity = parseFloat(item.quantity)
+        const parsedPallets = item.palletQuantities
+          .map((qty) => Number(qty))
+          .filter((qty) => Number.isFinite(qty) && qty > 0)
+
+        if (parsedPallets.length === 0) {
+          continue
+        }
+
+        const palletTotal = parsedPallets.reduce((sum, qty) => sum + qty, 0)
+        if (Math.abs(palletTotal - itemQuantity) > 0.0001) {
+          return NextResponse.json(
+            { error: '품목별 파레트 수량 합계가 품목 수량과 일치해야 합니다.' },
+            { status: 400 }
+          )
+        }
+      }
+    }
 
     // Calculate total foreign amount
     let totalForeignAmount = 0

@@ -98,6 +98,7 @@ interface ItemEntry {
   productId: string
   quantity: string
   unitPrice: string
+  palletQuantities: string
 }
 
 export default function ImportExportEditPage() {
@@ -129,11 +130,12 @@ export default function ImportExportEditPage() {
   const [currentItem, setCurrentItem] = useState<ItemEntry>({
     productId: '',
     quantity: '',
-    unitPrice: ''
+    unitPrice: '',
+    palletQuantities: ''
   })
   
   // Editable items from existing record
-  const [editableItems, setEditableItems] = useState<(ImportExportItem & { edited?: boolean })[]>([])
+  const [editableItems, setEditableItems] = useState<(ImportExportItem & { edited?: boolean; palletQuantities?: string })[]>([])
   
   // Product registration modal state
   const [showProductModal, setShowProductModal] = useState(false)
@@ -195,7 +197,8 @@ export default function ImportExportEditPage() {
       return editableItems.map(item => ({
         productId: item.productId.toString(),
         quantity: item.quantity.toString(),
-        unitPrice: item.unitPrice.toString()
+        unitPrice: item.unitPrice.toString(),
+        palletQuantities: item.palletQuantities || ''
       }))
     }
     if (items.length > 0) {
@@ -204,7 +207,8 @@ export default function ImportExportEditPage() {
     return (recordData?.items || []).map(item => ({
       productId: item.productId.toString(),
       quantity: item.quantity.toString(),
-      unitPrice: item.unitPrice.toString()
+      unitPrice: item.unitPrice.toString(),
+      palletQuantities: ''
     }))
   }
 
@@ -290,7 +294,7 @@ export default function ImportExportEditPage() {
       
       // Initialize editable items from existing items
       if (data.items && data.items.length > 0) {
-        setEditableItems(data.items.map(item => ({ ...item, edited: false })))
+        setEditableItems(data.items.map(item => ({ ...item, edited: false, palletQuantities: '' })))
       }
     } catch (error) {
       console.error('Error fetching record:', error)
@@ -441,12 +445,27 @@ export default function ImportExportEditPage() {
       alert('품목, 수량, 단가를 모두 입력해주세요.')
       return
     }
-    
+
+    const parsedPalletQuantities = currentItem.palletQuantities
+      .split(',')
+      .map((value) => parseFloat(value.trim()))
+      .filter((value) => Number.isFinite(value) && value > 0)
+
+    if (parsedPalletQuantities.length > 0) {
+      const quantity = parseFloat(currentItem.quantity)
+      const palletTotal = parsedPalletQuantities.reduce((sum, value) => sum + value, 0)
+      if (Math.abs(palletTotal - quantity) > 0.0001) {
+        alert('파레트 수량 합계가 품목 수량과 일치해야 합니다.')
+        return
+      }
+    }
+
     setItems([...items, currentItem])
     setCurrentItem({
       productId: '',
       quantity: '',
-      unitPrice: ''
+      unitPrice: '',
+      palletQuantities: ''
     })
   }
   
@@ -455,7 +474,7 @@ export default function ImportExportEditPage() {
   }
   
   // Handler for editing existing items
-  const handleEditableItemChange = (index: number, field: 'quantity' | 'unitPrice', value: string) => {
+  const handleEditableItemChange = (index: number, field: 'quantity' | 'unitPrice' | 'palletQuantities', value: string) => {
     const updatedItems = [...editableItems]
     const item = updatedItems[index]
     
@@ -463,6 +482,8 @@ export default function ImportExportEditPage() {
       item.quantity = parseFloat(value) || 0
     } else if (field === 'unitPrice') {
       item.unitPrice = parseFloat(value) || 0
+    } else if (field === 'palletQuantities') {
+      item.palletQuantities = value
     }
     
     // Recalculate amount and krwAmount
@@ -494,11 +515,41 @@ export default function ImportExportEditPage() {
       alert('품목 목록이 없습니다. 품목을 추가해주세요.')
       return
     }
+
+    for (const item of itemsToSubmit) {
+      const parsedPalletQuantities = item.palletQuantities
+        .split(',')
+        .map((value) => parseFloat(value.trim()))
+        .filter((value) => Number.isFinite(value) && value > 0)
+
+      if (parsedPalletQuantities.length === 0) {
+        continue
+      }
+
+      const quantity = parseFloat(item.quantity)
+      const palletTotal = parsedPalletQuantities.reduce((sum, value) => sum + value, 0)
+      if (Math.abs(palletTotal - quantity) > 0.0001) {
+        alert('파레트 수량 합계가 품목 수량과 일치해야 합니다.')
+        return
+      }
+    }
     
     setSubmitting(true)
     
     try {
-      const payload = { ...formData, items: itemsToSubmit, id: parseInt(id) }
+      const payload = {
+        ...formData,
+        items: itemsToSubmit.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          palletQuantities: item.palletQuantities
+            .split(',')
+            .map((value) => parseFloat(value.trim()))
+            .filter((value) => Number.isFinite(value) && value > 0),
+        })),
+        id: parseInt(id),
+      }
       
       const res = await fetch('/api/import-export', {
         method: 'PUT',
@@ -683,7 +734,7 @@ export default function ImportExportEditPage() {
           </p>
           
           {/* 품목 추가 폼 */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 품목
@@ -742,6 +793,19 @@ export default function ImportExportEditPage() {
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
+                파레트 분할 (선택)
+              </label>
+              <input
+                type="text"
+                value={currentItem.palletQuantities}
+                onChange={(e) => setCurrentItem({ ...currentItem, palletQuantities: e.target.value })}
+                placeholder="예: 30,30,40"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 &nbsp;
               </label>
               <button
@@ -762,6 +826,7 @@ export default function ImportExportEditPage() {
                   <tr className="bg-gray-50">
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">품목</th>
                     <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">수량</th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">파레트 분할</th>
                     <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">단가</th>
                     <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">금액</th>
                     <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">원화 금액</th>
@@ -781,6 +846,9 @@ export default function ImportExportEditPage() {
                         </td>
                         <td className="px-4 py-2 text-sm text-gray-900 text-right">
                           {parseFloat(item.quantity).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-700">
+                          {item.palletQuantities || '-'}
                         </td>
                         <td className="px-4 py-2 text-sm text-gray-900 text-right">
                           {currencySymbol}{parseFloat(item.unitPrice).toFixed(2)}
@@ -804,7 +872,7 @@ export default function ImportExportEditPage() {
                     )
                   })}
                   <tr className="bg-gray-50 font-semibold">
-                    <td colSpan={3} className="px-4 py-2 text-sm text-gray-900 text-right">
+                    <td colSpan={4} className="px-4 py-2 text-sm text-gray-900 text-right">
                       합계:
                     </td>
                     <td className="px-4 py-2 text-sm text-gray-900 text-right">
@@ -840,6 +908,7 @@ export default function ImportExportEditPage() {
                   <tr className="bg-gray-50">
                     <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">품목</th>
                     <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">수량</th>
+                    <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b">파레트 분할</th>
                     <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">단가</th>
                     <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">금액</th>
                     <th className="px-4 py-2 text-right text-sm font-medium text-gray-700 border-b">원화 금액</th>
@@ -863,6 +932,15 @@ export default function ImportExportEditPage() {
                             className="w-24 px-2 py-1 border border-gray-300 rounded text-right"
                           />
                           <span className="ml-1">{item.product.unit}</span>
+                        </td>
+                        <td className="px-4 py-2 text-sm text-gray-700">
+                          <input
+                            type="text"
+                            value={item.palletQuantities || ''}
+                            onChange={(e) => handleEditableItemChange(index, 'palletQuantities', e.target.value)}
+                            placeholder="예: 30,30,40"
+                            className="w-40 px-2 py-1 border border-gray-300 rounded"
+                          />
                         </td>
                         <td className="px-4 py-2 text-sm text-gray-900 text-right">
                           <span className="mr-1">{currencySymbol}</span>
@@ -893,7 +971,7 @@ export default function ImportExportEditPage() {
                     )
                   })}
                   <tr className="bg-gray-50 font-semibold">
-                    <td colSpan={3} className="px-4 py-2 text-sm text-gray-900 text-right">
+                    <td colSpan={4} className="px-4 py-2 text-sm text-gray-900 text-right">
                       합계:
                     </td>
                     <td className="px-4 py-2 text-sm text-gray-900 text-right">
@@ -911,7 +989,7 @@ export default function ImportExportEditPage() {
               </table>
             </div>
             <p className="text-xs text-gray-500 mt-2">
-              * 수량과 단가를 직접 수정할 수 있습니다. 변경 시 금액과 원화 금액이 자동으로 재계산됩니다.
+              * 수량/단가/파레트 분할을 수정할 수 있습니다. 파레트 분할은 쉼표(,)로 입력하며 합계는 수량과 일치해야 합니다.
             </p>
           </div>
         )}

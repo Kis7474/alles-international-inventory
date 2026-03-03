@@ -65,7 +65,7 @@ export default function InventoryPage() {
         params.append('storageLocation', activeTab)
       }
       
-      const res = await fetch(`/api/inventory?${params.toString()}`)
+      const res = await fetch(`/api/inventory?${params.toString()}`, { cache: 'no-store' })
       const response = await res.json()
       
       // 방어적 코딩: 배열이면 그대로, 객체면 data 속성 사용
@@ -88,7 +88,7 @@ export default function InventoryPage() {
 
   const handleItemClick = async (productId: number) => {
     try {
-      const res = await fetch(`/api/inventory?productId=${productId}`)
+      const res = await fetch(`/api/inventory?productId=${productId}`, { cache: 'no-store' })
       const data = await res.json()
       setSelectedItem(data)
     } catch (error) {

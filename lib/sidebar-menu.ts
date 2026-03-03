@@ -13,7 +13,7 @@ export const sidebarMenuItems: SidebarMenuItem[] = [
     icon: '💰',
     submenu: [
       { href: '/sales', label: '상세내역', icon: '📝' },
-      { href: '/sales/flow', label: '매입매출 흐름', icon: '🔄' },
+      { href: '/warehouse/flow', label: '입출고 흐름', icon: '🔄' },
       {
         label: '리포트',
         icon: '📈',
