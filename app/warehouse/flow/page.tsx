@@ -56,7 +56,7 @@ export default function WarehouseFlowPage() {
 
   const fetchProducts = async () => {
     try {
-      const res = await fetch('/api/products', { cache: 'no-store' })
+      const res = await fetch('/api/warehouse/flow?productsOnly=true', { cache: 'no-store' })
       const data = await res.json()
       setProducts(data)
     } catch (error) {

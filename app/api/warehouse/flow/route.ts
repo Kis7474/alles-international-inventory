@@ -6,9 +6,30 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
     const productId = searchParams.get('productId')
+    const productsOnly = searchParams.get('productsOnly')
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
     const storageLocation = searchParams.get('storageLocation')
+
+    if (productsOnly === 'true') {
+      const grouped = await prisma.inventoryLot.groupBy({
+        by: ['productId'],
+        where: { productId: { not: null } },
+      })
+      const productIds = grouped
+        .map((item) => item.productId)
+        .filter((id): id is number => id !== null)
+
+      const products = productIds.length > 0
+        ? await prisma.product.findMany({
+            where: { id: { in: productIds } },
+            select: { id: true, name: true, code: true },
+            orderBy: [{ name: 'asc' }],
+          })
+        : []
+
+      return NextResponse.json(products)
+    }
 
     if (!productId) {
       return NextResponse.json({ error: '품목 ID가 필요합니다.' }, { status: 400 })
