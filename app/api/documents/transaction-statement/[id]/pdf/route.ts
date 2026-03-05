@@ -6,6 +6,24 @@ const COMPANY_ADDRESS = '경기도 김포시 태장로 741, 경동미르웰시�
 const COMPANY_PHONE = '(02) 2645-8886'
 const COMPANY_FAX = '(031) 983-8867'
 
+function formatDateKor(date: Date): string {
+  return new Date(date).toLocaleDateString('ko-KR', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+}
+
+function formatMonthKor(date: Date): string {
+  const d = new Date(date)
+  return `${d.getFullYear()}년 ${d.getMonth() + 1}월`
+}
+
+function formatShortDate(value: string): string {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) return value
+  return `${parseInt(match[2], 10)}/${parseInt(match[3], 10)}`
+}
 
 // GET /api/documents/transaction-statement/[id]/pdf - 거래명세서 PDF 다운로드
 // Note: This returns HTML that can be printed to PDF
@@ -14,7 +32,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const id = parseInt(params.id)
+    const id = parseInt(params.id, 10)
 
     const statement = await prisma.transactionStatement.findUnique({
       where: { id },
@@ -33,11 +51,12 @@ export async function GET(
     }
 
     const logoUrl = `${request.nextUrl.origin}/images/alles-logo.svg`
-    const formattedDeliveryDate = new Date(statement.deliveryDate).toLocaleDateString('ko-KR', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    })
+    const isMonthlyStatement = statement.recipientRef?.includes('월합명세서') ?? false
+    const title = isMonthlyStatement ? '거 래 명 세 서' : '납 품 명 세 서'
+    const leftDateLabel = isMonthlyStatement ? '납 품 내 역' : '납 품 일'
+    const leftDateValue = isMonthlyStatement
+      ? `${formatMonthKor(statement.deliveryDate)} 납품 내역`
+      : formatDateKor(statement.deliveryDate)
 
     const itemRows = Array.from({ length: Math.max(8, statement.items.length) }, (_, index) => {
       const item = statement.items[index]
@@ -45,23 +64,33 @@ export async function GET(
       if (!item) {
         return `
         <tr>
-          <td>&nbsp;</td>
+          <td class="center">&nbsp;</td>
           <td></td>
-          <td></td>
-          <td></td>
-          <td></td>
-          <td></td>
+          <td class="center"></td>
+          <td class="number"></td>
+          <td class="number"></td>
+          <td class="number"></td>
         </tr>`
+      }
+
+      let firstCol = `${item.itemNo}`
+      let specText = item.specification || ''
+      if (isMonthlyStatement && item.specification) {
+        const [datePart, ...rest] = item.specification.split(' / ')
+        if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+          firstCol = formatShortDate(datePart)
+          specText = rest.join(' / ')
+        }
       }
 
       return `
       <tr>
-        <td>${item.itemNo}</td>
+        <td class="center">${firstCol}</td>
         <td>${item.productName}</td>
-        <td>${item.specification || ''}</td>
+        <td class="center">${specText}</td>
         <td class="number">${item.quantity.toLocaleString('ko-KR')}</td>
-        <td class="number">${item.unitPrice.toLocaleString('ko-KR')}</td>
-        <td class="number">${item.amount.toLocaleString('ko-KR')}</td>
+        <td class="number">₩&nbsp;${item.unitPrice.toLocaleString('ko-KR')}</td>
+        <td class="number">₩&nbsp;${item.amount.toLocaleString('ko-KR')}</td>
       </tr>`
     }).join('')
 
@@ -69,70 +98,93 @@ export async function GET(
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>거래명세서 - ${statement.statementNumber}</title>
   <style>
     @page { size: A4; margin: 12mm; }
-    body { font-family: 'Malgun Gothic', sans-serif; color: #111; font-size: 14px; }
-    .container { width: 100%; }
-    .title { text-align: center; font-size: 52px; letter-spacing: 14px; margin: 10px 0 30px; font-weight: 700; }
-    .top { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
-    .customer p, .company p { margin: 9px 0; font-size: 34px; }
-    .label { display: inline-block; width: 90px; }
-    .company { text-align: left; }
-    .logo { width: 300px; margin-bottom: 8px; }
-    .month-title { text-align: center; font-size: 35px; margin: 20px 0 12px; }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: #111; font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; }
+    .sheet { width: 100%; padding: 4mm 6mm; }
+    .title { text-align: center; font-size: 20mm; letter-spacing: 6mm; font-weight: 700; margin: 8mm 0 14mm; }
+    .top { display: grid; grid-template-columns: 1fr 1fr; column-gap: 8mm; }
+    .left-info .row, .right-info .row { font-size: 4.8mm; margin-bottom: 3.2mm; line-height: 1.3; }
+    .left-info .name { font-weight: 700; letter-spacing: 1.4mm; }
+    .label { display: inline-block; min-width: 28mm; }
+    .logo { width: 62mm; height: auto; margin-bottom: 2mm; }
+    .section-title { margin: 9mm 0 4mm; font-size: 5mm; }
+
     table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-    th, td { border: 1px solid #111; padding: 8px 6px; font-size: 28px; }
-    th { text-align: center; font-weight: 700; background: #fafafa; }
-    td { vertical-align: middle; }
-    .col-no { width: 7%; text-align: center; }
-    .col-product { width: 40%; }
-    .col-spec { width: 15%; text-align: center; }
-    .col-qty { width: 8%; text-align: right; }
-    .col-price { width: 15%; text-align: right; }
-    .col-amount { width: 15%; text-align: right; }
-    .number { text-align: right; }
-    .notes-wrap { display: grid; grid-template-columns: 1fr 240px; }
-    .notes { border: 1px solid #111; border-top: none; padding: 14px; font-size: 32px; line-height: 1.85; min-height: 210px; }
-    .totals { border-left: none; border-top: none; }
-    .totals td { border: 1px solid #111; font-size: 35px; }
-    .totals .label-cell { text-align: center; width: 50%; font-weight: 700; }
-    .signature { margin-top: 20px; display: flex; justify-content: space-between; align-items: flex-end; }
-    .signature .text { font-size: 36px; margin-top: 20px; }
-    .stamp { width: 220px; height: 140px; border: 1px dashed #666; color: #555; font-size: 18px; display: flex; align-items: center; justify-content: center; }
+    .items th, .items td { border: 0.35mm solid #1a1a1a; height: 12mm; padding: 1.2mm 2mm; font-size: 4.6mm; }
+    .items th { text-align: center; font-weight: 500; letter-spacing: 1mm; }
+    .items .col-1 { width: 8%; }
+    .items .col-2 { width: 41%; }
+    .items .col-3 { width: 16%; }
+    .items .col-4 { width: 7%; }
+    .items .col-5 { width: 14%; }
+    .items .col-6 { width: 14%; }
+    .center { text-align: center; }
+    .number { text-align: right; white-space: nowrap; }
+
+    .bottom-wrap { display: grid; grid-template-columns: 1fr 31%; }
+    .memo {
+      border-left: 0.35mm solid #1a1a1a;
+      border-right: 0.35mm solid #1a1a1a;
+      border-bottom: 0.35mm solid #1a1a1a;
+      padding: 4mm;
+      min-height: 31mm;
+      font-size: 4.6mm;
+      line-height: 1.9;
+    }
+    .totals td {
+      border-right: 0.35mm solid #1a1a1a;
+      border-bottom: 0.35mm solid #1a1a1a;
+      border-left: 0.35mm solid #1a1a1a;
+      height: 10.3mm;
+      font-size: 5mm;
+      padding: 1mm 2mm;
+    }
+    .totals .label-cell { text-align: center; letter-spacing: 1.2mm; }
+
+    .signature {
+      margin-top: 8mm;
+      display: grid;
+      grid-template-columns: 1fr 37mm;
+      align-items: end;
+    }
+    .signature .text { font-size: 5.2mm; }
+    .stamp { width: 37mm; height: 26mm; border: 0.3mm dashed #7c7c7c; font-size: 3.2mm; color: #666; display: flex; align-items: center; justify-content: center; }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="title">거 래 명 세 서</div>
+  <div class="sheet">
+    <div class="title">${title}</div>
 
     <div class="top">
-      <div class="customer">
-        <p><span class="label">받는분 :</span> ${statement.recipientName || '-'}</p>
-        <p><span class="label">참&nbsp;&nbsp;&nbsp;조 :</span> ${statement.recipientRef || '-'}</p>
-        <p><span class="label">전&nbsp;&nbsp;&nbsp;화 :</span> ${statement.recipientPhone || '-'}</p>
-        <p><span class="label">팩&nbsp;&nbsp;&nbsp;스 :</span> ${statement.recipientFax || '-'}</p>
+      <div class="left-info">
+        <div class="row"><span class="label">받는분 :</span> <span class="name">${statement.recipientName || ''}</span></div>
+        <div class="row"><span class="label">참&nbsp;&nbsp;&nbsp;조 :</span> ${statement.recipientRef || ''}</div>
+        <div class="row"><span class="label">전&nbsp;&nbsp;&nbsp;화 :</span> ${statement.recipientPhone || ''}</div>
+        <div class="row"><span class="label">팩&nbsp;&nbsp;&nbsp;스 :</span> ${statement.recipientFax || ''}</div>
       </div>
-      <div class="company">
+      <div class="right-info">
         <img src="${logoUrl}" alt="ALLES 로고" class="logo" />
-        <p>${COMPANY_ADDRESS}</p>
-        <p>전화 : ${COMPANY_PHONE}</p>
-        <p>팩스 : ${COMPANY_FAX}</p>
+        <div class="row">${COMPANY_ADDRESS}</div>
+        <div class="row">전화&nbsp;&nbsp;:&nbsp;&nbsp;${COMPANY_PHONE}</div>
+        <div class="row">팩스&nbsp;&nbsp;:&nbsp;&nbsp;${COMPANY_FAX}</div>
       </div>
     </div>
 
-    <div class="month-title">${formattedDeliveryDate} 납품 내역</div>
+    <div class="section-title">${leftDateLabel} : ${leftDateValue}</div>
 
-    <table>
+    <table class="items">
       <thead>
         <tr>
-          <th class="col-no">No</th>
-          <th class="col-product">제 품 명</th>
-          <th class="col-spec">규 격</th>
-          <th class="col-qty">수 량</th>
-          <th class="col-price">단 가</th>
-          <th class="col-amount">금 액</th>
+          <th class="col-1">${isMonthlyStatement ? '날짜' : 'No'}</th>
+          <th class="col-2">제&nbsp;&nbsp;품&nbsp;&nbsp;명</th>
+          <th class="col-3">규&nbsp;&nbsp;격</th>
+          <th class="col-4">수&nbsp;량</th>
+          <th class="col-5">단&nbsp;가</th>
+          <th class="col-6">금&nbsp;&nbsp;액</th>
         </tr>
       </thead>
       <tbody>
@@ -140,31 +192,31 @@ export async function GET(
       </tbody>
     </table>
 
-    <div class="notes-wrap">
-      <div class="notes">
+    <div class="bottom-wrap">
+      <div class="memo">
         * 지불조건 : ${statement.paymentTerms || '정기 결제'}<br />
         * 계좌번호 : ${statement.bankAccount || '하나은행 586-910007-02104'}<br />
-        (예금주 : ${COMPANY_NAME})
+        &nbsp;&nbsp;(예금주 : ${COMPANY_NAME})
       </div>
       <table class="totals">
         <tr>
-          <td class="label-cell">금 액</td>
-          <td class="number">${statement.subtotal.toLocaleString('ko-KR')}</td>
+          <td class="label-cell">금&nbsp;&nbsp;액</td>
+          <td class="number">₩&nbsp;${statement.subtotal.toLocaleString('ko-KR')}</td>
         </tr>
         <tr>
           <td class="label-cell">부가세</td>
-          <td class="number">${statement.vatAmount.toLocaleString('ko-KR')}</td>
+          <td class="number">₩&nbsp;${statement.vatAmount.toLocaleString('ko-KR')}</td>
         </tr>
         <tr>
           <td class="label-cell">총금액</td>
-          <td class="number">${statement.totalAmount.toLocaleString('ko-KR')}</td>
+          <td class="number">₩&nbsp;${statement.totalAmount.toLocaleString('ko-KR')}</td>
         </tr>
       </table>
     </div>
 
     <div class="signature">
       <div class="text">인수자 서명(이름) : ${statement.receiverName || ''}</div>
-      <div class="stamp">사업자 직인 영역</div>
+      <div class="stamp">직인</div>
     </div>
   </div>
 </body>
