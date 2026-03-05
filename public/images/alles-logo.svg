@@ -1,0 +1,15 @@
+<svg width="420" height="120" viewBox="0 0 420 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="420" height="120" fill="white"/>
+  <g>
+    <path d="M58 15C36 15 18 33 18 55C18 77 36 95 58 95C80 95 98 77 98 55C98 33 80 15 58 15Z" stroke="#0B4C8C" stroke-width="4"/>
+    <path d="M24 58C42 46 63 42 92 45" stroke="#0B4C8C" stroke-width="8" stroke-linecap="round"/>
+    <path d="M23 70C48 60 69 57 96 60" stroke="#D61920" stroke-width="8" stroke-linecap="round"/>
+    <path d="M24 82C46 74 67 71 94 74" stroke="#F1C40F" stroke-width="8" stroke-linecap="round"/>
+  </g>
+  <text x="125" y="68" font-family="Arial, sans-serif" font-size="64" font-weight="700" fill="#0B4C8C">ALL</text>
+  <rect x="288" y="30" width="56" height="12" fill="#D61920"/>
+  <rect x="288" y="48" width="56" height="12" fill="#0B4C8C"/>
+  <rect x="288" y="66" width="56" height="12" fill="#F1C40F"/>
+  <text x="350" y="68" font-family="Arial, sans-serif" font-size="64" font-weight="700" fill="#0B4C8C">S</text>
+  <text x="125" y="102" font-family="Arial, sans-serif" font-size="36" font-weight="600" fill="#0B4C8C">Alles International Ltd.</text>
+</svg>

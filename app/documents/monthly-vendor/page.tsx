@@ -37,7 +37,8 @@ export default function MonthlyVendorStatementPage() {
   const [loading, setLoading] = useState(false)
 
   const [vendorId, setVendorId] = useState('')
-  const [categoryId, setCategoryId] = useState('')
+  const [categoryIds, setCategoryIds] = useState<string[]>([])
+  const [searchText, setSearchText] = useState('')
   const [type, setType] = useState<'ALL' | 'SALES' | 'PURCHASE'>('ALL')
   const [startDate, setStartDate] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10))
   const [endDate, setEndDate] = useState(new Date().toISOString().slice(0, 10))
@@ -64,7 +65,8 @@ export default function MonthlyVendorStatementPage() {
     setLoading(true)
     try {
       const params = new URLSearchParams({ vendorId, startDate, endDate, type })
-      if (categoryId) params.set('categoryId', categoryId)
+      if (categoryIds.length > 0) params.set('categoryIds', categoryIds.join(','))
+      if (searchText.trim()) params.set('searchText', searchText.trim())
 
       const res = await fetch(`/api/documents/monthly-vendor?${params.toString()}`)
       const data = await res.json()
@@ -99,7 +101,8 @@ export default function MonthlyVendorStatementPage() {
           recipientName: selectedVendor?.name,
           startDate,
           endDate,
-          categoryId: categoryId ? parseInt(categoryId) : undefined,
+          categoryIds: categoryIds.length > 0 ? categoryIds.map((id) => parseInt(id, 10)) : undefined,
+          searchText: searchText.trim() || undefined,
           type: docType,
         }),
       })
@@ -122,7 +125,7 @@ export default function MonthlyVendorStatementPage() {
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-gray-900">거래처 월합명세서 자동 생성</h1>
 
-      <div className="bg-white p-4 rounded-lg shadow grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="bg-white p-4 rounded-lg shadow grid grid-cols-1 md:grid-cols-6 gap-4">
         <div>
           <label className="block text-sm mb-1">거래처 *</label>
           <select value={vendorId} onChange={(e) => setVendorId(e.target.value)} className="w-full border rounded px-3 py-2">
@@ -133,13 +136,31 @@ export default function MonthlyVendorStatementPage() {
           </select>
         </div>
         <div>
-          <label className="block text-sm mb-1">카테고리</label>
-          <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="w-full border rounded px-3 py-2">
-            <option value="">전체</option>
+          <label className="block text-sm mb-1">카테고리(복수 선택)</label>
+          <select
+            multiple
+            value={categoryIds}
+            onChange={(e) => {
+              const values = Array.from(e.target.selectedOptions, (option) => option.value)
+              setCategoryIds(values)
+            }}
+            className="w-full border rounded px-3 py-2 h-[104px]"
+          >
             {categories.map((category) => (
               <option key={category.id} value={category.id}>{category.nameKo}</option>
             ))}
           </select>
+          <p className="text-xs text-gray-500 mt-1">Ctrl/Cmd 키로 여러 카테고리를 동시에 선택할 수 있습니다.</p>
+        </div>
+        <div>
+          <label className="block text-sm mb-1">텍스트 검색</label>
+          <input
+            type="text"
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            placeholder="품목명/규격 검색"
+            className="w-full border rounded px-3 py-2"
+          />
         </div>
         <div>
           <label className="block text-sm mb-1">구분</label>

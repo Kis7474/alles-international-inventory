@@ -12,7 +12,8 @@ export async function GET(request: NextRequest) {
     const vendorId = searchParams.get('vendorId')
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
-    const categoryId = searchParams.get('categoryId')
+    const categoryIdsParam = searchParams.get('categoryIds')
+    const searchText = searchParams.get('searchText')
     const type = searchParams.get('type') // SALES | PURCHASE | ALL
 
     if (!vendorId || !startDate || !endDate) {
@@ -22,8 +23,9 @@ export async function GET(request: NextRequest) {
     const where: {
       vendorId: number
       date: { gte: Date; lte: Date }
-      categoryId?: number
+      categoryId?: { in: number[] }
       type?: 'SALES' | 'PURCHASE'
+      itemName?: { contains: string; mode: 'insensitive' }
     } = {
       vendorId: parseInt(vendorId),
       date: {
@@ -32,8 +34,16 @@ export async function GET(request: NextRequest) {
       },
     }
 
-    if (categoryId) where.categoryId = parseInt(categoryId)
+    const categoryIds = categoryIdsParam
+      ? categoryIdsParam
+          .split(',')
+          .map((id) => parseInt(id, 10))
+          .filter((id) => !Number.isNaN(id))
+      : []
+
+    if (categoryIds.length > 0) where.categoryId = { in: categoryIds }
     if (type === 'SALES' || type === 'PURCHASE') where.type = type
+    if (searchText) where.itemName = { contains: searchText, mode: 'insensitive' }
 
     const records = await prisma.salesRecord.findMany({
       where,
@@ -81,14 +91,16 @@ export async function POST(request: NextRequest) {
       recipientName,
       startDate,
       endDate,
-      categoryId,
+      categoryIds,
+      searchText,
       type,
     } = body as {
       vendorId: number
       recipientName?: string
       startDate: string
       endDate: string
-      categoryId?: number
+      categoryIds?: number[]
+      searchText?: string
       type: 'SALES' | 'PURCHASE'
     }
 
@@ -100,7 +112,8 @@ export async function POST(request: NextRequest) {
       vendorId: number
       type: 'SALES' | 'PURCHASE'
       date: { gte: Date; lte: Date }
-      categoryId?: number
+      categoryId?: { in: number[] }
+      itemName?: { contains: string; mode: 'insensitive' }
     } = {
       vendorId: parseInt(String(vendorId)),
       type,
@@ -110,7 +123,15 @@ export async function POST(request: NextRequest) {
       },
     }
 
-    if (categoryId) where.categoryId = parseInt(String(categoryId))
+    if (Array.isArray(categoryIds) && categoryIds.length > 0) {
+      const parsedCategoryIds = categoryIds
+        .map((id) => parseInt(String(id), 10))
+        .filter((id) => !Number.isNaN(id))
+
+      if (parsedCategoryIds.length > 0) where.categoryId = { in: parsedCategoryIds }
+    }
+
+    if (searchText) where.itemName = { contains: searchText, mode: 'insensitive' }
 
     const records = await prisma.salesRecord.findMany({
       where,
