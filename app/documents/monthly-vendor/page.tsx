@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 interface Vendor {
   id: number
@@ -29,6 +29,19 @@ interface Summary {
   grandTotal: number
 }
 
+const RECIPIENT_REF_PRESETS = ['구매팀', '영업팀', '관리부', '정산 담당자']
+const PAYMENT_TERMS_PRESETS = ['월합 정산', '정기 결제', '당월 마감 익월 결제']
+
+function getMonthRange(monthValue: string) {
+  const [year, month] = monthValue.split('-').map((v) => parseInt(v, 10))
+  const start = new Date(year, month - 1, 1)
+  const end = new Date(year, month, 0)
+  return {
+    startDate: start.toISOString().slice(0, 10),
+    endDate: end.toISOString().slice(0, 10),
+  }
+}
+
 export default function MonthlyVendorStatementPage() {
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [categories, setCategories] = useState<Category[]>([])
@@ -40,8 +53,15 @@ export default function MonthlyVendorStatementPage() {
   const [categoryIds, setCategoryIds] = useState<string[]>([])
   const [searchText, setSearchText] = useState('')
   const [type, setType] = useState<'ALL' | 'SALES' | 'PURCHASE'>('ALL')
-  const [startDate, setStartDate] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10))
-  const [endDate, setEndDate] = useState(new Date().toISOString().slice(0, 10))
+
+  const currentMonth = useMemo(() => new Date().toISOString().slice(0, 7), [])
+  const [targetMonth, setTargetMonth] = useState(currentMonth)
+
+  const monthRange = useMemo(() => getMonthRange(targetMonth), [targetMonth])
+  const [recipientRefPreset, setRecipientRefPreset] = useState('')
+  const [recipientRef, setRecipientRef] = useState('')
+  const [paymentTermsPreset, setPaymentTermsPreset] = useState('월합 정산')
+  const [paymentTerms, setPaymentTerms] = useState('월합 정산')
 
   useEffect(() => {
     const init = async () => {
@@ -64,7 +84,7 @@ export default function MonthlyVendorStatementPage() {
 
     setLoading(true)
     try {
-      const params = new URLSearchParams({ vendorId, startDate, endDate, type })
+      const params = new URLSearchParams({ vendorId, month: targetMonth, type })
       if (categoryIds.length > 0) params.set('categoryIds', categoryIds.join(','))
       if (searchText.trim()) params.set('searchText', searchText.trim())
 
@@ -93,14 +113,20 @@ export default function MonthlyVendorStatementPage() {
 
     try {
       const selectedVendor = vendors.find((v) => String(v.id) === vendorId)
+      const resolvedRef = recipientRef.trim() ? recipientRef.trim() : undefined
+      const resolvedTerms = paymentTerms.trim() ? paymentTerms.trim() : undefined
+
       const res = await fetch('/api/documents/monthly-vendor', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          vendorId: parseInt(vendorId),
+          vendorId: parseInt(vendorId, 10),
           recipientName: selectedVendor?.name,
-          startDate,
-          endDate,
+          recipientRef: resolvedRef,
+          paymentTerms: resolvedTerms,
+          month: targetMonth,
+          startDate: monthRange.startDate,
+          endDate: monthRange.endDate,
           categoryIds: categoryIds.length > 0 ? categoryIds.map((id) => parseInt(id, 10)) : undefined,
           searchText: searchText.trim() || undefined,
           type: docType,
@@ -125,7 +151,7 @@ export default function MonthlyVendorStatementPage() {
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-gray-900">거래처 월합명세서 자동 생성</h1>
 
-      <div className="bg-white p-4 rounded-lg shadow grid grid-cols-1 md:grid-cols-6 gap-4">
+      <div className="bg-white p-4 rounded-lg shadow grid grid-cols-1 md:grid-cols-7 gap-4">
         <div>
           <label className="block text-sm mb-1">거래처 *</label>
           <select value={vendorId} onChange={(e) => setVendorId(e.target.value)} className="w-full border rounded px-3 py-2">
@@ -134,6 +160,16 @@ export default function MonthlyVendorStatementPage() {
               <option key={vendor.id} value={vendor.id}>{vendor.name}</option>
             ))}
           </select>
+        </div>
+        <div>
+          <label className="block text-sm mb-1">조회 월 *</label>
+          <input
+            type="month"
+            value={targetMonth}
+            onChange={(e) => setTargetMonth(e.target.value)}
+            className="w-full border rounded px-3 py-2"
+          />
+          <p className="text-xs text-gray-500 mt-1">선택 월로 월합 조회/생성됩니다.</p>
         </div>
         <div>
           <label className="block text-sm mb-1">카테고리(복수 선택)</label>
@@ -171,12 +207,64 @@ export default function MonthlyVendorStatementPage() {
           </select>
         </div>
         <div>
-          <label className="block text-sm mb-1">시작일</label>
-          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full border rounded px-3 py-2" />
+          <label className="block text-sm mb-1">자동 기간(시작)</label>
+          <input type="date" value={monthRange.startDate} readOnly className="w-full border rounded px-3 py-2 bg-gray-50" />
         </div>
         <div>
-          <label className="block text-sm mb-1">종료일</label>
-          <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full border rounded px-3 py-2" />
+          <label className="block text-sm mb-1">자동 기간(종료)</label>
+          <input type="date" value={monthRange.endDate} readOnly className="w-full border rounded px-3 py-2 bg-gray-50" />
+        </div>
+      </div>
+
+      <div className="bg-white p-4 rounded-lg shadow grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm mb-1">참조 선택</label>
+          <select
+            value={recipientRefPreset}
+            onChange={(e) => {
+              const value = e.target.value
+              setRecipientRefPreset(value)
+              if (value) setRecipientRef(value)
+            }}
+            className="w-full border rounded px-3 py-2"
+          >
+            <option value="">직접 입력</option>
+            {RECIPIENT_REF_PRESETS.map((preset) => (
+              <option key={preset} value={preset}>{preset}</option>
+            ))}
+          </select>
+          <input
+            type="text"
+            value={recipientRef}
+            onChange={(e) => setRecipientRef(e.target.value)}
+            placeholder="참조를 입력하거나 위에서 선택"
+            className="w-full border rounded px-3 py-2 mt-2"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm mb-1">지불조건 선택</label>
+          <select
+            value={paymentTermsPreset}
+            onChange={(e) => {
+              const value = e.target.value
+              setPaymentTermsPreset(value)
+              setPaymentTerms(value)
+            }}
+            className="w-full border rounded px-3 py-2"
+          >
+            {PAYMENT_TERMS_PRESETS.map((preset) => (
+              <option key={preset} value={preset}>{preset}</option>
+            ))}
+            <option value="">직접 입력</option>
+          </select>
+          <input
+            type="text"
+            value={paymentTerms}
+            onChange={(e) => setPaymentTerms(e.target.value)}
+            placeholder="지불조건을 입력하거나 위에서 선택"
+            className="w-full border rounded px-3 py-2 mt-2"
+          />
         </div>
       </div>
 

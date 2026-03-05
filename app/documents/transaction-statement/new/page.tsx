@@ -12,6 +12,9 @@ interface StatementItem {
   amount: number
 }
 
+const RECIPIENT_REF_PRESETS = ['구매팀', '경리부', '물류팀', '담당자']
+const PAYMENT_TERMS_PRESETS = ['납품 후 익월 현금결제', '정기 결제', '월합 정산']
+
 export default function NewTransactionStatementPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
@@ -19,9 +22,11 @@ export default function NewTransactionStatementPage() {
   const [deliveryDate, setDeliveryDate] = useState(new Date().toISOString().split('T')[0])
   const [recipientName, setRecipientName] = useState('')
   const [recipientRef, setRecipientRef] = useState('')
+  const [recipientRefPreset, setRecipientRefPreset] = useState('')
   const [recipientPhone, setRecipientPhone] = useState('')
   const [recipientFax, setRecipientFax] = useState('')
   const [paymentTerms, setPaymentTerms] = useState('납품 후 익월 현금결제')
+  const [paymentTermsPreset, setPaymentTermsPreset] = useState('납품 후 익월 현금결제')
   const [bankAccount, setBankAccount] = useState('하나은행 586-910007-02104 (예금주: 알레스인터네셔날 주식회사)')
   const [receiverName, setReceiverName] = useState('')
 
@@ -40,11 +45,11 @@ export default function NewTransactionStatementPage() {
   const updateItem = (index: number, field: keyof StatementItem, value: string | number) => {
     const newItems = [...items]
     newItems[index] = { ...newItems[index], [field]: value }
-    
+
     if (field === 'quantity' || field === 'unitPrice') {
       newItems[index].amount = newItems[index].quantity * newItems[index].unitPrice
     }
-    
+
     setItems(newItems)
   }
 
@@ -127,12 +132,27 @@ export default function NewTransactionStatementPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">참조</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">참조 선택</label>
+              <select
+                value={recipientRefPreset}
+                onChange={(e) => {
+                  const value = e.target.value
+                  setRecipientRefPreset(value)
+                  if (value) setRecipientRef(value)
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                <option value="">직접 입력</option>
+                {RECIPIENT_REF_PRESETS.map((preset) => (
+                  <option key={preset} value={preset}>{preset}</option>
+                ))}
+              </select>
               <input
                 type="text"
                 value={recipientRef}
                 onChange={(e) => setRecipientRef(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                placeholder="참조를 입력하거나 위에서 선택"
+                className="w-full mt-2 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
               />
             </div>
             <div>
@@ -159,17 +179,13 @@ export default function NewTransactionStatementPage() {
         <div className="bg-white rounded-lg shadow-md p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold">품목 정보</h2>
-            <button
-              type="button"
-              onClick={addItem}
-              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
-            >
+            <button type="button" onClick={addItem} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
               + 품목 추가
             </button>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="min-w-full">
+            <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">No</th>
@@ -224,16 +240,10 @@ export default function NewTransactionStatementPage() {
                         required
                       />
                     </td>
-                    <td className="px-4 py-2 font-medium">
-                      {item.amount.toLocaleString('ko-KR')}
-                    </td>
+                    <td className="px-4 py-2 font-medium">{item.amount.toLocaleString('ko-KR')}</td>
                     <td className="px-4 py-2">
                       {items.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeItem(index)}
-                          className="text-red-600 hover:text-red-800"
-                        >
+                        <button type="button" onClick={() => removeItem(index)} className="text-red-600 hover:text-red-800">
                           삭제
                         </button>
                       )}
@@ -268,12 +278,26 @@ export default function NewTransactionStatementPage() {
           <h2 className="text-xl font-bold mb-4">지불 조건</h2>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">지불조건</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">지불조건 선택</label>
+              <select
+                value={paymentTermsPreset}
+                onChange={(e) => {
+                  const value = e.target.value
+                  setPaymentTermsPreset(value)
+                  if (value) setPaymentTerms(value)
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                {PAYMENT_TERMS_PRESETS.map((preset) => (
+                  <option key={preset} value={preset}>{preset}</option>
+                ))}
+                <option value="">직접 입력</option>
+              </select>
               <input
                 type="text"
                 value={paymentTerms}
                 onChange={(e) => setPaymentTerms(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="w-full mt-2 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
               />
             </div>
             <div>
@@ -298,18 +322,10 @@ export default function NewTransactionStatementPage() {
         </div>
 
         <div className="flex justify-end gap-4">
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-          >
+          <button type="button" onClick={() => router.back()} className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
             취소
           </button>
-          <button
-            type="submit"
-            disabled={loading}
-            className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400"
-          >
+          <button type="submit" disabled={loading} className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400">
             {loading ? '저장 중...' : '거래명세서 생성'}
           </button>
         </div>
