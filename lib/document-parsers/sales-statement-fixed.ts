@@ -1,4 +1,4 @@
-import { normalizeKoreanText } from '@/lib/automation/text-normalize'
+import { normalizeKoreanText } from '../automation/text-normalize'
 
 export interface ParsedSalesLine {
   lineNo: number

@@ -48,7 +48,7 @@
 - `package.json` 기준 Docker/worker 실행 스크립트 부재.
 - repo 내 Dockerfile/docker-compose 미존재.
 - 파일 저장은 기본적으로 `process.cwd()/public/uploads` (환경변수로 변경 가능)이며 `/data` 표준화는 미완료.
-- 백그라운드 잡(POP3 메일 수집/비동기 OCR/재처리 큐) 인프라 부재.
+- 백그라운드 잡(업로드 문서 파싱/재처리 큐) 인프라 부재.
 
 ---
 
@@ -124,7 +124,7 @@
 ### 제안
 - 프로세스 2종:
   - `web`: Next.js UI/API
-  - `worker`: 큐 소비자(문서 처리, POP3 수집, 재처리)
+  - `worker`: 큐 소비자(업로드 문서 처리/재처리)
 - 큐 백엔드 MVP:
   - 1안: PostgreSQL 기반 job table(추가 인프라 최소)
   - 2안: Redis+BullMQ(처리량 증가 대비)
@@ -166,7 +166,7 @@
 - 목적: 업로드 원본과 파싱 결과 저장
 - 주요 필드:
   - `id`, `documentType`(`SALES_STATEMENT`,`PURCHASE_STATEMENT`,`IMPORT_DECLARATION`,`IMPORT_INVOICE`)
-  - `source`(`UPLOAD`,`POP3`), `storagePath`, `mimeType`, `checksum`
+  - `source`(`UPLOAD`), `storagePath`, `mimeType`, `checksum`
   - `parseStatus`, `parsedAt`, `extractedJson`, `confidence`
   - `importCaseId?`, `vendorId?`, `issueDate?`
 
@@ -275,11 +275,11 @@
 
 ---
 
-## Phase 4 (1~2주): POP3 메일 수집 + 운영 고도화
+## Phase 4 (후속): 업로드 문서 재처리/운영 고도화
 
-### 워커(POP3 Collector)
-- 주기적으로 메일함 조회, 첨부파일 추출, 중복 체크(checksum/message-id).
-- 첨부를 `Document`로 적재 후 parse job enqueue.
+### 워커(재처리/장애복구)
+- 파싱 실패 문서 재처리 큐 운영.
+- 문서 파서 버전업 시 선택 재처리 배치 실행.
 
 ### 운영
 - 실패 원인 코드화(암호오류, 포맷미지원, OCR실패).
@@ -305,7 +305,7 @@
 ## 7-1. 배포/운영 기반
 - `Dockerfile` (신규)
 - `docker-compose.yml` (신규)
-- `.env.example` (확장: `/data`, worker, POP3 변수)
+- `.env.example` (확장: `/data`, worker 변수)
 - `scripts/deploy/run-migrate.sh` (신규)
 - `scripts/worker/start-worker.ts` 또는 `worker/main.ts` (신규)
 
@@ -341,8 +341,7 @@
 ## 7-6. 워커/메일 수집
 - `worker/processors/parse-document.ts` (신규)
 - `worker/processors/reconcile-import-docs.ts` (신규)
-- `worker/processors/pop3-collector.ts` (신규)
-- `lib/mail/pop3-client.ts` (신규)
+- (삭제) POP3 수집기는 1차 MVP 범위에서 제외
 
 ---
 
