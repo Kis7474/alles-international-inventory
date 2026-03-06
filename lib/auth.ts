@@ -108,7 +108,7 @@ export async function requireRole(request: NextRequest, allowedRoles: UserRole[]
 export function setSessionCookie(response: NextResponse, rawToken: string, expiresAt: Date) {
   response.cookies.set(SESSION_COOKIE_NAME, rawToken, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: false,
     sameSite: 'lax',
     path: '/',
     expires: expiresAt,
