@@ -8,6 +8,7 @@ export interface SidebarMenuItem {
 
 export const sidebarMenuItems: SidebarMenuItem[] = [
   { href: '/', label: '대시보드', icon: '📊' },
+  { href: '/automation', label: '자동화 수신함', icon: '🤖' },
   {
     label: '매입/매출',
     icon: '💰',
@@ -85,6 +86,7 @@ export function createInitialOpenGroups(pathname: string): Record<string, boolea
     '재고 관리': pathname.startsWith('/warehouse'),
     '서비스': pathname.startsWith('/services') || pathname.startsWith('/projects'),
     '문서 관리': pathname.startsWith('/documents'),
+    '자동화 수신함': pathname.startsWith('/automation'),
     '설정':
       pathname.startsWith('/sales/vendors') ||
       pathname.startsWith('/salesperson') ||
