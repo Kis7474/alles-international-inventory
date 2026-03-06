@@ -14,18 +14,8 @@
 ### 실행 방법
 ```bash
 cp .env.example .env
-<<<<<<< HEAD
-<<<<<<< HEAD
 export HOST_DATA_PATH=/data
 ./scripts/selfhost/bootstrap.sh
-=======
-docker compose up -d --build
-npm run migrate:deploy
->>>>>>> origin/main
-=======
-export HOST_DATA_PATH=/data
-./scripts/selfhost/bootstrap.sh
->>>>>>> origin/codex/conduct-gap-analysis-for-erp-automation-features-cj04t8
 ```
 
 ### 테스트 방법 (샘플 파일 없이)
@@ -33,14 +23,7 @@ export HOST_DATA_PATH=/data
 curl -s http://127.0.0.1:3000/api/health
 curl -s http://127.0.0.1:3000/api/ready
 ss -lntp | rg '3000|5432'
-<<<<<<< HEAD
-<<<<<<< HEAD
 docker compose images
-=======
->>>>>>> origin/main
-=======
-docker compose images
->>>>>>> origin/codex/conduct-gap-analysis-for-erp-automation-features-cj04t8
 ```
 
 ---
@@ -49,15 +32,7 @@ docker compose images
 
 ### 변경 파일
 - `prisma/schema.prisma`
-<<<<<<< HEAD
-<<<<<<< HEAD
 - `prisma/migrations/20260306000000_init_postgres/migration.sql`
-=======
-- `prisma/migrations/20260305090000_phase0_phase1_automation/migration.sql`
->>>>>>> origin/main
-=======
-- `prisma/migrations/20260306000000_init_postgres/migration.sql`
->>>>>>> origin/codex/conduct-gap-analysis-for-erp-automation-features-cj04t8
 - `app/api/automation/documents/upload/route.ts`
 - `app/api/automation/documents/sales/upload/route.ts` (호환 유지)
 - `app/api/automation/documents/[id]/route.ts`
