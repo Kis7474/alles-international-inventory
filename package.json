@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "postinstall": "prisma generate",
-    "worker": "ts-node worker/main.ts",
+    "worker": "ts-node --transpile-only -O '{\"module\":\"CommonJS\",\"moduleResolution\":\"node\"}' worker/main.ts",
     "migrate:deploy": "prisma migrate deploy",
     "selfhost:bootstrap": "bash scripts/selfhost/bootstrap.sh",
     "selfhost:reset-db": "bash scripts/selfhost/reset-db.sh"
