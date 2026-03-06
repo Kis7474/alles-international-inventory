@@ -2,6 +2,9 @@ FROM node:20-bookworm-slim AS base
 WORKDIR /app
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> origin/codex/conduct-gap-analysis-for-erp-automation-features-cj04t8
 # 1) Install deps without running postinstall (prisma schema not copied yet)
 COPY package*.json ./
 RUN npm ci --ignore-scripts
@@ -14,6 +17,7 @@ RUN npm run postinstall && npm run build
 
 EXPOSE 3000
 CMD ["npm", "run", "start"]
+<<<<<<< HEAD
 =======
 COPY package*.json ./
 RUN npm ci
@@ -24,3 +28,5 @@ RUN npx prisma generate
 EXPOSE 3000
 CMD ["npm", "run", "dev"]
 >>>>>>> origin/main
+=======
+>>>>>>> origin/codex/conduct-gap-analysis-for-erp-automation-features-cj04t8

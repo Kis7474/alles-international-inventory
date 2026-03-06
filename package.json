@@ -10,12 +10,18 @@
     "postinstall": "prisma generate",
     "worker": "ts-node worker/main.ts",
 <<<<<<< HEAD
+<<<<<<< HEAD
     "migrate:deploy": "prisma migrate deploy",
     "selfhost:bootstrap": "bash scripts/selfhost/bootstrap.sh",
     "selfhost:reset-db": "bash scripts/selfhost/reset-db.sh"
 =======
     "migrate:deploy": "prisma migrate deploy"
 >>>>>>> origin/main
+=======
+    "migrate:deploy": "prisma migrate deploy",
+    "selfhost:bootstrap": "bash scripts/selfhost/bootstrap.sh",
+    "selfhost:reset-db": "bash scripts/selfhost/reset-db.sh"
+>>>>>>> origin/codex/conduct-gap-analysis-for-erp-automation-features-cj04t8
   },
   "prisma": {
     "seed": "ts-node --compiler-options {\\\"module\\\":\\\"CommonJS\\\"} prisma/seed.ts"
