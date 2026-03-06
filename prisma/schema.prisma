@@ -2,7 +2,8 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -26,6 +27,37 @@ enum UserStatus {
   DISABLED
 }
 
+enum PaymentStatus {
+  UNPAID
+  PARTIAL
+  PAID
+}
+
+enum AutomationDocumentType {
+  SALES_STATEMENT
+  PURCHASE_STATEMENT
+  IMPORT_INVOICE
+  IMPORT_DECLARATION
+}
+
+enum DocumentParseStatus {
+  PENDING
+  PROCESSING
+  PARSED
+  FAILED
+}
+
+enum AutomationDraftType {
+  SALES_OUTBOUND
+}
+
+enum AutomationDraftStatus {
+  DRAFT
+  APPROVED
+  POSTED
+  FAILED
+}
+
 model User {
   id            Int        @id @default(autoincrement())
   email         String     @unique
@@ -39,6 +71,8 @@ model User {
 
   sessions      UserSession[]
   auditLogs     AuditLog[]
+  automationDocuments AutomationDocument[] @relation("AutomationDocumentCreatedBy")
+  approvedDrafts      AutomationDraft[]    @relation("AutomationDraftApprovedBy")
 
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
@@ -114,6 +148,7 @@ model Product {
   inventoryMovements InventoryMovement[] // 입출고 이력
   projectItems       ProjectItem[] // 프로젝트 품목 연결 추가
   monthlyCosts       ProductMonthlyCost[] // 품목별 월별 원가 이력
+  automationDraftLines AutomationDraftLine[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -301,6 +336,10 @@ model ImportExport {
   totalAmount  Float? // 합계 (공급가액 + 부가세)
 
   memo String?
+
+  paymentStatus    PaymentStatus @default(UNPAID)
+  paymentCheckedBy Int?
+  paymentCheckedAt DateTime?
 
   // PDF 첨부 파일 (통관 내역에서 연동 또는 직접 첨부)
   pdfFileName   String?
@@ -508,6 +547,9 @@ model SalesRecord {
   importExportId Int? // 수입등록에서 자동생성된 경우
 
   notes     String?
+  paymentStatus    PaymentStatus @default(UNPAID)
+  paymentCheckedBy Int?
+  paymentCheckedAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -917,4 +959,74 @@ model TransactionStatementItem {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model AutomationDocument {
+  id             String               @id @default(cuid())
+  type           AutomationDocumentType
+  sourceFileName String
+  mimeType       String
+  fileSize       Int
+  storagePath    String
+  checksum       String
+  parseStatus    DocumentParseStatus  @default(PENDING)
+  parseAttempts  Int                  @default(0)
+  parseError     String?
+  extractedText  String?
+  parsedAt       DateTime?
+
+  createdById Int?
+  createdBy   User? @relation("AutomationDocumentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  drafts    AutomationDraft[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([parseStatus, createdAt])
+  @@index([checksum])
+}
+
+model AutomationDraft {
+  id          String              @id @default(cuid())
+  type        AutomationDraftType
+  status      AutomationDraftStatus @default(DRAFT)
+  documentId  String
+  document    AutomationDocument  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  statementDate DateTime?
+  vendorName    String?
+  totalAmount   Float?
+
+  approvedById Int?
+  approvedBy   User? @relation("AutomationDraftApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt   DateTime?
+  postedAt     DateTime?
+
+  lines     AutomationDraftLine[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+}
+
+model AutomationDraftLine {
+  id        Int             @id @default(autoincrement())
+  draftId   String
+  draft     AutomationDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  lineNo    Int
+
+  rawItemName      String
+  normalizedItemName String
+  quantity         Float
+  unitPrice        Float
+  amount           Float
+
+  matchedProductId Int?
+  matchedProduct   Product? @relation(fields: [matchedProductId], references: [id])
+  matchScore       Float @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([draftId, lineNo])
 }

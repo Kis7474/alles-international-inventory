@@ -4,8 +4,12 @@ import { extname, join } from 'path'
 
 export type UploadType = 'customs' | 'import-export'
 
-const STORAGE_ROOT = process.env.FILE_STORAGE_ROOT || join(process.cwd(), 'public', 'uploads')
+const DATA_ROOT = process.env.DATA_ROOT || '/data'
+const STORAGE_ROOT = process.env.FILE_STORAGE_ROOT || join(DATA_ROOT, 'uploads')
 const PUBLIC_BASE_URL = process.env.FILE_PUBLIC_BASE_URL || '/uploads'
+
+export const DOCUMENTS_STORAGE_ROOT = process.env.DOCUMENTS_STORAGE_ROOT || join(DATA_ROOT, 'documents')
+export const BACKUP_ROOT = process.env.BACKUP_ROOT || join(DATA_ROOT, 'backups')
 
 function sanitizeUploadType(type: string | null): UploadType {
   return type === 'customs' ? 'customs' : 'import-export'

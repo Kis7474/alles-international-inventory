@@ -1,0 +1,58 @@
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-alles_inventory}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-alles_inventory}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build: .
+    restart: unless-stopped
+    command: sh -c "npm run start"
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/alles_inventory}
+      DIRECT_URL: ${DIRECT_URL:-postgresql://postgres:postgres@postgres:5432/alles_inventory}
+      FILE_STORAGE_ROOT: /data/uploads
+      DOCUMENTS_STORAGE_ROOT: /data/documents
+      BACKUP_ROOT: /data/backups
+      AUTH_SECRET: ${AUTH_SECRET}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-ChangeMeAdmin!123}
+      SEED_STAFF_PASSWORD: ${SEED_STAFF_PASSWORD:-ChangeMeStaff!123}
+    ports:
+      - "127.0.0.1:${WEB_PORT:-3000}:3000"
+    volumes:
+      - ${HOST_DATA_PATH:-/data}:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  worker:
+    build: .
+    restart: unless-stopped
+    command: sh -c "npm run worker"
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/alles_inventory}
+      DIRECT_URL: ${DIRECT_URL:-postgresql://postgres:postgres@postgres:5432/alles_inventory}
+      WORKER_POLL_INTERVAL_MS: ${WORKER_POLL_INTERVAL_MS:-5000}
+      DOCUMENTS_STORAGE_ROOT: /data/documents
+    volumes:
+      - ${HOST_DATA_PATH:-/data}:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
