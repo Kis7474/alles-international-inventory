@@ -20,7 +20,7 @@ POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres
 DATABASE_URL=postgresql://postgres:postgres@postgres:5432/alles_inventory
 DIRECT_URL=postgresql://postgres:postgres@postgres:5432/alles_inventory
-HOST_DATA_PATH=./data
+HOST_DATA_PATH=/data
 FILE_STORAGE_ROOT=/data/uploads
 DOCUMENTS_STORAGE_ROOT=/data/documents
 BACKUP_ROOT=/data/backups
@@ -30,12 +30,14 @@ WORKER_POLL_INTERVAL_MS=5000
 ## 최초 부트스트랩
 ```bash
 cp .env.example .env
+# 필요 시 HOST_DATA_PATH=/data 설정
 ./scripts/selfhost/bootstrap.sh
 ```
 
 ## DB 완전 리셋(기존 데이터 파기)
 ```bash
 ./scripts/selfhost/reset-db.sh
+# down -v + no-cache rebuild + migrate 포함
 ```
 
 ## 수동 검증 핵심

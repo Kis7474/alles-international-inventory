@@ -277,11 +277,9 @@ http://localhost:3000
 
 ```bash
 cp .env.example .env
-mkdir -p ./data/documents ./data/uploads ./data/backups
-chmod -R 775 ./data
-docker compose up -d --build postgres
-docker compose run --rm web npm run migrate:deploy
-docker compose up -d web worker
+# 권장: 서버 영구경로 사용
+export HOST_DATA_PATH=/data
+./scripts/selfhost/bootstrap.sh
 ```
 
 ### 2) 접속/보안
@@ -300,6 +298,7 @@ docker compose up -d web worker
 
 ```bash
 ./scripts/selfhost/reset-db.sh
+# (내부적으로 down -v + no-cache rebuild + migrate 수행)
 ```
 
 ### 5) 주요 환경 변수
