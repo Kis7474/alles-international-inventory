@@ -92,6 +92,7 @@ export default function NewSalesPage() {
     cost: '',
     notes: '',
     purchasePriceOverride: '', // 매입가 오버라이드
+    autoCreatePurchase: true,
   })
 
   useEffect(() => {
@@ -333,7 +334,12 @@ export default function NewSalesPage() {
 
     try {
       // 매출 등록 시 확인 메시지
-      if (formData.type === 'SALES' && formData.productId && formData.purchasePriceOverride) {
+      if (
+        formData.type === 'SALES' &&
+        formData.autoCreatePurchase &&
+        formData.productId &&
+        formData.purchasePriceOverride
+      ) {
         const purchasePrice = parseFloat(formData.purchasePriceOverride)
         if (purchasePrice > 0) {
           const confirmed = confirm(
@@ -631,11 +637,34 @@ export default function NewSalesPage() {
                   placeholder="0"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  매출 등록 시 이 매입가로 매입 레코드가 자동 생성됩니다
+                  자동등록 ON 상태에서 매출 등록 시 이 매입가로 매입 레코드가 자동 생성됩니다
                 </p>
               </div>
             )}
           </div>
+
+          {formData.type === 'SALES' && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.autoCreatePurchase}
+                  onChange={(e) =>
+                    setFormData({ ...formData, autoCreatePurchase: e.target.checked })
+                  }
+                  className="mt-1"
+                />
+                <div>
+                  <div className="text-sm font-semibold text-amber-900">
+                    매출 등록 시 매입 자동등록
+                  </div>
+                  <div className="text-xs text-amber-800 mt-1">
+                    거래 특성상 자동생성이 부적합한 건은 OFF로 등록하세요.
+                  </div>
+                </div>
+              </label>
+            </div>
+          )}
 
           {/* 계산 결과 표시 */}
           <div className="bg-gray-50 p-4 rounded-lg">

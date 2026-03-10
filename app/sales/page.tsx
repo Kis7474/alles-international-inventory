@@ -77,6 +77,7 @@ export default function SalesPage() {
   const [filterCategory, setFilterCategory] = useState('')
   const [filterVendor, setFilterVendor] = useState('') // Phase 4
   const [filterItemName, setFilterItemName] = useState('') // Phase 4
+  const [filterYearMonth, setFilterYearMonth] = useState('')
   const [filterStartDate, setFilterStartDate] = useState('')
   const [filterEndDate, setFilterEndDate] = useState('')
   
@@ -162,8 +163,12 @@ export default function SalesPage() {
       if (filterCategory) params.append('categoryId', filterCategory)
       if (filterVendor) params.append('vendorId', filterVendor) // Phase 4
       if (filterItemName) params.append('itemName', filterItemName) // Phase 4
-      if (filterStartDate) params.append('startDate', filterStartDate)
-      if (filterEndDate) params.append('endDate', filterEndDate)
+      if (filterYearMonth) {
+        params.append('yearMonth', filterYearMonth)
+      } else {
+        if (filterStartDate) params.append('startDate', filterStartDate)
+        if (filterEndDate) params.append('endDate', filterEndDate)
+      }
 
       const res = await fetch(`/api/sales?${params.toString()}`, { cache: 'no-store' })
       const response = await res.json()
@@ -427,8 +432,12 @@ export default function SalesPage() {
         if (filterCategory) params.append('categoryId', filterCategory)
         if (filterVendor) params.append('vendorId', filterVendor)
         if (filterItemName) params.append('itemName', filterItemName)
-        if (filterStartDate) params.append('startDate', filterStartDate)
-        if (filterEndDate) params.append('endDate', filterEndDate)
+        if (filterYearMonth) {
+          params.append('yearMonth', filterYearMonth)
+        } else {
+          if (filterStartDate) params.append('startDate', filterStartDate)
+          if (filterEndDate) params.append('endDate', filterEndDate)
+        }
 
         const res = await fetch(`/api/sales?${params.toString()}`, { cache: 'no-store' })
         const response = await res.json()
@@ -461,6 +470,7 @@ export default function SalesPage() {
     setFilterCategory('')
     setFilterVendor('')
     setFilterItemName('')
+    setFilterYearMonth('')
     setFilterStartDate('')
     setFilterEndDate('')
     setPage(1)
@@ -601,25 +611,43 @@ export default function SalesPage() {
           </div>
           
           <div>
-            <label className="block text-sm font-medium mb-1 text-gray-700">시작일</label>
+            <label className="block text-sm font-medium mb-1 text-gray-700">월별 조회(연-월)</label>
             <input
-              type="date"
-              value={filterStartDate}
-              onChange={(e) => setFilterStartDate(e.target.value)}
+              type="month"
+              value={filterYearMonth}
+              onChange={(e) => setFilterYearMonth(e.target.value)}
               className="w-full px-3 py-2 border rounded-lg text-gray-900"
             />
           </div>
-          
-          <div>
-            <label className="block text-sm font-medium mb-1 text-gray-700">종료일</label>
-            <input
-              type="date"
-              value={filterEndDate}
-              onChange={(e) => setFilterEndDate(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg text-gray-900"
-            />
+
+          <div className="text-xs text-gray-500 flex items-end pb-2">
+            월별 조회를 선택하면 시작일/종료일 조건보다 우선 적용됩니다.
           </div>
         </div>
+
+        {!filterYearMonth && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <div>
+              <label className="block text-sm font-medium mb-1 text-gray-700">시작일</label>
+              <input
+                type="date"
+                value={filterStartDate}
+                onChange={(e) => setFilterStartDate(e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg text-gray-900"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1 text-gray-700">종료일</label>
+              <input
+                type="date"
+                value={filterEndDate}
+                onChange={(e) => setFilterEndDate(e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg text-gray-900"
+              />
+            </div>
+          </div>
+        )}
 
         {/* Phase 4: 거래처/품목명 필터 */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">

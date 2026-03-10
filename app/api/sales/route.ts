@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
     const itemName = searchParams.get('itemName') // Phase 4: 품목명 필터
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
+    const yearMonth = searchParams.get('yearMonth')
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
 
@@ -60,7 +61,15 @@ export async function GET(request: NextRequest) {
         mode: 'insensitive'
       }
     }
-    if (startDate || endDate) {
+    if (yearMonth && /^\d{4}-\d{2}$/.test(yearMonth)) {
+      const [year, month] = yearMonth.split('-').map(Number)
+      const monthStart = new Date(year, month - 1, 1)
+      const monthEnd = new Date(year, month, 0, 23, 59, 59, 999)
+      where.date = {
+        gte: monthStart,
+        lte: monthEnd,
+      }
+    } else if (startDate || endDate) {
       where.date = {}
       if (startDate) {
         where.date.gte = new Date(startDate)
@@ -130,6 +139,7 @@ export async function POST(request: NextRequest) {
       cost,
       notes,
       purchasePriceOverride, // 매입가 오버라이드 (프론트에서 전달)
+      autoCreatePurchase, // 매출 등록 시 매입 자동 생성 여부
     } = body
 
     // 금액 계산
@@ -196,7 +206,9 @@ export async function POST(request: NextRequest) {
     })
 
     // ★★★ 매출 등록 시 매입(PURCHASE)도 동시 생성 ★★★
-    if (type === 'SALES' && productId) {
+    const shouldAutoCreatePurchase = autoCreatePurchase !== false
+
+    if (type === 'SALES' && productId && shouldAutoCreatePurchase) {
       const { createAutoPurchaseRecord } = await import('@/lib/purchase-auto')
       
       // 품목 정보 조회
