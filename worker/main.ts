@@ -1,6 +1,10 @@
 import { promises as fs } from 'fs'
 import { AutomationDocumentType, PrismaClient } from '@prisma/client'
-import { extractTextFromPdfBuffer, parseFixedSalesStatementFromText } from '../lib/document-parsers/sales-statement-fixed'
+import {
+  extractTextFromPdfBuffer,
+  parseFixedSalesStatementFromText,
+  validateParsedSalesStatement,
+} from '../lib/document-parsers/sales-statement-fixed'
 import { normalizeKoreanText } from '../lib/automation/text-normalize'
 
 const prisma = new PrismaClient()
@@ -37,6 +41,20 @@ async function parseSalesStatement(documentId: string) {
   const bytes = await fs.readFile(document.storagePath)
   const text = extractTextFromPdfBuffer(bytes)
   const parsed = parseFixedSalesStatementFromText(text)
+  const validation = validateParsedSalesStatement(parsed)
+
+  console.log('[worker] parse summary', {
+    documentId,
+    type: document.type,
+    lineCount: parsed.lines.length,
+    vendorName: parsed.vendorName,
+    totalAmount: parsed.totalAmount,
+    valid: validation.valid,
+  })
+
+  if (!validation.valid) {
+    throw new Error(validation.reason || 'Failed to validate parsed statement')
+  }
 
   const draft = await prisma.automationDraft.create({
     data: {
@@ -87,6 +105,8 @@ async function processByDocumentType(documentId: string, type: AutomationDocumen
 }
 
 async function run() {
+  console.log('[worker] parser poll started', { pollMs: POLL_MS })
+
   while (true) {
     try {
       const pending = await prisma.automationDocument.findFirst({
@@ -98,6 +118,12 @@ async function run() {
         await new Promise((resolve) => setTimeout(resolve, POLL_MS))
         continue
       }
+
+      console.log('[worker] pending document found', {
+        documentId: pending.id,
+        type: pending.type,
+        createdAt: pending.createdAt,
+      })
 
       const lock = await prisma.automationDocument.updateMany({
         where: { id: pending.id, parseStatus: 'PENDING' },
@@ -112,14 +138,17 @@ async function run() {
 
       try {
         await processByDocumentType(pending.id, pending.type)
+        console.log('[worker] parse success', { documentId: pending.id, type: pending.type })
       } catch (error) {
+        const message = error instanceof Error ? error.message : 'unknown error'
         await prisma.automationDocument.update({
           where: { id: pending.id },
           data: {
             parseStatus: 'FAILED',
-            parseError: error instanceof Error ? error.message : 'unknown error',
+            parseError: message,
           },
         })
+        console.error('[worker] parse failure', { documentId: pending.id, type: pending.type, error: message })
       }
     } catch (error) {
       console.error('[worker] parser poll error', error)

@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-HOST_DATA_PATH_VALUE="${HOST_DATA_PATH:-/data}"
-
 run_privileged() {
   if command -v sudo >/dev/null 2>&1; then
     sudo "$@"
@@ -11,16 +9,22 @@ run_privileged() {
   fi
 }
 
-echo "[1/5] Preparing persistent data path: ${HOST_DATA_PATH_VALUE}"
-run_privileged mkdir -p "${HOST_DATA_PATH_VALUE}/documents" "${HOST_DATA_PATH_VALUE}/uploads" "${HOST_DATA_PATH_VALUE}/backups"
-run_privileged chmod -R 775 "${HOST_DATA_PATH_VALUE}"
-
 if [[ ! -f .env ]]; then
-  echo "[2/5] .env not found. Copying from .env.example"
+  echo "[1/5] .env not found. Copying from .env.example"
   cp .env.example .env
 else
-  echo "[2/5] Using existing .env"
+  echo "[1/5] Using existing .env"
 fi
+
+set -a
+source .env
+set +a
+
+HOST_DATA_PATH_VALUE="${HOST_DATA_PATH:-/data}"
+
+echo "[2/5] Preparing persistent data path: ${HOST_DATA_PATH_VALUE}"
+run_privileged mkdir -p "${HOST_DATA_PATH_VALUE}/documents" "${HOST_DATA_PATH_VALUE}/uploads" "${HOST_DATA_PATH_VALUE}/backups"
+run_privileged chmod -R 775 "${HOST_DATA_PATH_VALUE}"
 
 echo "[3/5] Rebuilding web/worker images to avoid stale image state"
 docker compose build --no-cache web worker

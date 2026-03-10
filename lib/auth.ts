@@ -105,10 +105,23 @@ export async function requireRole(request: NextRequest, allowedRoles: UserRole[]
   return result
 }
 
+
+function isSecureCookieEnabled(): boolean {
+  if (process.env.NODE_ENV !== 'production') return false
+
+  const forceInsecure = process.env.ALLOW_INSECURE_HTTP_AUTH === '1'
+  if (forceInsecure) return false
+
+  const appUrl = process.env.NEXTAUTH_URL || process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || ''
+  if (appUrl && appUrl.startsWith('http://')) return false
+
+  return true
+}
+
 export function setSessionCookie(response: NextResponse, rawToken: string, expiresAt: Date) {
   response.cookies.set(SESSION_COOKIE_NAME, rawToken, {
     httpOnly: true,
-    secure: false,
+    secure: isSecureCookieEnabled(),
     sameSite: 'lax',
     path: '/',
     expires: expiresAt,
@@ -118,7 +131,7 @@ export function setSessionCookie(response: NextResponse, rawToken: string, expir
 export function clearSessionCookie(response: NextResponse) {
   response.cookies.set(SESSION_COOKIE_NAME, '', {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: isSecureCookieEnabled(),
     sameSite: 'lax',
     path: '/',
     maxAge: 0,
