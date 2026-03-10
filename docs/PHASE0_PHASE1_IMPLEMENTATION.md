@@ -14,8 +14,8 @@
 ### 실행 방법
 ```bash
 cp .env.example .env
-docker compose up -d --build
-npm run migrate:deploy
+export HOST_DATA_PATH=/data
+./scripts/selfhost/bootstrap.sh
 ```
 
 ### 테스트 방법 (샘플 파일 없이)
@@ -23,6 +23,7 @@ npm run migrate:deploy
 curl -s http://127.0.0.1:3000/api/health
 curl -s http://127.0.0.1:3000/api/ready
 ss -lntp | rg '3000|5432'
+docker compose images
 ```
 
 ---
@@ -31,7 +32,7 @@ ss -lntp | rg '3000|5432'
 
 ### 변경 파일
 - `prisma/schema.prisma`
-- `prisma/migrations/20260305090000_phase0_phase1_automation/migration.sql`
+- `prisma/migrations/20260306000000_init_postgres/migration.sql`
 - `app/api/automation/documents/upload/route.ts`
 - `app/api/automation/documents/sales/upload/route.ts` (호환 유지)
 - `app/api/automation/documents/[id]/route.ts`

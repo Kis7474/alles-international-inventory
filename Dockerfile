@@ -1,11 +1,20 @@
 FROM node:20-bookworm-slim AS base
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm ci
+# Install system runtime deps required by Prisma engine in Debian Bookworm
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends openssl ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
 
+# 1) Install deps without running postinstall (prisma schema not copied yet)
+COPY package*.json ./
+RUN npm ci --ignore-scripts
+
+# 2) Copy source (including prisma/schema.prisma)
 COPY . .
-RUN npx prisma generate
+
+# 3) Run generation/build after schema is present
+RUN npm run postinstall && npm run build
 
 EXPOSE 3000
-CMD ["npm", "run", "dev"]
+CMD ["npm", "run", "start"]
