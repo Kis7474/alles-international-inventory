@@ -40,7 +40,7 @@ async function parseSalesStatement(documentId: string) {
   if (!document) return
 
   const bytes = await fs.readFile(document.storagePath)
-  const text = extractTextFromPdfBuffer(bytes)
+  const text = await extractTextFromPdfBuffer(bytes)
   const debug = getSalesStatementParseDebug(text)
   console.log('[worker] extracted text preview', {
     documentId,

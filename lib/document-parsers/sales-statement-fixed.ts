@@ -1,5 +1,12 @@
+import { execFile } from 'child_process'
+import { promisify } from 'util'
+import { mkdtemp, readFile, rm, writeFile } from 'fs/promises'
+import { tmpdir } from 'os'
+import { join } from 'path'
 import { inflateSync } from 'zlib'
 import { normalizeKoreanText } from '../automation/text-normalize'
+
+const execFileAsync = promisify(execFile)
 
 export interface ParsedSalesLine {
   lineNo: number
@@ -168,13 +175,27 @@ function parseLineItem(line: string): Omit<ParsedSalesLine, 'lineNo' | 'normaliz
   return { rawItemName, quantity, unitPrice, amount }
 }
 
+function buildErpTemplateRows(lines: string[]): string[] {
+  const headerIndex = lines.findIndex((line) => /\bNo\b/i.test(line) && /제품명/.test(line) && /수량/.test(line) && /단가/.test(line) && /금액/.test(line))
+  if (headerIndex < 0) return []
+
+  const out: string[] = []
+  for (const line of lines.slice(headerIndex + 1)) {
+    if (/(?:금액|부가세|총금액|계좌번호|지불조건)\s*[:：]?/.test(line)) break
+    if (line.length < 4) continue
+    out.push(line)
+  }
+  return out
+}
+
 function buildCandidateRows(cleanedText: string): string[] {
-  return cleanedText
-    .split('\n')
-    .map((line) => line.trim())
+  const lines = cleanedText.split('\n').map((line) => line.trim()).filter((line) => line.length >= 2)
+  const erpRows = buildErpTemplateRows(lines)
+  const genericRows = lines
     .filter((line) => line.length >= 4)
     .filter((line) => /\d{1,3}(?:,\d{3})/.test(line) || /\b\d+\s+\d[\d,]+\s+\d[\d,]+$/.test(line))
-    .slice(0, 40)
+
+  return Array.from(new Set([...erpRows, ...genericRows])).slice(0, 60)
 }
 
 export function getSalesStatementParseDebug(text: string): SalesStatementParseDebug {
@@ -242,7 +263,22 @@ export function validateParsedSalesStatement(statement: ParsedSalesStatement): {
   return { valid: true }
 }
 
-export function extractTextFromPdfBuffer(buffer: Buffer): string {
+async function extractTextWithPdftotext(buffer: Buffer): Promise<string> {
+  const workDir = await mkdtemp(join(tmpdir(), 'sales-pdf-'))
+  const inputPath = join(workDir, 'input.pdf')
+  const outputPath = join(workDir, 'output.txt')
+
+  try {
+    await writeFile(inputPath, buffer)
+    await execFileAsync('pdftotext', ['-layout', '-enc', 'UTF-8', inputPath, outputPath])
+    const txt = await readFile(outputPath, 'utf8')
+    return normalizeExtractedText(txt)
+  } finally {
+    await rm(workDir, { recursive: true, force: true })
+  }
+}
+
+function extractTextFromPdfBufferLegacy(buffer: Buffer): string {
   const raw = buffer.toString('latin1')
   const textChunks: string[] = []
 
@@ -261,4 +297,17 @@ export function extractTextFromPdfBuffer(buffer: Buffer): string {
   const combined = textChunks.join('\n')
   if (combined.trim()) return normalizeExtractedText(combined)
   return normalizeExtractedText(raw)
+}
+
+export async function extractTextFromPdfBuffer(buffer: Buffer): Promise<string> {
+  try {
+    const extracted = await extractTextWithPdftotext(buffer)
+    if (extracted.trim()) {
+      return extracted
+    }
+  } catch {
+    // fallback below
+  }
+
+  return extractTextFromPdfBufferLegacy(buffer)
 }
