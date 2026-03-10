@@ -17,8 +17,13 @@ export interface ParsedSalesStatement {
   lines: ParsedSalesLine[]
 }
 
+export interface SalesStatementParseDebug {
+  extractedTextPreview: string
+  candidateRows: string[]
+}
+
 function parseNumber(raw: string): number {
-  return Number(raw.replace(/,/g, '').trim())
+  return Number(raw.replace(/[₩,\s]/g, '').trim())
 }
 
 function decodePdfLiteralString(input: string): string {
@@ -80,19 +85,19 @@ function decodePdfHexString(hex: string): string {
 function extractTextOps(content: string): string[] {
   const chunks: string[] = []
 
-  const literalOps = Array.from(content.matchAll(/\(((?:\\.|[^\\)])*)\)\s*(?:Tj|'|"|TJ)/g))
-  for (const m of literalOps) {
-    const decoded = decodePdfLiteralString(m[1])
-    if (decoded.trim()) chunks.push(decoded)
+  for (const m of Array.from(content.matchAll(/\[((?:.|\n|\r)*?)\]\s*TJ/g))) {
+    const arr = m[1]
+    const joined = Array.from(arr.matchAll(/\(((?:\\.|[^\\)])*)\)|<([0-9A-Fa-f\s]+)>/g))
+      .map((s) => (s[1] ? decodePdfLiteralString(s[1]) : decodePdfHexString(s[2])))
+      .join('')
+      .trim()
+
+    if (joined) chunks.push(joined)
   }
 
-  const arrayOps = Array.from(content.matchAll(/\[((?:.|\n|\r)*?)\]\s*TJ/g))
-  for (const m of arrayOps) {
-    const arr = m[1]
-    for (const s of Array.from(arr.matchAll(/\(((?:\\.|[^\\)])*)\)|<([0-9A-Fa-f\s]+)>/g))) {
-      const value = s[1] ? decodePdfLiteralString(s[1]) : decodePdfHexString(s[2])
-      if (value.trim()) chunks.push(value)
-    }
+  for (const m of Array.from(content.matchAll(/\(((?:\\.|[^\\)])*)\)\s*(?:Tj|'|")/g))) {
+    const decoded = decodePdfLiteralString(m[1]).trim()
+    if (decoded) chunks.push(decoded)
   }
 
   return chunks
@@ -105,32 +110,44 @@ function normalizeExtractedText(raw: string): string {
     .replace(/[ ]{2,}/g, ' ')
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
 }
 
 function isArtifactLine(line: string): boolean {
   const trimmed = line.trim()
   if (!trimmed) return true
-  if (/\/Resources|\/Font|\/ProcSet|\/MediaBox|endobj|obj|xref|stream|endstream/i.test(trimmed)) return true
-  if ((trimmed.match(/[<>{}\[\]\/]/g) || []).length > trimmed.length / 6) return true
+  if (/\/Resources|\/Font|\/ProcSet|\/MediaBox|endobj|obj|xref|stream|endstream|Filter|Length/i.test(trimmed)) return true
+  if ((trimmed.match(/[<>{}\[\]\/]/g) || []).length > trimmed.length / 5) return true
   return false
 }
 
+function toColumns(line: string): string[] {
+  return line
+    .replace(/[|│]/g, ' ')
+    .split(/\s{2,}/)
+    .map((v) => v.trim())
+    .filter(Boolean)
+}
+
 function parseLineItem(line: string): Omit<ParsedSalesLine, 'lineNo' | 'normalizedItemName'> | null {
-  const work = line.trim().replace(/^\d{1,3}\s*[.|)]\s*/, '')
+  const work = line
+    .trim()
+    .replace(/^\d{1,3}\s*[.|)]\s*/, '')
+    .replace(/[₩]/g, '')
   if (!work || isArtifactLine(work)) return null
 
   const numberMatches = Array.from(work.matchAll(/-?\d{1,3}(?:,\d{3})*(?:\.\d+)?/g))
-  if (numberMatches.length < 2) return null
+  if (numberMatches.length < 3) return null
 
   const tail = numberMatches.slice(-3)
   const nums = tail.map((m) => parseNumber(m[0]))
   if (nums.some((n) => Number.isNaN(n))) return null
 
-  let quantity = nums.length === 3 ? nums[0] : 0
-  const unitPrice = nums.length === 3 ? nums[1] : nums[0]
-  const amount = nums.length === 3 ? nums[2] : nums[1]
+  let quantity = nums[0]
+  const unitPrice = nums[1]
+  const amount = nums[2]
 
-  if ((quantity <= 0 || quantity > 100000) && unitPrice > 0) {
+  if ((quantity <= 0 || quantity > 100000) && unitPrice > 0 && amount > 0) {
     const inferred = amount / unitPrice
     if (Number.isFinite(inferred) && inferred > 0 && inferred < 100000) {
       quantity = Number(inferred.toFixed(3))
@@ -138,24 +155,46 @@ function parseLineItem(line: string): Omit<ParsedSalesLine, 'lineNo' | 'normaliz
   }
 
   const cutIndex = tail[0]?.index ?? 0
-  const rawItemName = work.slice(0, cutIndex).replace(/[|]+/g, ' ').trim()
+  const columns = toColumns(work.slice(0, cutIndex))
+  const rawItemName = (columns.length >= 2 ? columns[columns.length - 2] : columns[0] || '')
+    .replace(/^(?:\d{1,3}|\d{1,2}\/\d{1,2})\s+/, '')
+    .replace(/^(?:No|번호|날짜)$/i, '')
+    .trim()
+
   if (!rawItemName || rawItemName.length < 2) return null
   if (/^[\d\W_]+$/.test(rawItemName)) return null
-  if (amount <= 0 || unitPrice < 0 || quantity <= 0) return null
+  if (amount <= 0 || unitPrice <= 0 || quantity <= 0) return null
 
   return { rawItemName, quantity, unitPrice, amount }
+}
+
+function buildCandidateRows(cleanedText: string): string[] {
+  return cleanedText
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length >= 4)
+    .filter((line) => /\d{1,3}(?:,\d{3})/.test(line) || /\b\d+\s+\d[\d,]+\s+\d[\d,]+$/.test(line))
+    .slice(0, 40)
+}
+
+export function getSalesStatementParseDebug(text: string): SalesStatementParseDebug {
+  const cleanedText = normalizeExtractedText(text)
+  return {
+    extractedTextPreview: cleanedText.slice(0, 2000),
+    candidateRows: buildCandidateRows(cleanedText).slice(0, 20),
+  }
 }
 
 export function parseFixedSalesStatementFromText(text: string): ParsedSalesStatement {
   const cleanedText = normalizeExtractedText(text)
   const vendorMatch = cleanedText.match(/(?:받는분|거래처)\s*[:：]?\s*([^\n\r]+)/)
   const dateMatch = cleanedText.match(/(20\d{2})[.\-/년\s]+(\d{1,2})[.\-/월\s]+(\d{1,2})/)
-  const totalMatch = cleanedText.match(/(?:총금액|합계)\s*[:：]?\s*([\d,]+)/)
+  const totalMatch = cleanedText.match(/(?:총금액|합계)\s*[:：]?\s*₩?\s*([\d,]+)/)
 
   const lines: ParsedSalesLine[] = []
   const seen = new Set<string>()
 
-  for (const line of cleanedText.split('\n')) {
+  for (const line of buildCandidateRows(cleanedText)) {
     const parsed = parseLineItem(line)
     if (!parsed) continue
 
@@ -212,8 +251,8 @@ export function extractTextFromPdfBuffer(buffer: Buffer): string {
     const bytes = Buffer.from(streamBody, 'latin1')
 
     try {
-      const inflated = inflateSync(bytes)
-      textChunks.push(...extractTextOps(inflated.toString('latin1')))
+      const inflated = inflateSync(bytes).toString('latin1')
+      textChunks.push(...extractTextOps(inflated))
     } catch {
       textChunks.push(...extractTextOps(streamBody))
     }

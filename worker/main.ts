@@ -3,6 +3,7 @@ import { AutomationDocumentType, PrismaClient } from '@prisma/client'
 import {
   extractTextFromPdfBuffer,
   parseFixedSalesStatementFromText,
+  getSalesStatementParseDebug,
   validateParsedSalesStatement,
 } from '../lib/document-parsers/sales-statement-fixed'
 import { normalizeKoreanText } from '../lib/automation/text-normalize'
@@ -40,6 +41,18 @@ async function parseSalesStatement(documentId: string) {
 
   const bytes = await fs.readFile(document.storagePath)
   const text = extractTextFromPdfBuffer(bytes)
+  const debug = getSalesStatementParseDebug(text)
+  console.log('[worker] extracted text preview', {
+    documentId,
+    type: document.type,
+    preview: debug.extractedTextPreview,
+  })
+  console.log('[worker] candidate raw rows', {
+    documentId,
+    type: document.type,
+    rows: debug.candidateRows,
+  })
+
   const parsed = parseFixedSalesStatementFromText(text)
   const validation = validateParsedSalesStatement(parsed)
 
