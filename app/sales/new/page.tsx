@@ -87,7 +87,6 @@ export default function NewSalesPage() {
   
   // Filtered products based on vendor and type
   const [availableProducts, setAvailableProducts] = useState<Product[]>([])
-  const [isBulkMode, setIsBulkMode] = useState(false)
   const [bulkLines, setBulkLines] = useState<BulkLineForm[]>([
     {
       productId: '',
@@ -149,91 +148,9 @@ export default function NewSalesPage() {
     }
   }
 
-  const handlePurchasePriceOverrideChange = (value: string) => {
-    setFormData((prev) => {
-      const shouldSyncCost =
-        prev.type === 'SALES' &&
-        prev.autoCreatePurchase &&
-        (prev.cost === '' || parseFloat(prev.cost || '0') === 0 || prev.cost === prev.purchasePriceOverride)
-
-      return {
-        ...prev,
-        purchasePriceOverride: value,
-        cost: shouldSyncCost ? value : prev.cost,
-      }
-    })
-  }
-
   const toDateOnly = (value: string | Date) => {
     const d = new Date(value)
     return new Date(d.getFullYear(), d.getMonth(), d.getDate())
-  }
-
-  const handleProductChange = async (productId: string) => {
-    if (productId) {
-      const product = products.find((p) => p.id === parseInt(productId))
-      if (product) {
-        // Auto-fill category from product
-        const categoryId = product.categoryId ? product.categoryId.toString() : ''
-        
-        // Phase 5: Use product.currentCost directly (already calculated by updateProductCurrentCost)
-        const cost = product.currentCost || 0
-        
-        // Set default purchase price override
-        let defaultPurchasePrice = product.defaultPurchasePrice || product.currentCost || 0
-        
-        // P0: For SALES mode, fetch purchase vendor price if purchaseVendorId exists
-        if (formData.type === 'SALES' && product.purchaseVendorId) {
-          try {
-            const res = await fetch(`/api/vendor-product-prices?productId=${productId}&vendorId=${product.purchaseVendorId}`)
-            const prices: VendorPrice[] = await res.json()
-            
-            if (prices.length > 0) {
-              // Get the most recent purchase price before or on the transaction date
-              const transactionDate = toDateOnly(formData.date)
-              const applicablePrice = prices
-                .filter((p: VendorPrice) => toDateOnly(p.effectiveDate) <= transactionDate && p.purchasePrice !== null)
-                .sort((a: VendorPrice, b: VendorPrice) => toDateOnly(b.effectiveDate).getTime() - toDateOnly(a.effectiveDate).getTime())[0]
-              
-              if (applicablePrice && applicablePrice.purchasePrice) {
-                defaultPurchasePrice = applicablePrice.purchasePrice
-              }
-            }
-          } catch (error) {
-            console.error('Error fetching purchase vendor price:', error)
-            // Fall back to defaultPurchasePrice
-          }
-        }
-        
-        // Set default unit price based on transaction type
-        const defaultPrice = formData.type === 'PURCHASE'
-          ? (product.defaultPurchasePrice || product.currentCost || 0)
-          : 0
-        
-        setFormData((prev) => ({ 
-          ...prev, 
-          productId, 
-          itemName: product.name,
-          categoryId: categoryId,
-          cost: cost.toString(),
-          purchasePriceOverride: defaultPurchasePrice.toString(),
-          unitPrice: formData.type === 'SALES' ? '' : defaultPrice.toString(),
-        }))
-        
-        // Fetch vendor-specific price if vendor is selected (will override the default price)
-        if (formData.vendorId) {
-          fetchVendorPrice(parseInt(productId), parseInt(formData.vendorId), formData.date, formData.type)
-        } else {
-          if (formData.type === 'SALES') {
-            alert('매출 단가는 거래처별 가격에서만 자동 반영됩니다. 거래처를 먼저 선택해주세요.')
-          } else if (defaultPrice === 0) {
-            alert('⚠️ 매입단가가 설정되지 않았습니다. 수동으로 입력해주세요.')
-          }
-        }
-      }
-    } else {
-      setFormData((prev) => ({ ...prev, productId: '', itemName: '', unitPrice: '', cost: '', purchasePriceOverride: '' }))
-    }
   }
 
   const handleVendorChange = (vendorId: string) => {
@@ -422,8 +339,13 @@ export default function NewSalesPage() {
     setLoading(true)
 
     try {
-      if (isBulkMode) {
-        const invalidLine = bulkLines.find((line) => !line.productId || !line.quantity || !line.unitPrice)
+        if (!formData.date || !formData.type || !formData.salespersonId || !formData.categoryId) {
+        alert('날짜/거래유형/담당자/카테고리를 먼저 입력해주세요.')
+        setLoading(false)
+        return
+      }
+
+      const invalidLine = bulkLines.find((line) => !line.productId || !line.quantity || !line.unitPrice)
         if (invalidLine) {
           alert('다품목 모드에서는 각 라인의 품목/수량/단가를 입력해주세요.')
           setLoading(false)
@@ -469,51 +391,6 @@ export default function NewSalesPage() {
         alert(`다품목 등록 완료 (매출 ${data.summary?.createdSales || 0}건)`)
         router.push('/sales')
         return
-      }
-      const selectedProduct = formData.productId
-        ? products.find((p) => p.id === parseInt(formData.productId, 10))
-        : null
-
-      if (formData.type === 'SALES' && formData.autoCreatePurchase && selectedProduct && !selectedProduct.purchaseVendorId) {
-        alert('선택한 품목에 매입 거래처가 등록되어 있지 않아 자동 매입을 생성할 수 없습니다.\n품목에 매입 거래처를 등록하거나 자동등록을 OFF로 변경해주세요.')
-        setLoading(false)
-        return
-      }
-
-      // 매출 등록 시 확인 메시지
-      if (
-        formData.type === 'SALES' &&
-        formData.autoCreatePurchase &&
-        formData.productId &&
-        formData.purchasePriceOverride
-      ) {
-        const purchasePrice = parseFloat(formData.purchasePriceOverride)
-        if (purchasePrice > 0) {
-          const confirmed = confirm(
-            `매입가 ₩${purchasePrice.toLocaleString()}으로 매입도 동시 등록됩니다.\n진행하시겠습니까?`
-          )
-          if (!confirmed) {
-            setLoading(false)
-            return
-          }
-        }
-      }
-
-      const res = await fetch('/api/sales', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        alert(data.error || '등록 중 오류가 발생했습니다.')
-        return
-      }
-
-      alert('매입매출이 등록되었습니다.')
-      router.push('/sales')
     } catch (error) {
       console.error('Error creating sales record:', error)
       alert('등록 중 오류가 발생했습니다.')
@@ -522,41 +399,6 @@ export default function NewSalesPage() {
     }
   }
 
-  const calculateAmount = () => {
-    const quantity = parseFloat(formData.quantity) || 0
-    const unitPrice = parseFloat(formData.unitPrice) || 0
-    return quantity * unitPrice
-  }
-
-  const calculateMargin = () => {
-    if (formData.type !== 'SALES') return 0
-    const amount = calculateAmount()
-    const unitCost = parseFloat(formData.cost) || 0
-    const quantity = parseFloat(formData.quantity) || 0
-    const totalCost = unitCost * quantity
-    return amount - totalCost
-  }
-
-  const calculateMarginRate = () => {
-    const amount = calculateAmount()
-    if (amount === 0) return 0
-    const margin = calculateMargin()
-    return (margin / amount) * 100
-  }
-
-  const getCommissionRate = () => {
-    const selectedSalesperson = salespersons.find(
-      (sp) => sp.id === parseInt(formData.salespersonId)
-    )
-    return selectedSalesperson?.commissionRate || 0
-  }
-
-  const calculateCommission = () => {
-    if (formData.type !== 'SALES') return 0
-    const margin = calculateMargin()
-    const commissionRate = getCommissionRate()
-    return margin * commissionRate
-  }
 
   return (
     <div>
@@ -623,6 +465,23 @@ export default function NewSalesPage() {
                 ))}
               </select>
             </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1 text-gray-700">카테고리 *</label>
+              <select
+                required
+                value={formData.categoryId}
+                onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg text-gray-900"
+              >
+                <option value="">선택하세요</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.nameKo}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* 거래처/고객 - 거래처 먼저 선택하도록 순서 변경 */}
@@ -657,17 +516,7 @@ export default function NewSalesPage() {
             </div>
           </div>
 
-          {/* 품목 모드 */}
-          <div className="bg-gray-50 border rounded-lg p-3">
-            <label className="flex items-center gap-2 text-sm text-gray-800">
-              <input type="checkbox" checked={isBulkMode} onChange={(e) => setIsBulkMode(e.target.checked)} />
-              다품목 일괄 입력 모드
-            </label>
-          </div>
-
-
-          {isBulkMode && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold text-blue-900">다품목 입력</h3>
                 <button type="button" onClick={addBulkLine} className="px-3 py-1 text-sm bg-blue-600 text-white rounded">+ 행 추가</button>
@@ -700,7 +549,7 @@ export default function NewSalesPage() {
                           </select>
                         </td>
                         <td className="px-2 py-1">
-                          <input type="number" step="0.01" value={line.quantity} onChange={(e) => updateBulkLine(index, { quantity: e.target.value })} className="w-24 border rounded px-2 py-1 text-right text-gray-900" />
+                          <input type="number" step="1" min="1" value={line.quantity} onChange={(e) => updateBulkLine(index, { quantity: e.target.value })} className="w-24 border rounded px-2 py-1 text-right text-gray-900" />
                         </td>
                         <td className="px-2 py-1">
                           <input type="number" step="0.01" value={line.unitPrice} onChange={(e) => updateBulkLine(index, { unitPrice: e.target.value })} className="w-28 border rounded px-2 py-1 text-right text-gray-900" />
@@ -720,140 +569,6 @@ export default function NewSalesPage() {
                 </table>
               </div>
             </div>
-          )}
-
-          {!isBulkMode && (
-          <>
-          {/* 품목 정보 */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Phase 4: Autocomplete for product */}
-            <Autocomplete
-              label="품목 선택 (선택한 거래처의 품목만 표시)"
-              options={availableProducts.map(p => ({
-                id: p.id,
-                label: p.name,
-                sublabel: p.unit
-              }))}
-              value={formData.productId}
-              onChange={(value) => handleProductChange(value)}
-              placeholder={formData.vendorId ? '품목을 검색하세요' : '거래처를 먼저 선택하세요'}
-              disabled={!formData.vendorId}
-            />
-
-            <div>
-              <label className="block text-sm font-medium mb-1 text-gray-700">
-                카테고리 * {formData.productId && <span className="text-xs text-blue-600">(품목에서 자동 설정됨)</span>}
-              </label>
-              <select
-                required
-                value={formData.categoryId}
-                onChange={(e) =>
-                  setFormData({ ...formData, categoryId: e.target.value })
-                }
-                className="w-full px-3 py-2 border rounded-lg text-gray-900"
-                disabled={!!formData.productId}
-              >
-                <option value="">선택하세요</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.nameKo}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1 text-gray-700">
-              품목명 *
-            </label>
-            <input
-              type="text"
-              required
-              value={formData.itemName}
-              onChange={(e) =>
-                setFormData({ ...formData, itemName: e.target.value })
-              }
-              className="w-full px-3 py-2 border rounded-lg text-gray-900"
-              placeholder="품목명을 입력하세요 (또는 위에서 품목 선택)"
-              disabled={!!formData.productId}
-            />
-          </div>
-
-          {/* 금액 정보 */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1 text-gray-700">
-                수량 *
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                required
-                value={formData.quantity}
-                onChange={(e) =>
-                  setFormData({ ...formData, quantity: e.target.value })
-                }
-                className="w-full px-3 py-2 border rounded-lg text-gray-900"
-                placeholder="0"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1 text-gray-700">
-                {formData.type === 'PURCHASE' ? '매입단가' : '매출단가'} * {formData.productId && <span className="text-xs text-blue-600">(품목 단가 자동 적용됨)</span>}
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                required
-                value={formData.unitPrice}
-                onChange={(e) =>
-                  setFormData({ ...formData, unitPrice: e.target.value })
-                }
-                className="w-full px-3 py-2 border rounded-lg text-gray-900"
-                placeholder="0"
-              />
-            </div>
-
-            {formData.type === 'SALES' && (
-              <div>
-                <label className="block text-sm font-medium mb-1 text-gray-700">
-                  원가(마진 계산용 단위 원가) {formData.productId && <span className="text-xs text-blue-600">(품목 currentCost 자동 설정, 수정 가능)</span>}
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.cost}
-                  onChange={(e) =>
-                    setFormData({ ...formData, cost: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border rounded-lg text-gray-900"
-                  placeholder="0"
-                />
-              </div>
-            )}
-
-            {formData.type === 'SALES' && formData.productId && (
-              <div>
-                <label className="block text-sm font-medium mb-1 text-gray-700">
-                  매입가 (자동 매입 레코드 생성용) {' '}
-                  <span className="text-xs text-blue-600">(품목 기본 매입단가 자동 설정, 수정 가능)</span>
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.purchasePriceOverride}
-                  onChange={(e) => handlePurchasePriceOverrideChange(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg text-gray-900"
-                  placeholder="0"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  자동등록 ON일 때 원가가 비어있거나 0이면 원가에도 동일값이 자동 반영됩니다. (원가 수동 수정 시 자동 반영 중단)
-                </p>
-              </div>
-            )}
-          </div>
 
           {formData.type === 'SALES' && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
@@ -861,80 +576,15 @@ export default function NewSalesPage() {
                 <input
                   type="checkbox"
                   checked={formData.autoCreatePurchase}
-                  onChange={(e) =>
-                    setFormData((prev) => {
-                      const nextAutoCreate = e.target.checked
-                      const shouldSyncCost =
-                        nextAutoCreate &&
-                        prev.type === 'SALES' &&
-                        prev.purchasePriceOverride !== '' &&
-                        (prev.cost === '' || parseFloat(prev.cost || '0') === 0)
-
-                      return {
-                        ...prev,
-                        autoCreatePurchase: nextAutoCreate,
-                        cost: shouldSyncCost ? prev.purchasePriceOverride : prev.cost,
-                      }
-                    })
-                  }
+                  onChange={(e) => setFormData((prev) => ({ ...prev, autoCreatePurchase: e.target.checked }))}
                   className="mt-1"
                 />
                 <div>
-                  <div className="text-sm font-semibold text-amber-900">
-                    매출 등록 시 매입 자동등록
-                  </div>
-                  <div className="text-xs text-amber-800 mt-1">
-                    거래 특성상 자동생성이 부적합한 건은 OFF로 등록하세요.
-                  </div>
+                  <div className="text-sm font-semibold text-amber-900">매출 등록 시 매입 자동등록</div>
+                  <div className="text-xs text-amber-800 mt-1">라인별 체크를 해제하면 해당 품목은 자동매입 생성하지 않습니다.</div>
                 </div>
               </label>
             </div>
-          )}
-
-          </>
-          )}
-
-          {!isBulkMode && (
-            <>
-              {/* 계산 결과 표시 */}
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="font-medium mb-3 text-gray-900">계산 결과</h3>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div>
-                    <div className="text-sm text-gray-600">공급가액</div>
-                    <div className="text-lg font-bold text-gray-900">
-                      ₩{calculateAmount().toLocaleString()}
-                    </div>
-                  </div>
-                  {formData.type === 'SALES' && (
-                    <>
-                      <div>
-                        <div className="text-sm text-gray-600">마진</div>
-                        <div className="text-lg font-bold text-green-600">
-                          ₩{calculateMargin().toLocaleString()}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-sm text-gray-600">마진율</div>
-                        <div className="text-lg font-bold text-purple-600">
-                          {calculateMarginRate().toFixed(1)}%
-                        </div>
-                      </div>
-                      {getCommissionRate() > 0 && (
-                        <div>
-                          <div className="text-sm text-gray-600">
-                            커미션 ({getCommissionRate() * 100}%)
-                          </div>
-                          <div className="text-lg font-bold text-blue-600">
-                            ₩{calculateCommission().toLocaleString()}
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              </div>
-            </>
           )}
 
           {/* 비고 */}
