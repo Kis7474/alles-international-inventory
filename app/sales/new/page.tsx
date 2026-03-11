@@ -86,6 +86,7 @@ export default function NewSalesPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [loading, setLoading] = useState(false)
+  const [lineErrors, setLineErrors] = useState<Array<{ lineNo: number | null; message: string }>>([])
   
   // Filtered products based on vendor and type
   const [availableProducts, setAvailableProducts] = useState<Product[]>([])
@@ -362,6 +363,7 @@ export default function NewSalesPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+    setLineErrors([])
 
     try {
       if (!formData.date || !formData.type || !formData.salespersonId) {
@@ -370,12 +372,13 @@ export default function NewSalesPage() {
         return
       }
 
-      const invalidLine = bulkLines.find((line) => !line.productId || !line.categoryId || !line.quantity || !line.unitPrice)
-        if (invalidLine) {
-          alert('각 라인의 품목/카테고리/수량/단가를 입력해주세요.')
-          setLoading(false)
-          return
-        }
+      const invalidIndex = bulkLines.findIndex((line) => !line.productId || !line.categoryId || !line.quantity || !line.unitPrice)
+      if (invalidIndex >= 0) {
+        setLineErrors([{ lineNo: invalidIndex + 1, message: '품목/카테고리/수량/단가를 모두 입력해주세요.' }])
+        alert(`${invalidIndex + 1}행 입력을 확인해주세요.`)
+        setLoading(false)
+        return
+      }
 
         const res = await fetch('/api/sales/bulk', {
           method: 'POST',
@@ -407,13 +410,25 @@ export default function NewSalesPage() {
 
         const data = await res.json()
         if (!res.ok) {
-          const lineError = data?.lineErrors?.[0]
-          alert(lineError ? `${lineError.lineNo}행 오류: ${lineError.message}` : (data.error || '다품목 등록 중 오류가 발생했습니다.'))
+          const parsedLineErrors = Array.isArray(data?.lineErrors)
+            ? data.lineErrors.map((e: { lineNo?: number; message?: string }) => ({
+                lineNo: typeof e.lineNo === 'number' ? e.lineNo : null,
+                message: e.message || '라인 오류',
+              }))
+            : []
+
+          if (parsedLineErrors.length > 0) {
+            setLineErrors(parsedLineErrors)
+            alert(`${parsedLineErrors[0].lineNo}행 오류: ${parsedLineErrors[0].message}`)
+          } else {
+            setLineErrors([{ lineNo: null, message: data.error || '품목 등록 중 오류가 발생했습니다.' }])
+            alert(data.error || '품목 등록 중 오류가 발생했습니다.')
+          }
           setLoading(false)
           return
         }
 
-        alert(`다품목 등록 완료 (매출 ${data.summary?.createdSales || 0}건)`)
+        alert(`품목 등록 완료 (매출 ${data.summary?.createdSales || 0}건)`)
         router.push('/sales')
         return
     } catch (error) {
@@ -423,6 +438,9 @@ export default function NewSalesPage() {
       setLoading(false)
     }
   }
+
+  const totalLineCount = bulkLines.length
+  const autoPurchaseLineCount = bulkLines.filter((line) => line.autoCreatePurchase).length
 
 
   return (
@@ -530,16 +548,33 @@ export default function NewSalesPage() {
                 <h3 className="font-semibold text-blue-900">품목 입력</h3>
                 <button type="button" onClick={addBulkLine} className="px-3 py-1 text-sm bg-blue-600 text-white rounded">+ 행 추가</button>
               </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
+                <div className="bg-white border rounded px-3 py-2">총 라인: <span className="font-semibold">{totalLineCount}</span></div>
+                <div className="bg-white border rounded px-3 py-2">자동매입 예정: <span className="font-semibold">{autoPurchaseLineCount}</span></div>
+                <div className="bg-white border rounded px-3 py-2">수동매입 예정: <span className="font-semibold">{Math.max(totalLineCount - autoPurchaseLineCount, 0)}</span></div>
+              </div>
+              {lineErrors.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded p-3 text-sm text-red-700">
+                  <div className="font-semibold mb-1">저장 오류</div>
+                  <ul className="list-disc pl-5 space-y-1">
+                    {lineErrors.map((err, idx) => (
+                      <li key={`${err.lineNo ?? 'global'}-${idx}`}>{err.lineNo ? `${err.lineNo}행` : '공통'}: {err.message}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               <div className="overflow-x-auto">
                 <table className="min-w-full table-fixed text-sm">
                   <colgroup>
-                    <col className="w-[24%]" />
-                    <col className="w-[18%]" />
+                    <col className="w-[20%]" />
                     <col className="w-[12%]" />
-                    <col className="w-[14%]" />
-                    <col className="w-[14%]" />
-                    <col className="w-[10%]" />
-                    <col className="w-[8%]" />
+                    <col className="w-[9%]" />
+                    <col className="w-[11%]" />
+                    <col className="w-[11%]" />
+                    <col className="w-[11%]" />
+                    <col className="w-[16%]" />
+                    <col className="w-[5%]" />
+                    <col className="w-[5%]" />
                   </colgroup>
                   <thead>
                     <tr className="border-b">
@@ -548,6 +583,8 @@ export default function NewSalesPage() {
                       <th className="px-2 py-1 text-right">수량</th>
                       <th className="px-2 py-1 text-right">단가</th>
                       <th className="px-2 py-1 text-right">원가</th>
+                      <th className="px-2 py-1 text-right">매입가(자동)</th>
+                      <th className="px-2 py-1 text-left">라인 비고</th>
                       <th className="px-2 py-1 text-center">자동매입</th>
                       <th className="px-2 py-1 text-center">작업</th>
                     </tr>
@@ -589,6 +626,12 @@ export default function NewSalesPage() {
                         </td>
                         <td className="px-2 py-1">
                           <input type="number" step="0.01" value={line.cost} onChange={(e) => updateBulkLine(index, { cost: e.target.value })} className="w-full border rounded px-2 py-1 text-right text-gray-900" />
+                        </td>
+                        <td className="px-2 py-1">
+                          <input type="number" step="0.01" value={line.purchasePriceOverride} onChange={(e) => updateBulkLine(index, { purchasePriceOverride: e.target.value })} className="w-full border rounded px-2 py-1 text-right text-gray-900" placeholder="자동매입 단가" />
+                        </td>
+                        <td className="px-2 py-1">
+                          <input type="text" value={line.notes} onChange={(e) => updateBulkLine(index, { notes: e.target.value })} className="w-full border rounded px-2 py-1 text-gray-900" placeholder="라인 메모" />
                         </td>
                         <td className="px-2 py-1 text-center">
                           <input type="checkbox" checked={line.autoCreatePurchase} onChange={(e) => updateBulkLine(index, { autoCreatePurchase: e.target.checked })} />
