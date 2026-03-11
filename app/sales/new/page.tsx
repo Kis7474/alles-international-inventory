@@ -65,6 +65,18 @@ interface VendorPrice {
   effectiveDate: string
 }
 
+
+interface BulkLineForm {
+  productId: string
+  itemName: string
+  quantity: string
+  unitPrice: string
+  cost: string
+  purchasePriceOverride: string
+  autoCreatePurchase: boolean
+  notes: string
+}
+
 export default function NewSalesPage() {
   const router = useRouter()
   const [salespersons, setSalespersons] = useState<Salesperson[]>([])
@@ -75,6 +87,20 @@ export default function NewSalesPage() {
   
   // Filtered products based on vendor and type
   const [availableProducts, setAvailableProducts] = useState<Product[]>([])
+  const [isBulkMode, setIsBulkMode] = useState(false)
+  const [bulkLines, setBulkLines] = useState<BulkLineForm[]>([
+    {
+      productId: '',
+      itemName: '',
+      quantity: '',
+      unitPrice: '',
+      cost: '',
+      purchasePriceOverride: '',
+      autoCreatePurchase: true,
+      notes: '',
+    },
+  ])
+
   
   // Phase 4: vendorSearch and productSearch removed - now using Autocomplete component
   
@@ -337,11 +363,113 @@ export default function NewSalesPage() {
     return true
   })
 
+  const updateBulkLine = (index: number, patch: Partial<BulkLineForm>) => {
+    setBulkLines((prev) => prev.map((line, i) => (i === index ? { ...line, ...patch } : line)))
+  }
+
+  const addBulkLine = () => {
+    setBulkLines((prev) => [
+      ...prev,
+      {
+        productId: '',
+        itemName: '',
+        quantity: '',
+        unitPrice: '',
+        cost: '',
+        purchasePriceOverride: '',
+        autoCreatePurchase: formData.autoCreatePurchase,
+        notes: '',
+      },
+    ])
+  }
+
+  const removeBulkLine = (index: number) => {
+    setBulkLines((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const handleBulkProductChange = async (index: number, productId: string) => {
+    const product = products.find((p) => p.id === parseInt(productId, 10))
+    if (!product) return
+
+    let unitPrice = ''
+    if (formData.vendorId) {
+      try {
+        const res = await fetch(`/api/vendor-product-prices?productId=${product.id}&vendorId=${formData.vendorId}`)
+        const prices: VendorPrice[] = await res.json()
+        const txDate = toDateOnly(formData.date)
+        const applicable = prices
+          .filter((p) => toDateOnly(p.effectiveDate) <= txDate)
+          .sort((a, b) => toDateOnly(b.effectiveDate).getTime() - toDateOnly(a.effectiveDate).getTime())[0]
+
+        const price = formData.type === 'SALES' ? applicable?.salesPrice : applicable?.purchasePrice
+        if (price && price > 0) unitPrice = String(price)
+      } catch (e) {
+        console.error('bulk price lookup failed', e)
+      }
+    }
+
+    updateBulkLine(index, {
+      productId,
+      itemName: product.name,
+      cost: String(product.currentCost || 0),
+      purchasePriceOverride: String(product.defaultPurchasePrice || product.currentCost || 0),
+      unitPrice,
+    })
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
 
     try {
+      if (isBulkMode) {
+        const invalidLine = bulkLines.find((line) => !line.productId || !line.quantity || !line.unitPrice)
+        if (invalidLine) {
+          alert('다품목 모드에서는 각 라인의 품목/수량/단가를 입력해주세요.')
+          setLoading(false)
+          return
+        }
+
+        const res = await fetch('/api/sales/bulk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            header: {
+              date: formData.date,
+              type: formData.type,
+              salespersonId: formData.salespersonId,
+              categoryId: formData.categoryId,
+              vendorId: formData.vendorId,
+              customer: formData.customer,
+              notes: formData.notes,
+              autoCreatePurchaseDefault: formData.autoCreatePurchase,
+            },
+            lines: bulkLines.map((line, idx) => ({
+              lineNo: idx + 1,
+              productId: line.productId,
+              itemName: line.itemName,
+              quantity: line.quantity,
+              unitPrice: line.unitPrice,
+              cost: line.cost,
+              purchasePriceOverride: line.purchasePriceOverride,
+              autoCreatePurchase: line.autoCreatePurchase,
+              notes: line.notes,
+            })),
+          }),
+        })
+
+        const data = await res.json()
+        if (!res.ok) {
+          const lineError = data?.lineErrors?.[0]
+          alert(lineError ? `${lineError.lineNo}행 오류: ${lineError.message}` : (data.error || '다품목 등록 중 오류가 발생했습니다.'))
+          setLoading(false)
+          return
+        }
+
+        alert(`다품목 등록 완료 (매출 ${data.summary?.createdSales || 0}건)`)
+        router.push('/sales')
+        return
+      }
       const selectedProduct = formData.productId
         ? products.find((p) => p.id === parseInt(formData.productId, 10))
         : null
@@ -529,6 +657,73 @@ export default function NewSalesPage() {
             </div>
           </div>
 
+          {/* 품목 모드 */}
+          <div className="bg-gray-50 border rounded-lg p-3">
+            <label className="flex items-center gap-2 text-sm text-gray-800">
+              <input type="checkbox" checked={isBulkMode} onChange={(e) => setIsBulkMode(e.target.checked)} />
+              다품목 일괄 입력 모드
+            </label>
+          </div>
+
+
+          {isBulkMode && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-blue-900">다품목 입력</h3>
+                <button type="button" onClick={addBulkLine} className="px-3 py-1 text-sm bg-blue-600 text-white rounded">+ 행 추가</button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="px-2 py-1 text-left">품목</th>
+                      <th className="px-2 py-1 text-right">수량</th>
+                      <th className="px-2 py-1 text-right">단가</th>
+                      <th className="px-2 py-1 text-right">원가</th>
+                      <th className="px-2 py-1 text-center">자동매입</th>
+                      <th className="px-2 py-1 text-center">작업</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bulkLines.map((line, index) => (
+                      <tr key={index} className="border-b">
+                        <td className="px-2 py-1">
+                          <select
+                            value={line.productId}
+                            onChange={(e) => handleBulkProductChange(index, e.target.value)}
+                            className="w-full border rounded px-2 py-1 text-gray-900"
+                          >
+                            <option value="">선택하세요</option>
+                            {(availableProducts.length > 0 ? availableProducts : products).map((p) => (
+                              <option key={p.id} value={p.id}>{p.name}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-2 py-1">
+                          <input type="number" step="0.01" value={line.quantity} onChange={(e) => updateBulkLine(index, { quantity: e.target.value })} className="w-24 border rounded px-2 py-1 text-right text-gray-900" />
+                        </td>
+                        <td className="px-2 py-1">
+                          <input type="number" step="0.01" value={line.unitPrice} onChange={(e) => updateBulkLine(index, { unitPrice: e.target.value })} className="w-28 border rounded px-2 py-1 text-right text-gray-900" />
+                        </td>
+                        <td className="px-2 py-1">
+                          <input type="number" step="0.01" value={line.cost} onChange={(e) => updateBulkLine(index, { cost: e.target.value })} className="w-28 border rounded px-2 py-1 text-right text-gray-900" />
+                        </td>
+                        <td className="px-2 py-1 text-center">
+                          <input type="checkbox" checked={line.autoCreatePurchase} onChange={(e) => updateBulkLine(index, { autoCreatePurchase: e.target.checked })} />
+                        </td>
+                        <td className="px-2 py-1 text-center">
+                          <button type="button" onClick={() => removeBulkLine(index)} className="text-red-600 text-xs" disabled={bulkLines.length === 1}>삭제</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {!isBulkMode && (
+          <>
           {/* 품목 정보 */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Phase 4: Autocomplete for product */}
@@ -696,44 +891,51 @@ export default function NewSalesPage() {
             </div>
           )}
 
-          {/* 계산 결과 표시 */}
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <h3 className="font-medium mb-3 text-gray-900">계산 결과</h3>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div>
-                <div className="text-sm text-gray-600">공급가액</div>
-                <div className="text-lg font-bold text-gray-900">
-                  ₩{calculateAmount().toLocaleString()}
+          </>
+          )}
+
+          {!isBulkMode && (
+            <>
+              {/* 계산 결과 표시 */}
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h3 className="font-medium mb-3 text-gray-900">계산 결과</h3>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                    <div className="text-sm text-gray-600">공급가액</div>
+                    <div className="text-lg font-bold text-gray-900">
+                      ₩{calculateAmount().toLocaleString()}
+                    </div>
+                  </div>
+                  {formData.type === 'SALES' && (
+                    <>
+                      <div>
+                        <div className="text-sm text-gray-600">마진</div>
+                        <div className="text-lg font-bold text-green-600">
+                          ₩{calculateMargin().toLocaleString()}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-sm text-gray-600">마진율</div>
+                        <div className="text-lg font-bold text-purple-600">
+                          {calculateMarginRate().toFixed(1)}%
+                        </div>
+                      </div>
+                      {getCommissionRate() > 0 && (
+                        <div>
+                          <div className="text-sm text-gray-600">
+                            커미션 ({getCommissionRate() * 100}%)
+                          </div>
+                          <div className="text-lg font-bold text-blue-600">
+                            ₩{calculateCommission().toLocaleString()}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
-              {formData.type === 'SALES' && (
-                <>
-                  <div>
-                    <div className="text-sm text-gray-600">마진</div>
-                    <div className="text-lg font-bold text-green-600">
-                      ₩{calculateMargin().toLocaleString()}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-gray-600">마진율</div>
-                    <div className="text-lg font-bold text-purple-600">
-                      {calculateMarginRate().toFixed(1)}%
-                    </div>
-                  </div>
-                  {getCommissionRate() > 0 && (
-                    <div>
-                      <div className="text-sm text-gray-600">
-                        커미션 ({getCommissionRate() * 100}%)
-                      </div>
-                      <div className="text-lg font-bold text-blue-600">
-                        ₩{calculateCommission().toLocaleString()}
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
+            </>
+          )}
 
           {/* 비고 */}
           <div>
