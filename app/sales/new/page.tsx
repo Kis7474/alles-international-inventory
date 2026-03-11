@@ -138,6 +138,11 @@ export default function NewSalesPage() {
     })
   }
 
+  const toDateOnly = (value: string | Date) => {
+    const d = new Date(value)
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  }
+
   const handleProductChange = async (productId: string) => {
     if (productId) {
       const product = products.find((p) => p.id === parseInt(productId))
@@ -159,11 +164,10 @@ export default function NewSalesPage() {
             
             if (prices.length > 0) {
               // Get the most recent purchase price before or on the transaction date
-              const transactionDate = new Date(formData.date)
-              const transactionTime = transactionDate.getTime()
+              const transactionDate = toDateOnly(formData.date)
               const applicablePrice = prices
-                .filter((p: VendorPrice) => new Date(p.effectiveDate).getTime() <= transactionTime && p.purchasePrice !== null)
-                .sort((a: VendorPrice, b: VendorPrice) => new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime())[0]
+                .filter((p: VendorPrice) => toDateOnly(p.effectiveDate) <= transactionDate && p.purchasePrice !== null)
+                .sort((a: VendorPrice, b: VendorPrice) => toDateOnly(b.effectiveDate).getTime() - toDateOnly(a.effectiveDate).getTime())[0]
               
               if (applicablePrice && applicablePrice.purchasePrice) {
                 defaultPurchasePrice = applicablePrice.purchasePrice
@@ -176,9 +180,9 @@ export default function NewSalesPage() {
         }
         
         // Set default unit price based on transaction type
-        const defaultPrice = formData.type === 'PURCHASE' 
+        const defaultPrice = formData.type === 'PURCHASE'
           ? (product.defaultPurchasePrice || product.currentCost || 0)
-          : (product.defaultSalesPrice || 0)
+          : 0
         
         setFormData((prev) => ({ 
           ...prev, 
@@ -187,17 +191,17 @@ export default function NewSalesPage() {
           categoryId: categoryId,
           cost: cost.toString(),
           purchasePriceOverride: defaultPurchasePrice.toString(),
-          unitPrice: defaultPrice.toString(),
+          unitPrice: formData.type === 'SALES' ? '' : defaultPrice.toString(),
         }))
         
         // Fetch vendor-specific price if vendor is selected (will override the default price)
         if (formData.vendorId) {
           fetchVendorPrice(parseInt(productId), parseInt(formData.vendorId), formData.date, formData.type)
         } else {
-          // Show warning if price is 0 and no vendor is selected
-          if (defaultPrice === 0) {
-            const priceType = formData.type === 'PURCHASE' ? '매입단가' : '매출단가'
-            alert(`⚠️ ${priceType}가 설정되지 않았습니다. 수동으로 입력해주세요.`)
+          if (formData.type === 'SALES') {
+            alert('매출 단가는 거래처별 가격에서만 자동 반영됩니다. 거래처를 먼저 선택해주세요.')
+          } else if (defaultPrice === 0) {
+            alert('⚠️ 매입단가가 설정되지 않았습니다. 수동으로 입력해주세요.')
           }
         }
       }
@@ -256,25 +260,14 @@ export default function NewSalesPage() {
 
   const fetchVendorPrice = async (productId: number, vendorId: number, date: string, type: string) => {
     try {
-      // Priority 1: 최근 거래 단가 (동일 품목 + 동일 거래처 + 동일 거래유형)
-      const recentPriceRes = await fetch(`/api/products/latest-price?productId=${productId}&vendorId=${vendorId}&type=${type}`)
-      const recentPriceData = await recentPriceRes.json()
-      
-      if (recentPriceData.unitPrice && recentPriceData.unitPrice > 0) {
-        setFormData((prev) => ({ ...prev, unitPrice: recentPriceData.unitPrice.toString() }))
-        return
-      }
-
-      // Priority 2: 거래처별 특별가 (VendorProductPrice)
       const res = await fetch(`/api/vendor-product-prices?productId=${productId}&vendorId=${vendorId}`)
       const prices: VendorPrice[] = await res.json()
+      const transactionDate = toDateOnly(date)
       
       if (prices.length > 0) {
-        // Get the most recent price before or on the transaction date
-        const transactionDate = new Date(date)
         const applicablePrice = prices
-          .filter((p: VendorPrice) => new Date(p.effectiveDate) <= transactionDate)
-          .sort((a: VendorPrice, b: VendorPrice) => new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime())[0]
+          .filter((p: VendorPrice) => toDateOnly(p.effectiveDate) <= transactionDate)
+          .sort((a: VendorPrice, b: VendorPrice) => toDateOnly(b.effectiveDate).getTime() - toDateOnly(a.effectiveDate).getTime())[0]
         
         if (applicablePrice) {
           const price = type === 'PURCHASE' ? applicablePrice.purchasePrice : applicablePrice.salesPrice
@@ -284,32 +277,35 @@ export default function NewSalesPage() {
           }
         }
       }
-      
-      // Priority 3: 기본 단가 (Product.defaultPurchasePrice / defaultSalesPrice)
+
+      if (type === 'SALES') {
+        setFormData((prev) => ({ ...prev, unitPrice: '' }))
+        alert('선택한 거래처의 매출단가가 없습니다. 거래처별 가격을 등록해주세요.')
+        return
+      }
+
       const product = products.find((p) => p.id === productId)
       if (product) {
-        const defaultPrice = type === 'PURCHASE' 
-          ? (product.defaultPurchasePrice || product.currentCost || 0)
-          : (product.defaultSalesPrice || 0)
+        const defaultPrice = product.defaultPurchasePrice || product.currentCost || 0
         if (defaultPrice === 0) {
-          const priceType = type === 'PURCHASE' ? '매입단가' : '매출단가'
-          alert(`⚠️ ${priceType}가 설정되지 않았습니다. 수동으로 입력해주세요.`)
+          alert('⚠️ 매입단가가 설정되지 않았습니다. 수동으로 입력해주세요.')
         }
         setFormData((prev) => ({ ...prev, unitPrice: defaultPrice.toString() }))
       }
     } catch (error) {
       console.error('Error fetching vendor price:', error)
-      // Fall back to product's default price based on transaction type
-      const product = products.find((p) => p.id === productId)
-      if (product) {
-        const defaultPrice = type === 'PURCHASE' 
-          ? (product.defaultPurchasePrice || product.currentCost || 0)
-          : (product.defaultSalesPrice || 0)
-        if (defaultPrice === 0) {
-          const priceType = type === 'PURCHASE' ? '매입단가' : '매출단가'
-          alert(`⚠️ ${priceType} 조회 중 오류가 발생했습니다. 수동으로 입력해주세요.`)
+      if (type === 'SALES') {
+        setFormData((prev) => ({ ...prev, unitPrice: '' }))
+        alert('⚠️ 거래처별 매출단가 조회 중 오류가 발생했습니다.')
+      } else {
+        const product = products.find((p) => p.id === productId)
+        if (product) {
+          const defaultPrice = product.defaultPurchasePrice || product.currentCost || 0
+          if (defaultPrice === 0) {
+            alert('⚠️ 매입단가 조회 중 오류가 발생했습니다. 수동으로 입력해주세요.')
+          }
+          setFormData((prev) => ({ ...prev, unitPrice: defaultPrice.toString() }))
         }
-        setFormData((prev) => ({ ...prev, unitPrice: defaultPrice.toString() }))
       }
     }
   }
@@ -324,10 +320,8 @@ export default function NewSalesPage() {
       } else {
         const product = products.find((p) => p.id === parseInt(formData.productId))
         if (product) {
-          const defaultPrice = formData.type === 'PURCHASE' 
-            ? (product.defaultPurchasePrice || product.currentCost || 0)
-            : (product.defaultSalesPrice || 0)
-          setFormData((prev) => ({ ...prev, date, unitPrice: defaultPrice.toString() }))
+          const defaultPrice = product.defaultPurchasePrice || product.currentCost || 0
+          setFormData((prev) => ({ ...prev, date, unitPrice: formData.type === 'SALES' ? '' : defaultPrice.toString() }))
         }
       }
     }

@@ -86,6 +86,11 @@ export default function EditSalesPage() {
     notes: '',
   })
 
+  const toDateOnly = (value: string | Date) => {
+    const d = new Date(value)
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  }
+
   useEffect(() => {
     // Fetch data once on mount when ID is available
     // fetchData shouldn't change after initial render, and we only want to fetch when id changes
@@ -216,15 +221,15 @@ export default function EditSalesPage() {
           fetchVendorPrice(parseInt(productId), parseInt(formData.vendorId), formData.date, formData.type)
         } else {
           // 거래처 없으면 기본 단가 사용 (거래유형에 따라)
-          const defaultPrice = formData.type === 'PURCHASE' 
+          const defaultPrice = formData.type === 'PURCHASE'
             ? (product.defaultPurchasePrice || 0)
-            : (product.defaultSalesPrice || 0)
+            : 0
           setFormData(prev => ({ 
             ...prev, 
             productId, 
             itemName: product.name, 
             categoryId: categoryId,
-            unitPrice: defaultPrice.toString(),
+            unitPrice: formData.type === 'SALES' ? '' : defaultPrice.toString(),
             cost: cost.toString(),
           }))
         }
@@ -234,27 +239,17 @@ export default function EditSalesPage() {
     }
   }
 
-  // Phase 5: 거래처별 단가 조회 (우선순위: 최근 거래 → 특별가 → 기본가)
+  // 거래처별 단가 조회
   const fetchVendorPrice = async (productId: number, vendorId: number, date: string, type: string) => {
     try {
-      // Priority 1: 최근 거래 단가 (동일 품목 + 동일 거래처 + 동일 거래유형)
-      const recentPriceRes = await fetch(`/api/products/latest-price?productId=${productId}&vendorId=${vendorId}&type=${type}`)
-      const recentPriceData = await recentPriceRes.json()
-      
-      if (recentPriceData.unitPrice && recentPriceData.unitPrice > 0) {
-        setFormData(prev => ({ ...prev, unitPrice: recentPriceData.unitPrice.toString() }))
-        return
-      }
-
-      // Priority 2: 거래처별 특별가 (VendorProductPrice)
       const res = await fetch(`/api/vendor-product-prices?productId=${productId}&vendorId=${vendorId}`)
       const prices: VendorPrice[] = await res.json()
       
       if (prices.length > 0) {
-        const transactionDate = new Date(date)
+        const transactionDate = toDateOnly(date)
         const applicablePrice = prices
-          .filter(p => new Date(p.effectiveDate) <= transactionDate)
-          .sort((a, b) => new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime())[0]
+          .filter(p => toDateOnly(p.effectiveDate) <= transactionDate)
+          .sort((a, b) => toDateOnly(b.effectiveDate).getTime() - toDateOnly(a.effectiveDate).getTime())[0]
         
         if (applicablePrice) {
           const price = type === 'PURCHASE' ? applicablePrice.purchasePrice : applicablePrice.salesPrice
@@ -264,23 +259,29 @@ export default function EditSalesPage() {
           }
         }
       }
-      
-      // Priority 3: 기본 단가 (Product.defaultPurchasePrice / defaultSalesPrice)
+
+      if (type === 'SALES') {
+        setFormData(prev => ({ ...prev, unitPrice: '' }))
+        alert('선택한 거래처의 매출단가가 없습니다. 거래처별 가격을 등록해주세요.')
+        return
+      }
+
       const product = products.find(p => p.id === productId)
       if (product) {
-        const defaultPrice = type === 'PURCHASE' 
-          ? (product.defaultPurchasePrice || 0)
-          : (product.defaultSalesPrice || 0)
+        const defaultPrice = product.defaultPurchasePrice || 0
         if (defaultPrice === 0) {
-          const priceType = type === 'PURCHASE' ? '매입단가' : '매출단가'
-          alert(`⚠️ ${priceType}가 설정되지 않았습니다. 수동으로 입력해주세요.`)
+          alert('⚠️ 매입단가가 설정되지 않았습니다. 수동으로 입력해주세요.')
         }
         setFormData(prev => ({ ...prev, unitPrice: defaultPrice.toString() }))
       }
     } catch (error) {
       console.error('Error fetching vendor price:', error)
-      const priceType = type === 'PURCHASE' ? '매입단가' : '매출단가'
-      alert(`⚠️ ${priceType} 조회 중 오류가 발생했습니다.`)
+      if (type === 'SALES') {
+        setFormData(prev => ({ ...prev, unitPrice: '' }))
+        alert('⚠️ 거래처별 매출단가 조회 중 오류가 발생했습니다.')
+      } else {
+        alert('⚠️ 매입단가 조회 중 오류가 발생했습니다.')
+      }
     }
   }
 
