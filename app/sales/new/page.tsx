@@ -68,6 +68,7 @@ interface VendorPrice {
 
 interface BulkLineForm {
   productId: string
+  productSearchText: string
   categoryId: string
   itemName: string
   quantity: string
@@ -91,6 +92,7 @@ export default function NewSalesPage() {
   const [bulkLines, setBulkLines] = useState<BulkLineForm[]>([
     {
       productId: '',
+      productSearchText: '',
       categoryId: '',
       itemName: '',
       quantity: '',
@@ -109,7 +111,6 @@ export default function NewSalesPage() {
     date: new Date().toISOString().split('T')[0],
     type: 'SALES',
     salespersonId: '',
-    categoryId: '',
     productId: '',
     vendorId: '',
     itemName: '',
@@ -291,6 +292,7 @@ export default function NewSalesPage() {
       ...prev,
       {
         productId: '',
+        productSearchText: '',
         categoryId: '',
         itemName: '',
         quantity: '',
@@ -307,8 +309,26 @@ export default function NewSalesPage() {
     setBulkLines((prev) => prev.filter((_, i) => i !== index))
   }
 
-  const handleBulkProductChange = async (index: number, productId: string) => {
-    const product = products.find((p) => p.id === parseInt(productId, 10))
+
+  const getProductOptions = () => (availableProducts.length > 0 ? availableProducts : products)
+
+  const handleBulkProductInputChange = (index: number, inputValue: string) => {
+    updateBulkLine(index, { productSearchText: inputValue })
+
+    if (!inputValue.trim()) {
+      updateBulkLine(index, { productId: '', categoryId: '', itemName: '' })
+      return
+    }
+
+    const candidates = getProductOptions()
+    const exact = candidates.find((p) => p.name.toLowerCase() === inputValue.trim().toLowerCase())
+    if (exact) {
+      void handleBulkProductChange(index, String(exact.id), exact.name)
+    }
+  }
+
+  const handleBulkProductChange = async (index: number, productId: string, productName?: string) => {
+    const product = getProductOptions().find((p) => p.id === parseInt(productId, 10)) || products.find((p) => p.id === parseInt(productId, 10))
     if (!product) return
 
     let unitPrice = ''
@@ -330,6 +350,7 @@ export default function NewSalesPage() {
 
     updateBulkLine(index, {
       productId,
+      productSearchText: productName || product.name,
       categoryId: product.categoryId ? String(product.categoryId) : '',
       itemName: product.name,
       cost: String(product.currentCost || 0),
@@ -364,7 +385,6 @@ export default function NewSalesPage() {
               date: formData.date,
               type: formData.type,
               salespersonId: formData.salespersonId,
-              categoryId: formData.categoryId || undefined,
               vendorId: formData.vendorId,
               customer: formData.customer,
               notes: formData.notes,
@@ -471,21 +491,6 @@ export default function NewSalesPage() {
               </select>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-1 text-gray-700">기본 카테고리 (선택)</label>
-              <select
-                value={formData.categoryId}
-                onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
-                className="w-full px-3 py-2 border rounded-lg text-gray-900"
-              >
-                <option value="">선택하세요</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.nameKo}
-                  </option>
-                ))}
-              </select>
-            </div>
           </div>
 
           {/* 거래처/고객 - 거래처 먼저 선택하도록 순서 변경 */}
@@ -551,16 +556,18 @@ export default function NewSalesPage() {
                     {bulkLines.map((line, index) => (
                       <tr key={index} className="border-b">
                         <td className="px-2 py-1">
-                          <select
-                            value={line.productId}
-                            onChange={(e) => handleBulkProductChange(index, e.target.value)}
+                          <input
+                            list={`product-options-${index}`}
+                            value={line.productSearchText}
+                            onChange={(e) => handleBulkProductInputChange(index, e.target.value)}
                             className="w-full border rounded px-2 py-1 text-gray-900"
-                          >
-                            <option value="">선택하세요</option>
-                            {(availableProducts.length > 0 ? availableProducts : products).map((p) => (
-                              <option key={p.id} value={p.id}>{p.name}</option>
+                            placeholder="품목명 검색 또는 선택"
+                          />
+                          <datalist id={`product-options-${index}`}>
+                            {getProductOptions().map((p) => (
+                              <option key={p.id} value={p.name} />
                             ))}
-                          </select>
+                          </datalist>
                         </td>
                         <td className="px-2 py-1">
                           <select
