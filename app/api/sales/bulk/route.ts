@@ -7,7 +7,7 @@ interface BulkHeader {
   date: string
   type: 'SALES' | 'PURCHASE'
   salespersonId: string | number
-  categoryId: string | number
+  categoryId?: string | number
   vendorId?: string | number
   customer?: string
   notes?: string
@@ -17,6 +17,7 @@ interface BulkHeader {
 interface BulkLine {
   lineNo?: number
   productId?: string | number | null
+  categoryId?: string | number
   itemName?: string
   quantity: string | number
   unitPrice: string | number
@@ -49,8 +50,8 @@ export async function POST(request: NextRequest) {
       return jsonError('header와 lines(1건 이상)는 필수입니다.', 400)
     }
 
-    if (!header.date || !header.type || !header.salespersonId || !header.categoryId) {
-      return jsonError('header.date, type, salespersonId, categoryId는 필수입니다.', 400)
+    if (!header.date || !header.type || !header.salespersonId) {
+      return jsonError('header.date, type, salespersonId는 필수입니다.', 400)
     }
 
     const baseDate = new Date(header.date)
@@ -59,11 +60,15 @@ export async function POST(request: NextRequest) {
     }
 
     const salespersonId = Number(header.salespersonId)
-    const categoryId = Number(header.categoryId)
+    const headerCategoryId = header.categoryId ? Number(header.categoryId) : null
     const vendorId = header.vendorId ? Number(header.vendorId) : null
 
-    if (!Number.isFinite(salespersonId) || !Number.isFinite(categoryId)) {
-      return jsonError('유효하지 않은 담당자/카테고리입니다.', 400)
+    if (!Number.isFinite(salespersonId)) {
+      return jsonError('유효하지 않은 담당자입니다.', 400)
+    }
+
+    if (headerCategoryId !== null && !Number.isFinite(headerCategoryId)) {
+      return jsonError('유효하지 않은 기본 카테고리입니다.', 400)
     }
 
     const autoCreatePurchaseDefault = header.autoCreatePurchaseDefault !== false
@@ -99,6 +104,15 @@ export async function POST(request: NextRequest) {
           throw new Error(`LINE_${lineNo}: 품목을 찾을 수 없습니다.`)
         }
 
+        const resolvedCategoryIdRaw = line.categoryId ?? headerCategoryId
+        const resolvedCategoryId = resolvedCategoryIdRaw !== null && resolvedCategoryIdRaw !== undefined && resolvedCategoryIdRaw !== ''
+          ? Number(resolvedCategoryIdRaw)
+          : NaN
+
+        if (!Number.isFinite(resolvedCategoryId)) {
+          throw new Error(`LINE_${lineNo}: 카테고리는 필수입니다.`)
+        }
+
         const itemName = line.itemName?.trim() || product?.name || ''
         if (!itemName) {
           throw new Error(`LINE_${lineNo}: 품목명은 필수입니다.`)
@@ -132,7 +146,7 @@ export async function POST(request: NextRequest) {
             date: baseDate,
             type: header.type,
             salespersonId,
-            categoryId,
+            categoryId: resolvedCategoryId,
             productId,
             vendorId,
             itemName,
@@ -165,7 +179,7 @@ export async function POST(request: NextRequest) {
                 date: baseDate,
                 type: 'PURCHASE',
                 salespersonId,
-                categoryId,
+                categoryId: resolvedCategoryId,
                 productId,
                 vendorId: product.purchaseVendorId,
                 itemName: product.name,
