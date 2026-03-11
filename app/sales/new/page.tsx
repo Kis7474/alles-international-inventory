@@ -123,6 +123,21 @@ export default function NewSalesPage() {
     }
   }
 
+  const handlePurchasePriceOverrideChange = (value: string) => {
+    setFormData((prev) => {
+      const shouldSyncCost =
+        prev.type === 'SALES' &&
+        prev.autoCreatePurchase &&
+        (prev.cost === '' || parseFloat(prev.cost || '0') === 0 || prev.cost === prev.purchasePriceOverride)
+
+      return {
+        ...prev,
+        purchasePriceOverride: value,
+        cost: shouldSyncCost ? value : prev.cost,
+      }
+    })
+  }
+
   const handleProductChange = async (productId: string) => {
     if (productId) {
       const product = products.find((p) => p.id === parseInt(productId))
@@ -640,14 +655,12 @@ export default function NewSalesPage() {
                   type="number"
                   step="0.01"
                   value={formData.purchasePriceOverride}
-                  onChange={(e) =>
-                    setFormData({ ...formData, purchasePriceOverride: e.target.value })
-                  }
+                  onChange={(e) => handlePurchasePriceOverrideChange(e.target.value)}
                   className="w-full px-3 py-2 border rounded-lg text-gray-900"
                   placeholder="0"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  원가와 별개 값이며, 자동등록 ON 상태에서만 이 값으로 매입 레코드가 생성됩니다.
+                  자동등록 ON일 때 원가가 비어있거나 0이면 원가에도 동일값이 자동 반영됩니다. (원가 수동 수정 시 자동 반영 중단)
                 </p>
               </div>
             )}
@@ -660,7 +673,20 @@ export default function NewSalesPage() {
                   type="checkbox"
                   checked={formData.autoCreatePurchase}
                   onChange={(e) =>
-                    setFormData({ ...formData, autoCreatePurchase: e.target.checked })
+                    setFormData((prev) => {
+                      const nextAutoCreate = e.target.checked
+                      const shouldSyncCost =
+                        nextAutoCreate &&
+                        prev.type === 'SALES' &&
+                        prev.purchasePriceOverride !== '' &&
+                        (prev.cost === '' || parseFloat(prev.cost || '0') === 0)
+
+                      return {
+                        ...prev,
+                        autoCreatePurchase: nextAutoCreate,
+                        cost: shouldSyncCost ? prev.purchasePriceOverride : prev.cost,
+                      }
+                    })
                   }
                   className="mt-1"
                 />
