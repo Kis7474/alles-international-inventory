@@ -205,8 +205,20 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // ★★★ 매출 등록 시 매입(PURCHASE)도 동시 생성 ★★★
     const shouldAutoCreatePurchase = autoCreatePurchase !== false
+
+    if (type === 'SALES' && productId && shouldAutoCreatePurchase) {
+      const productForValidation = await prisma.product.findUnique({
+        where: { id: parseInt(productId) },
+        select: { purchaseVendorId: true },
+      })
+
+      if (!productForValidation?.purchaseVendorId) {
+        return jsonError('선택한 품목에 매입 거래처가 없어 자동 매입을 생성할 수 없습니다. 자동등록을 OFF로 변경하거나 품목의 매입 거래처를 먼저 등록해주세요.', 400)
+      }
+    }
+
+    // ★★★ 매출 등록 시 매입(PURCHASE)도 동시 생성 ★★★
 
     if (type === 'SALES' && productId && shouldAutoCreatePurchase) {
       const { createAutoPurchaseRecord } = await import('@/lib/purchase-auto')

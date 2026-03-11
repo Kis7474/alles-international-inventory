@@ -102,10 +102,10 @@ export default function NewSalesPage() {
   const fetchMasterData = async () => {
     try {
       const [salespersonsRes, categoriesRes, productsRes, vendorsRes] = await Promise.all([
-        fetch('/api/salesperson'),
-        fetch('/api/categories'),
-        fetch('/api/products'),
-        fetch('/api/vendors'),
+        fetch('/api/salesperson', { cache: 'no-store' }),
+        fetch('/api/categories', { cache: 'no-store' }),
+        fetch('/api/products', { cache: 'no-store' }),
+        fetch('/api/vendors', { cache: 'no-store' }),
       ])
 
       const salespersonsData = await salespersonsRes.json()
@@ -134,7 +134,7 @@ export default function NewSalesPage() {
         const cost = product.currentCost || 0
         
         // Set default purchase price override
-        let defaultPurchasePrice = product.defaultPurchasePrice || 0
+        let defaultPurchasePrice = product.defaultPurchasePrice || product.currentCost || 0
         
         // P0: For SALES mode, fetch purchase vendor price if purchaseVendorId exists
         if (formData.type === 'SALES' && product.purchaseVendorId) {
@@ -162,7 +162,7 @@ export default function NewSalesPage() {
         
         // Set default unit price based on transaction type
         const defaultPrice = formData.type === 'PURCHASE' 
-          ? (product.defaultPurchasePrice || 0)
+          ? (product.defaultPurchasePrice || product.currentCost || 0)
           : (product.defaultSalesPrice || 0)
         
         setFormData((prev) => ({ 
@@ -274,7 +274,7 @@ export default function NewSalesPage() {
       const product = products.find((p) => p.id === productId)
       if (product) {
         const defaultPrice = type === 'PURCHASE' 
-          ? (product.defaultPurchasePrice || 0)
+          ? (product.defaultPurchasePrice || product.currentCost || 0)
           : (product.defaultSalesPrice || 0)
         if (defaultPrice === 0) {
           const priceType = type === 'PURCHASE' ? '매입단가' : '매출단가'
@@ -288,7 +288,7 @@ export default function NewSalesPage() {
       const product = products.find((p) => p.id === productId)
       if (product) {
         const defaultPrice = type === 'PURCHASE' 
-          ? (product.defaultPurchasePrice || 0)
+          ? (product.defaultPurchasePrice || product.currentCost || 0)
           : (product.defaultSalesPrice || 0)
         if (defaultPrice === 0) {
           const priceType = type === 'PURCHASE' ? '매입단가' : '매출단가'
@@ -310,7 +310,7 @@ export default function NewSalesPage() {
         const product = products.find((p) => p.id === parseInt(formData.productId))
         if (product) {
           const defaultPrice = formData.type === 'PURCHASE' 
-            ? (product.defaultPurchasePrice || 0)
+            ? (product.defaultPurchasePrice || product.currentCost || 0)
             : (product.defaultSalesPrice || 0)
           setFormData((prev) => ({ ...prev, date, unitPrice: defaultPrice.toString() }))
         }
@@ -333,6 +333,16 @@ export default function NewSalesPage() {
     setLoading(true)
 
     try {
+      const selectedProduct = formData.productId
+        ? products.find((p) => p.id === parseInt(formData.productId, 10))
+        : null
+
+      if (formData.type === 'SALES' && formData.autoCreatePurchase && selectedProduct && !selectedProduct.purchaseVendorId) {
+        alert('선택한 품목에 매입 거래처가 등록되어 있지 않아 자동 매입을 생성할 수 없습니다.\n품목에 매입 거래처를 등록하거나 자동등록을 OFF로 변경해주세요.')
+        setLoading(false)
+        return
+      }
+
       // 매출 등록 시 확인 메시지
       if (
         formData.type === 'SALES' &&
@@ -605,7 +615,7 @@ export default function NewSalesPage() {
             {formData.type === 'SALES' && (
               <div>
                 <label className="block text-sm font-medium mb-1 text-gray-700">
-                  원가 {formData.productId && <span className="text-xs text-blue-600">(품목에서 자동 설정됨, 수정 가능)</span>}
+                  원가(마진 계산용 단위 원가) {formData.productId && <span className="text-xs text-blue-600">(품목 currentCost 자동 설정, 수정 가능)</span>}
                 </label>
                 <input
                   type="number"
@@ -623,8 +633,8 @@ export default function NewSalesPage() {
             {formData.type === 'SALES' && formData.productId && (
               <div>
                 <label className="block text-sm font-medium mb-1 text-gray-700">
-                  매입가 (자동 매입 등록용) {' '}
-                  <span className="text-xs text-blue-600">(품목 기본 매입가 자동 설정, 수정 가능)</span>
+                  매입가 (자동 매입 레코드 생성용) {' '}
+                  <span className="text-xs text-blue-600">(품목 기본 매입단가 자동 설정, 수정 가능)</span>
                 </label>
                 <input
                   type="number"
@@ -637,7 +647,7 @@ export default function NewSalesPage() {
                   placeholder="0"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  자동등록 ON 상태에서 매출 등록 시 이 매입가로 매입 레코드가 자동 생성됩니다
+                  원가와 별개 값이며, 자동등록 ON 상태에서만 이 값으로 매입 레코드가 생성됩니다.
                 </p>
               </div>
             )}
