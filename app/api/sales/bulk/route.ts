@@ -192,7 +192,7 @@ export async function POST(request: NextRequest) {
                 marginRate: 0,
                 costSource: 'SALES_AUTO',
                 linkedSalesId: salesRecord.id,
-                notes: `매출 ${salesRecord.id}에서 자동생성`,
+                notes: '자동생성',
               },
             })
             createdPurchases += 1

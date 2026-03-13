@@ -98,6 +98,17 @@ export async function GET(request: NextRequest) {
             date: true,
           }
         },
+        linkedSalesRecord: {
+          select: {
+            id: true,
+            itemName: true,
+            quantity: true,
+            unitPrice: true,
+            amount: true,
+            date: true,
+            vendor: { select: { name: true } },
+          },
+        },
       },
       orderBy: { date: 'desc' },
       skip: (page - 1) * limit,
@@ -250,7 +261,7 @@ export async function POST(request: NextRequest) {
             itemName: product.name,
             costSource: 'SALES_AUTO',
             linkedSalesId: salesRecord.id,
-            notes: `매출 ${salesRecord.id}에서 자동생성`,
+            notes: '자동생성',
           })
         }
       }
