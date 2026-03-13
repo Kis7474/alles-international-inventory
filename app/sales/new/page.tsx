@@ -102,7 +102,7 @@ export default function NewSalesPage() {
       purchasePriceOverride: '',
       autoCreatePurchase: true,
       notes: '',
-    },
+      },
   ])
 
   
@@ -119,7 +119,6 @@ export default function NewSalesPage() {
     quantity: '',
     unitPrice: '',
     cost: '',
-    notes: '',
     purchasePriceOverride: '', // 매입가 오버라이드
     autoCreatePurchase: true,
   })
@@ -302,7 +301,7 @@ export default function NewSalesPage() {
         purchasePriceOverride: '',
         autoCreatePurchase: formData.autoCreatePurchase,
         notes: '',
-      },
+          },
     ])
   }
 
@@ -390,7 +389,6 @@ export default function NewSalesPage() {
               salespersonId: formData.salespersonId,
               vendorId: formData.vendorId,
               customer: formData.customer,
-              notes: formData.notes,
               autoCreatePurchaseDefault: formData.autoCreatePurchase,
             },
             lines: bulkLines.map((line, idx) => ({
@@ -584,7 +582,7 @@ export default function NewSalesPage() {
                       <th className="px-2 py-1 text-right">단가</th>
                       <th className="px-2 py-1 text-right">원가</th>
                       <th className="px-2 py-1 text-right">매입가(자동)</th>
-                      <th className="px-2 py-1 text-left">라인 비고</th>
+                      <th className="px-2 py-1 text-left">비고</th>
                       <th className="px-2 py-1 text-center">자동매입</th>
                       <th className="px-2 py-1 text-center">작업</th>
                     </tr>
@@ -631,7 +629,7 @@ export default function NewSalesPage() {
                           <input type="number" step="0.01" value={line.purchasePriceOverride} onChange={(e) => updateBulkLine(index, { purchasePriceOverride: e.target.value })} className="w-full border rounded px-2 py-1 text-right text-gray-900" placeholder="자동매입 단가" />
                         </td>
                         <td className="px-2 py-1">
-                          <input type="text" value={line.notes} onChange={(e) => updateBulkLine(index, { notes: e.target.value })} className="w-full border rounded px-2 py-1 text-gray-900" placeholder="라인 메모" />
+                          <input type="text" value={line.notes} onChange={(e) => updateBulkLine(index, { notes: e.target.value })} className="w-full border rounded px-2 py-1 text-gray-900" placeholder="비고" />
                         </td>
                         <td className="px-2 py-1 text-center">
                           <input type="checkbox" checked={line.autoCreatePurchase} onChange={(e) => updateBulkLine(index, { autoCreatePurchase: e.target.checked })} />
@@ -646,21 +644,6 @@ export default function NewSalesPage() {
               </div>
             </div>
 
-          {/* 비고 */}
-          <div>
-            <label className="block text-sm font-medium mb-1 text-gray-700">
-              비고
-            </label>
-            <textarea
-              value={formData.notes}
-              onChange={(e) =>
-                setFormData({ ...formData, notes: e.target.value })
-              }
-              className="w-full px-3 py-2 border rounded-lg text-gray-900"
-              rows={3}
-              placeholder="비고 사항을 입력하세요"
-            />
-          </div>
 
           {/* 버튼 */}
           <div className="flex gap-2">

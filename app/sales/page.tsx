@@ -741,9 +741,9 @@ export default function SalesPage() {
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">구분</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">거래처</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">품목명</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">비고</th>
                 <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">수량</th>
                 <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">단가</th>
-                <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">금액(부가세포함)</th>
                 <th 
                   className="px-4 py-3 text-right text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100"
                   onClick={() => handleSort('amount')}
@@ -808,14 +808,14 @@ export default function SalesPage() {
                       )}
                     </div>
                   </td>
+                  <td className="px-4 py-3 text-gray-900 max-w-[240px] truncate" title={record.notes || ''}>
+                    {record.notes || '-'}
+                  </td>
                   <td className="px-4 py-3 text-right text-gray-900">
                     {formatNumber(record.quantity, 2)}
                   </td>
                   <td className="px-4 py-3 text-right text-gray-900">
                     ₩{formatNumber(record.unitPrice, 0)}
-                  </td>
-                  <td className="px-4 py-3 text-right text-gray-900">
-                    ₩{formatNumber(record.totalAmount || record.amount, 0)}
                   </td>
                   <td className="px-4 py-3 text-right text-gray-900">
                     ₩{formatNumber(record.amount, 0)}
