@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
     const itemName = searchParams.get('itemName') // Phase 4: 품목명 필터
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
+    const yearMonth = searchParams.get('yearMonth')
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
 
@@ -60,7 +61,15 @@ export async function GET(request: NextRequest) {
         mode: 'insensitive'
       }
     }
-    if (startDate || endDate) {
+    if (yearMonth && /^\d{4}-\d{2}$/.test(yearMonth)) {
+      const [year, month] = yearMonth.split('-').map(Number)
+      const monthStart = new Date(year, month - 1, 1)
+      const monthEnd = new Date(year, month, 0, 23, 59, 59, 999)
+      where.date = {
+        gte: monthStart,
+        lte: monthEnd,
+      }
+    } else if (startDate || endDate) {
       where.date = {}
       if (startDate) {
         where.date.gte = new Date(startDate)
@@ -88,6 +97,17 @@ export async function GET(request: NextRequest) {
             quantity: true,
             date: true,
           }
+        },
+        linkedSalesRecord: {
+          select: {
+            id: true,
+            itemName: true,
+            quantity: true,
+            unitPrice: true,
+            amount: true,
+            date: true,
+            vendor: { select: { name: true } },
+          },
         },
       },
       orderBy: { date: 'desc' },
@@ -130,6 +150,7 @@ export async function POST(request: NextRequest) {
       cost,
       notes,
       purchasePriceOverride, // 매입가 오버라이드 (프론트에서 전달)
+      autoCreatePurchase, // 매출 등록 시 매입 자동 생성 여부
     } = body
 
     // 금액 계산
@@ -195,8 +216,22 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    const shouldAutoCreatePurchase = autoCreatePurchase !== false
+
+    if (type === 'SALES' && productId && shouldAutoCreatePurchase) {
+      const productForValidation = await prisma.product.findUnique({
+        where: { id: parseInt(productId) },
+        select: { purchaseVendorId: true },
+      })
+
+      if (!productForValidation?.purchaseVendorId) {
+        return jsonError('선택한 품목에 매입 거래처가 없어 자동 매입을 생성할 수 없습니다. 자동등록을 OFF로 변경하거나 품목의 매입 거래처를 먼저 등록해주세요.', 400)
+      }
+    }
+
     // ★★★ 매출 등록 시 매입(PURCHASE)도 동시 생성 ★★★
-    if (type === 'SALES' && productId) {
+
+    if (type === 'SALES' && productId && shouldAutoCreatePurchase) {
       const { createAutoPurchaseRecord } = await import('@/lib/purchase-auto')
       
       // 품목 정보 조회
@@ -226,7 +261,7 @@ export async function POST(request: NextRequest) {
             itemName: product.name,
             costSource: 'SALES_AUTO',
             linkedSalesId: salesRecord.id,
-            notes: `매출 ${salesRecord.id}에서 자동생성`,
+            notes: '자동생성',
           })
         }
       }

@@ -57,6 +57,15 @@ interface SalesRecord {
   costSource?: string | null
   linkedPurchases?: LinkedPurchase[]
   linkedSalesId?: number | null
+  linkedSalesRecord?: {
+    id: number
+    itemName: string
+    quantity: number
+    unitPrice: number
+    amount: number
+    date: string
+    vendor: { name: string } | null
+  } | null
 }
 
 type SortField = 'date' | 'amount' | 'marginRate'
@@ -77,6 +86,7 @@ export default function SalesPage() {
   const [filterCategory, setFilterCategory] = useState('')
   const [filterVendor, setFilterVendor] = useState('') // Phase 4
   const [filterItemName, setFilterItemName] = useState('') // Phase 4
+  const [filterYearMonth, setFilterYearMonth] = useState('')
   const [filterStartDate, setFilterStartDate] = useState('')
   const [filterEndDate, setFilterEndDate] = useState('')
   
@@ -101,6 +111,7 @@ export default function SalesPage() {
       amount: number
     }>
   } | null>(null)
+  const [detailRecord, setDetailRecord] = useState<SalesRecord | null>(null)
 
   // Phase 5: 페이지네이션 상태
   const [page, setPage] = useState(1)
@@ -162,8 +173,12 @@ export default function SalesPage() {
       if (filterCategory) params.append('categoryId', filterCategory)
       if (filterVendor) params.append('vendorId', filterVendor) // Phase 4
       if (filterItemName) params.append('itemName', filterItemName) // Phase 4
-      if (filterStartDate) params.append('startDate', filterStartDate)
-      if (filterEndDate) params.append('endDate', filterEndDate)
+      if (filterYearMonth) {
+        params.append('yearMonth', filterYearMonth)
+      } else {
+        if (filterStartDate) params.append('startDate', filterStartDate)
+        if (filterEndDate) params.append('endDate', filterEndDate)
+      }
 
       const res = await fetch(`/api/sales?${params.toString()}`, { cache: 'no-store' })
       const response = await res.json()
@@ -427,8 +442,12 @@ export default function SalesPage() {
         if (filterCategory) params.append('categoryId', filterCategory)
         if (filterVendor) params.append('vendorId', filterVendor)
         if (filterItemName) params.append('itemName', filterItemName)
-        if (filterStartDate) params.append('startDate', filterStartDate)
-        if (filterEndDate) params.append('endDate', filterEndDate)
+        if (filterYearMonth) {
+          params.append('yearMonth', filterYearMonth)
+        } else {
+          if (filterStartDate) params.append('startDate', filterStartDate)
+          if (filterEndDate) params.append('endDate', filterEndDate)
+        }
 
         const res = await fetch(`/api/sales?${params.toString()}`, { cache: 'no-store' })
         const response = await res.json()
@@ -461,6 +480,7 @@ export default function SalesPage() {
     setFilterCategory('')
     setFilterVendor('')
     setFilterItemName('')
+    setFilterYearMonth('')
     setFilterStartDate('')
     setFilterEndDate('')
     setPage(1)
@@ -601,25 +621,43 @@ export default function SalesPage() {
           </div>
           
           <div>
-            <label className="block text-sm font-medium mb-1 text-gray-700">시작일</label>
+            <label className="block text-sm font-medium mb-1 text-gray-700">월별 조회(연-월)</label>
             <input
-              type="date"
-              value={filterStartDate}
-              onChange={(e) => setFilterStartDate(e.target.value)}
+              type="month"
+              value={filterYearMonth}
+              onChange={(e) => setFilterYearMonth(e.target.value)}
               className="w-full px-3 py-2 border rounded-lg text-gray-900"
             />
           </div>
-          
-          <div>
-            <label className="block text-sm font-medium mb-1 text-gray-700">종료일</label>
-            <input
-              type="date"
-              value={filterEndDate}
-              onChange={(e) => setFilterEndDate(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg text-gray-900"
-            />
+
+          <div className="text-xs text-gray-500 flex items-end pb-2">
+            월별 조회를 선택하면 시작일/종료일 조건보다 우선 적용됩니다.
           </div>
         </div>
+
+        {!filterYearMonth && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <div>
+              <label className="block text-sm font-medium mb-1 text-gray-700">시작일</label>
+              <input
+                type="date"
+                value={filterStartDate}
+                onChange={(e) => setFilterStartDate(e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg text-gray-900"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1 text-gray-700">종료일</label>
+              <input
+                type="date"
+                value={filterEndDate}
+                onChange={(e) => setFilterEndDate(e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg text-gray-900"
+              />
+            </div>
+          </div>
+        )}
 
         {/* Phase 4: 거래처/품목명 필터 */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
@@ -715,15 +753,14 @@ export default function SalesPage() {
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">품목명</th>
                 <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">수량</th>
                 <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">단가</th>
-                <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">금액(부가세포함)</th>
                 <th 
                   className="px-4 py-3 text-right text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100"
                   onClick={() => handleSort('amount')}
                 >
                   금액 {sortField === 'amount' && (sortDirection === 'asc' ? '↑' : '↓')}
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">담당자</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">카테고리</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">담당자</th>
                 <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">마진</th>
                 <th 
                   className="px-4 py-3 text-right text-sm font-medium text-gray-700 cursor-pointer hover:bg-gray-100"
@@ -754,12 +791,6 @@ export default function SalesPage() {
                     }`}>
                       {record.type === 'SALES' ? '매출' : '매입'}
                     </span>
-                    {/* P1: Auto-generated purchase badge */}
-                    {record.type === 'PURCHASE' && record.costSource === 'SALES_AUTO' && (
-                      <span className="ml-1 px-2 py-1 rounded text-xs bg-purple-100 text-purple-800" title={`매출 #${record.linkedSalesId}에서 자동생성`}>
-                        [자동생성]
-                      </span>
-                    )}
                   </td>
                   <td className="px-4 py-3 text-gray-900">
                     {record.vendor?.name || record.customer || '-'}
@@ -781,19 +812,16 @@ export default function SalesPage() {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-right text-gray-900">
-                    {formatNumber(record.quantity, 2)}
+                    {formatNumber(record.quantity, 0)}
                   </td>
                   <td className="px-4 py-3 text-right text-gray-900">
                     ₩{formatNumber(record.unitPrice, 0)}
                   </td>
                   <td className="px-4 py-3 text-right text-gray-900">
-                    ₩{formatNumber(record.totalAmount || record.amount, 0)}
-                  </td>
-                  <td className="px-4 py-3 text-right text-gray-900">
                     ₩{formatNumber(record.amount, 0)}
                   </td>
-                  <td className="px-4 py-3 text-gray-900">{record.salesperson.name}</td>
                   <td className="px-4 py-3 text-gray-900">{record.category.nameKo}</td>
+                  <td className="px-4 py-3 text-gray-900">{record.salesperson.name}</td>
                   <td className="px-4 py-3 text-right">
                     {record.type === 'SALES' ? (
                       <span className={record.margin >= 0 ? 'text-green-600' : 'text-red-600'}>
@@ -813,6 +841,12 @@ export default function SalesPage() {
                     )}
                   </td>
                   <td className="px-4 py-3">
+                    <button
+                      onClick={() => setDetailRecord(record)}
+                      className="text-indigo-600 hover:text-indigo-800 mr-3"
+                    >
+                      상세
+                    </button>
                     <Link
                       href={`/sales/${record.id}`}
                       className="text-blue-600 hover:text-blue-800 mr-3"
@@ -830,7 +864,7 @@ export default function SalesPage() {
               ))}
               {sortedSales.length === 0 && (
                 <tr>
-                  <td colSpan={14} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={13} className="px-4 py-8 text-center text-gray-500">
                     등록된 매입매출 내역이 없습니다.
                   </td>
                 </tr>
@@ -916,6 +950,56 @@ export default function SalesPage() {
           items={modalData.items}
           loading={loading}
         />
+      )}
+
+      {detailRecord && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-2xl rounded-lg bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b px-6 py-4">
+              <h3 className="text-lg font-bold text-gray-900">매입매출 상세</h3>
+              <button
+                onClick={() => setDetailRecord(null)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                닫기
+              </button>
+            </div>
+            <div className="space-y-4 px-6 py-4 text-sm text-gray-800">
+              <div>
+                <div className="font-semibold text-gray-900">비고</div>
+                <div className="mt-1 rounded border bg-gray-50 p-2">{detailRecord.notes || '-'}</div>
+              </div>
+
+              <div>
+                <div className="font-semibold text-gray-900">연동된 매입</div>
+                {detailRecord.linkedPurchases && detailRecord.linkedPurchases.length > 0 ? (
+                  <ul className="mt-1 space-y-1 rounded border bg-gray-50 p-2">
+                    {detailRecord.linkedPurchases.map((purchase) => (
+                      <li key={purchase.id}>
+                        #{purchase.id} / {purchase.vendor?.name || '-'} / {new Date(purchase.date).toLocaleDateString('ko-KR')} / 
+                        ₩{formatNumber(purchase.unitPrice, 0)} × {formatNumber(purchase.quantity, 0)} = ₩{formatNumber(purchase.amount, 0)}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="mt-1 rounded border bg-gray-50 p-2">-</div>
+                )}
+              </div>
+
+              <div>
+                <div className="font-semibold text-gray-900">연동된 매출</div>
+                {detailRecord.linkedSalesRecord ? (
+                  <div className="mt-1 rounded border bg-gray-50 p-2">
+                    #{detailRecord.linkedSalesRecord.id} / {detailRecord.linkedSalesRecord.vendor?.name || '-'} / {new Date(detailRecord.linkedSalesRecord.date).toLocaleDateString('ko-KR')} / {detailRecord.linkedSalesRecord.itemName} / 
+                    ₩{formatNumber(detailRecord.linkedSalesRecord.unitPrice, 0)} × {formatNumber(detailRecord.linkedSalesRecord.quantity, 0)} = ₩{formatNumber(detailRecord.linkedSalesRecord.amount, 0)}
+                  </div>
+                ) : (
+                  <div className="mt-1 rounded border bg-gray-50 p-2">-</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

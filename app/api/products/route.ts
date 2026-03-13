@@ -170,11 +170,11 @@ export async function POST(request: Request) {
     // salesVendors 배열로 거래처별 가격 저장 (VendorProductPrice에 저장)
     if (salesVendors && Array.isArray(salesVendors) && salesVendors.length > 0) {
       await prisma.vendorProductPrice.createMany({
-        data: salesVendors.map((sv: { vendorId: number; salesPrice: number }) => ({
+        data: salesVendors.map((sv: { vendorId: number; salesPrice: number; effectiveDate?: string }) => ({
           vendorId: sv.vendorId,
           productId: product.id,
           salesPrice: sv.salesPrice,
-          effectiveDate: new Date(),
+          effectiveDate: sv.effectiveDate ? new Date(sv.effectiveDate) : new Date(),
         })),
       })
     }
@@ -275,11 +275,11 @@ export async function PUT(request: Request) {
       // 새로운 매출거래처별 가격 생성
       if (salesVendors.length > 0) {
         await prisma.vendorProductPrice.createMany({
-          data: salesVendors.map((sv: { vendorId: number; salesPrice: number }) => ({
+          data: salesVendors.map((sv: { vendorId: number; salesPrice: number; effectiveDate?: string }) => ({
             vendorId: sv.vendorId,
             productId: parsedId,
             salesPrice: sv.salesPrice,
-            effectiveDate: new Date(),
+            effectiveDate: sv.effectiveDate ? new Date(sv.effectiveDate) : new Date(),
           })),
         })
       }

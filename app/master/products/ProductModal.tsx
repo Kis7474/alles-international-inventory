@@ -65,6 +65,7 @@ interface SalesVendorPrice {
   vendorId: number
   vendorName: string
   salesPrice: number
+  effectiveDate: string
 }
 
 interface ProductModalProps {
@@ -95,6 +96,7 @@ export default function ProductModal({ productId, isOpen, onClose, onSave }: Pro
   // 새 매출거래처 추가용
   const [newVendorId, setNewVendorId] = useState('')
   const [newSalesPrice, setNewSalesPrice] = useState('')
+  const [newEffectiveDate, setNewEffectiveDate] = useState(new Date().toISOString().split('T')[0])
   
   // 거래처 목록, 카테고리 목록 fetch
   const [vendors, setVendors] = useState<Vendor[]>([])
@@ -132,6 +134,7 @@ export default function ProductModal({ productId, isOpen, onClose, onSave }: Pro
         vendorId: vp.vendorId,
         vendorName: vp.vendor?.name || '',
         salesPrice: vp.salesPrice || 0,
+        effectiveDate: vp.effectiveDate ? vp.effectiveDate.split('T')[0] : new Date().toISOString().split('T')[0],
       })))
     }
     setLoading(false)
@@ -177,6 +180,7 @@ export default function ProductModal({ productId, isOpen, onClose, onSave }: Pro
         salesVendors: salesVendorPrices.map(sv => ({
           vendorId: sv.vendorId,
           salesPrice: sv.salesPrice,
+          effectiveDate: sv.effectiveDate,
         })),
       }
 
@@ -206,7 +210,7 @@ export default function ProductModal({ productId, isOpen, onClose, onSave }: Pro
   }
 
   const addSalesVendor = () => {
-    if (!newVendorId || !newSalesPrice) return
+    if (!newVendorId || !newSalesPrice || !newEffectiveDate) return
     const vendor = vendors.find(v => v.id === parseInt(newVendorId))
     if (!vendor) return
     
@@ -220,9 +224,11 @@ export default function ProductModal({ productId, isOpen, onClose, onSave }: Pro
       vendorId: parseInt(newVendorId),
       vendorName: vendor.name,
       salesPrice: parseFloat(newSalesPrice),
+      effectiveDate: newEffectiveDate,
     }])
     setNewVendorId('')
     setNewSalesPrice('')
+    setNewEffectiveDate(new Date().toISOString().split('T')[0])
   }
 
   const removeSalesVendor = (vendorId: number) => {
@@ -232,6 +238,12 @@ export default function ProductModal({ productId, isOpen, onClose, onSave }: Pro
   const updateSalesPrice = (vendorId: number, price: string) => {
     setSalesVendorPrices(salesVendorPrices.map(sv => 
       sv.vendorId === vendorId ? { ...sv, salesPrice: parseFloat(price) || 0 } : sv
+    ))
+  }
+
+  const updateEffectiveDate = (vendorId: number, effectiveDate: string) => {
+    setSalesVendorPrices(salesVendorPrices.map(sv =>
+      sv.vendorId === vendorId ? { ...sv, effectiveDate } : sv
     ))
   }
 
@@ -438,13 +450,14 @@ export default function ProductModal({ productId, isOpen, onClose, onSave }: Pro
                 <tr>
                   <th className="px-3 py-2 text-left">거래처</th>
                   <th className="px-3 py-2 text-right">매출가</th>
+                  <th className="px-3 py-2 text-center">적용 시작일</th>
                   {isEditMode && <th className="px-3 py-2 w-20">관리</th>}
                 </tr>
               </thead>
               <tbody>
                 {salesVendorPrices.length === 0 ? (
                   <tr>
-                    <td colSpan={isEditMode ? 3 : 2} className="px-3 py-4 text-center text-gray-400">
+                    <td colSpan={isEditMode ? 4 : 3} className="px-3 py-4 text-center text-gray-400">
                       등록된 매출거래처가 없습니다.
                     </td>
                   </tr>
@@ -462,6 +475,18 @@ export default function ProductModal({ productId, isOpen, onClose, onSave }: Pro
                           />
                         ) : (
                           `₩${sv.salesPrice?.toLocaleString()}`
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        {isEditMode ? (
+                          <input
+                            type="date"
+                            value={sv.effectiveDate}
+                            onChange={(e) => updateEffectiveDate(sv.vendorId, e.target.value)}
+                            className="border rounded px-2 py-1"
+                          />
+                        ) : (
+                          new Date(sv.effectiveDate).toLocaleDateString('ko-KR')
                         )}
                       </td>
                       {isEditMode && (
@@ -506,6 +531,15 @@ export default function ProductModal({ productId, isOpen, onClose, onSave }: Pro
                     onChange={(e) => setNewSalesPrice(e.target.value)}
                     className="w-full border rounded px-2 py-1"
                     placeholder="0"
+                  />
+                </div>
+                <div className="w-40">
+                  <label className="block text-xs text-gray-500 mb-1">적용 시작일</label>
+                  <input
+                    type="date"
+                    value={newEffectiveDate}
+                    onChange={(e) => setNewEffectiveDate(e.target.value)}
+                    className="w-full border rounded px-2 py-1"
                   />
                 </div>
                 <button

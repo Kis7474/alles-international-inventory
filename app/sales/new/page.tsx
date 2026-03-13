@@ -65,6 +65,20 @@ interface VendorPrice {
   effectiveDate: string
 }
 
+
+interface BulkLineForm {
+  productId: string
+  productSearchText: string
+  categoryId: string
+  itemName: string
+  quantity: string
+  unitPrice: string
+  cost: string
+  purchasePriceOverride: string
+  autoCreatePurchase: boolean
+  notes: string
+}
+
 export default function NewSalesPage() {
   const router = useRouter()
   const [salespersons, setSalespersons] = useState<Salesperson[]>([])
@@ -72,9 +86,25 @@ export default function NewSalesPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [loading, setLoading] = useState(false)
+  const [lineErrors, setLineErrors] = useState<Array<{ lineNo: number | null; message: string }>>([])
   
   // Filtered products based on vendor and type
   const [availableProducts, setAvailableProducts] = useState<Product[]>([])
+  const [bulkLines, setBulkLines] = useState<BulkLineForm[]>([
+    {
+      productId: '',
+      productSearchText: '',
+      categoryId: '',
+      itemName: '',
+      quantity: '',
+      unitPrice: '',
+      cost: '',
+      purchasePriceOverride: '',
+      autoCreatePurchase: true,
+      notes: '',
+      },
+  ])
+
   
   // Phase 4: vendorSearch and productSearch removed - now using Autocomplete component
   
@@ -82,7 +112,6 @@ export default function NewSalesPage() {
     date: new Date().toISOString().split('T')[0],
     type: 'SALES',
     salespersonId: '',
-    categoryId: '',
     productId: '',
     vendorId: '',
     itemName: '',
@@ -90,8 +119,8 @@ export default function NewSalesPage() {
     quantity: '',
     unitPrice: '',
     cost: '',
-    notes: '',
     purchasePriceOverride: '', // 매입가 오버라이드
+    autoCreatePurchase: true,
   })
 
   useEffect(() => {
@@ -101,10 +130,10 @@ export default function NewSalesPage() {
   const fetchMasterData = async () => {
     try {
       const [salespersonsRes, categoriesRes, productsRes, vendorsRes] = await Promise.all([
-        fetch('/api/salesperson'),
-        fetch('/api/categories'),
-        fetch('/api/products'),
-        fetch('/api/vendors'),
+        fetch('/api/salesperson', { cache: 'no-store' }),
+        fetch('/api/categories', { cache: 'no-store' }),
+        fetch('/api/products', { cache: 'no-store' }),
+        fetch('/api/vendors', { cache: 'no-store' }),
       ])
 
       const salespersonsData = await salespersonsRes.json()
@@ -122,72 +151,9 @@ export default function NewSalesPage() {
     }
   }
 
-  const handleProductChange = async (productId: string) => {
-    if (productId) {
-      const product = products.find((p) => p.id === parseInt(productId))
-      if (product) {
-        // Auto-fill category from product
-        const categoryId = product.categoryId ? product.categoryId.toString() : ''
-        
-        // Phase 5: Use product.currentCost directly (already calculated by updateProductCurrentCost)
-        const cost = product.currentCost || 0
-        
-        // Set default purchase price override
-        let defaultPurchasePrice = product.defaultPurchasePrice || 0
-        
-        // P0: For SALES mode, fetch purchase vendor price if purchaseVendorId exists
-        if (formData.type === 'SALES' && product.purchaseVendorId) {
-          try {
-            const res = await fetch(`/api/vendor-product-prices?productId=${productId}&vendorId=${product.purchaseVendorId}`)
-            const prices: VendorPrice[] = await res.json()
-            
-            if (prices.length > 0) {
-              // Get the most recent purchase price before or on the transaction date
-              const transactionDate = new Date(formData.date)
-              const transactionTime = transactionDate.getTime()
-              const applicablePrice = prices
-                .filter((p: VendorPrice) => new Date(p.effectiveDate).getTime() <= transactionTime && p.purchasePrice !== null)
-                .sort((a: VendorPrice, b: VendorPrice) => new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime())[0]
-              
-              if (applicablePrice && applicablePrice.purchasePrice) {
-                defaultPurchasePrice = applicablePrice.purchasePrice
-              }
-            }
-          } catch (error) {
-            console.error('Error fetching purchase vendor price:', error)
-            // Fall back to defaultPurchasePrice
-          }
-        }
-        
-        // Set default unit price based on transaction type
-        const defaultPrice = formData.type === 'PURCHASE' 
-          ? (product.defaultPurchasePrice || 0)
-          : (product.defaultSalesPrice || 0)
-        
-        setFormData((prev) => ({ 
-          ...prev, 
-          productId, 
-          itemName: product.name,
-          categoryId: categoryId,
-          cost: cost.toString(),
-          purchasePriceOverride: defaultPurchasePrice.toString(),
-          unitPrice: defaultPrice.toString(),
-        }))
-        
-        // Fetch vendor-specific price if vendor is selected (will override the default price)
-        if (formData.vendorId) {
-          fetchVendorPrice(parseInt(productId), parseInt(formData.vendorId), formData.date, formData.type)
-        } else {
-          // Show warning if price is 0 and no vendor is selected
-          if (defaultPrice === 0) {
-            const priceType = formData.type === 'PURCHASE' ? '매입단가' : '매출단가'
-            alert(`⚠️ ${priceType}가 설정되지 않았습니다. 수동으로 입력해주세요.`)
-          }
-        }
-      }
-    } else {
-      setFormData((prev) => ({ ...prev, productId: '', itemName: '', unitPrice: '', cost: '', purchasePriceOverride: '' }))
-    }
+  const toDateOnly = (value: string | Date) => {
+    const d = new Date(value)
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate())
   }
 
   const handleVendorChange = (vendorId: string) => {
@@ -240,25 +206,14 @@ export default function NewSalesPage() {
 
   const fetchVendorPrice = async (productId: number, vendorId: number, date: string, type: string) => {
     try {
-      // Priority 1: 최근 거래 단가 (동일 품목 + 동일 거래처 + 동일 거래유형)
-      const recentPriceRes = await fetch(`/api/products/latest-price?productId=${productId}&vendorId=${vendorId}&type=${type}`)
-      const recentPriceData = await recentPriceRes.json()
-      
-      if (recentPriceData.unitPrice && recentPriceData.unitPrice > 0) {
-        setFormData((prev) => ({ ...prev, unitPrice: recentPriceData.unitPrice.toString() }))
-        return
-      }
-
-      // Priority 2: 거래처별 특별가 (VendorProductPrice)
       const res = await fetch(`/api/vendor-product-prices?productId=${productId}&vendorId=${vendorId}`)
       const prices: VendorPrice[] = await res.json()
+      const transactionDate = toDateOnly(date)
       
       if (prices.length > 0) {
-        // Get the most recent price before or on the transaction date
-        const transactionDate = new Date(date)
         const applicablePrice = prices
-          .filter((p: VendorPrice) => new Date(p.effectiveDate) <= transactionDate)
-          .sort((a: VendorPrice, b: VendorPrice) => new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime())[0]
+          .filter((p: VendorPrice) => toDateOnly(p.effectiveDate) <= transactionDate)
+          .sort((a: VendorPrice, b: VendorPrice) => toDateOnly(b.effectiveDate).getTime() - toDateOnly(a.effectiveDate).getTime())[0]
         
         if (applicablePrice) {
           const price = type === 'PURCHASE' ? applicablePrice.purchasePrice : applicablePrice.salesPrice
@@ -268,32 +223,35 @@ export default function NewSalesPage() {
           }
         }
       }
-      
-      // Priority 3: 기본 단가 (Product.defaultPurchasePrice / defaultSalesPrice)
+
+      if (type === 'SALES') {
+        setFormData((prev) => ({ ...prev, unitPrice: '' }))
+        alert('선택한 거래처의 매출단가가 없습니다. 거래처별 가격을 등록해주세요.')
+        return
+      }
+
       const product = products.find((p) => p.id === productId)
       if (product) {
-        const defaultPrice = type === 'PURCHASE' 
-          ? (product.defaultPurchasePrice || 0)
-          : (product.defaultSalesPrice || 0)
+        const defaultPrice = product.defaultPurchasePrice || product.currentCost || 0
         if (defaultPrice === 0) {
-          const priceType = type === 'PURCHASE' ? '매입단가' : '매출단가'
-          alert(`⚠️ ${priceType}가 설정되지 않았습니다. 수동으로 입력해주세요.`)
+          alert('⚠️ 매입단가가 설정되지 않았습니다. 수동으로 입력해주세요.')
         }
         setFormData((prev) => ({ ...prev, unitPrice: defaultPrice.toString() }))
       }
     } catch (error) {
       console.error('Error fetching vendor price:', error)
-      // Fall back to product's default price based on transaction type
-      const product = products.find((p) => p.id === productId)
-      if (product) {
-        const defaultPrice = type === 'PURCHASE' 
-          ? (product.defaultPurchasePrice || 0)
-          : (product.defaultSalesPrice || 0)
-        if (defaultPrice === 0) {
-          const priceType = type === 'PURCHASE' ? '매입단가' : '매출단가'
-          alert(`⚠️ ${priceType} 조회 중 오류가 발생했습니다. 수동으로 입력해주세요.`)
+      if (type === 'SALES') {
+        setFormData((prev) => ({ ...prev, unitPrice: '' }))
+        alert('⚠️ 거래처별 매출단가 조회 중 오류가 발생했습니다.')
+      } else {
+        const product = products.find((p) => p.id === productId)
+        if (product) {
+          const defaultPrice = product.defaultPurchasePrice || product.currentCost || 0
+          if (defaultPrice === 0) {
+            alert('⚠️ 매입단가 조회 중 오류가 발생했습니다. 수동으로 입력해주세요.')
+          }
+          setFormData((prev) => ({ ...prev, unitPrice: defaultPrice.toString() }))
         }
-        setFormData((prev) => ({ ...prev, unitPrice: defaultPrice.toString() }))
       }
     }
   }
@@ -308,10 +266,8 @@ export default function NewSalesPage() {
       } else {
         const product = products.find((p) => p.id === parseInt(formData.productId))
         if (product) {
-          const defaultPrice = formData.type === 'PURCHASE' 
-            ? (product.defaultPurchasePrice || 0)
-            : (product.defaultSalesPrice || 0)
-          setFormData((prev) => ({ ...prev, date, unitPrice: defaultPrice.toString() }))
+          const defaultPrice = product.defaultPurchasePrice || product.currentCost || 0
+          setFormData((prev) => ({ ...prev, date, unitPrice: formData.type === 'SALES' ? '' : defaultPrice.toString() }))
         }
       }
     }
@@ -327,40 +283,152 @@ export default function NewSalesPage() {
     return true
   })
 
+  const updateBulkLine = (index: number, patch: Partial<BulkLineForm>) => {
+    setBulkLines((prev) => prev.map((line, i) => (i === index ? { ...line, ...patch } : line)))
+  }
+
+  const addBulkLine = () => {
+    setBulkLines((prev) => [
+      ...prev,
+      {
+        productId: '',
+        productSearchText: '',
+        categoryId: '',
+        itemName: '',
+        quantity: '',
+        unitPrice: '',
+        cost: '',
+        purchasePriceOverride: '',
+        autoCreatePurchase: formData.autoCreatePurchase,
+        notes: '',
+          },
+    ])
+  }
+
+  const removeBulkLine = (index: number) => {
+    setBulkLines((prev) => prev.filter((_, i) => i !== index))
+  }
+
+
+  const getProductOptions = () => (availableProducts.length > 0 ? availableProducts : products)
+
+  const handleBulkProductInputChange = (index: number, inputValue: string) => {
+    updateBulkLine(index, { productSearchText: inputValue })
+
+    if (!inputValue.trim()) {
+      updateBulkLine(index, { productId: '', categoryId: '', itemName: '' })
+      return
+    }
+
+    const candidates = getProductOptions()
+    const exact = candidates.find((p) => p.name.toLowerCase() === inputValue.trim().toLowerCase())
+    if (exact) {
+      void handleBulkProductChange(index, String(exact.id), exact.name)
+    }
+  }
+
+  const handleBulkProductChange = async (index: number, productId: string, productName?: string) => {
+    const product = getProductOptions().find((p) => p.id === parseInt(productId, 10)) || products.find((p) => p.id === parseInt(productId, 10))
+    if (!product) return
+
+    let unitPrice = ''
+    if (formData.vendorId) {
+      try {
+        const res = await fetch(`/api/vendor-product-prices?productId=${product.id}&vendorId=${formData.vendorId}`)
+        const prices: VendorPrice[] = await res.json()
+        const txDate = toDateOnly(formData.date)
+        const applicable = prices
+          .filter((p) => toDateOnly(p.effectiveDate) <= txDate)
+          .sort((a, b) => toDateOnly(b.effectiveDate).getTime() - toDateOnly(a.effectiveDate).getTime())[0]
+
+        const price = formData.type === 'SALES' ? applicable?.salesPrice : applicable?.purchasePrice
+        if (price && price > 0) unitPrice = String(price)
+      } catch (e) {
+        console.error('bulk price lookup failed', e)
+      }
+    }
+
+    updateBulkLine(index, {
+      productId,
+      productSearchText: productName || product.name,
+      categoryId: product.categoryId ? String(product.categoryId) : '',
+      itemName: product.name,
+      cost: String(product.currentCost || 0),
+      purchasePriceOverride: String(product.defaultPurchasePrice || product.currentCost || 0),
+      unitPrice,
+    })
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+    setLineErrors([])
 
     try {
-      // 매출 등록 시 확인 메시지
-      if (formData.type === 'SALES' && formData.productId && formData.purchasePriceOverride) {
-        const purchasePrice = parseFloat(formData.purchasePriceOverride)
-        if (purchasePrice > 0) {
-          const confirmed = confirm(
-            `매입가 ₩${purchasePrice.toLocaleString()}으로 매입도 동시 등록됩니다.\n진행하시겠습니까?`
-          )
-          if (!confirmed) {
-            setLoading(false)
-            return
-          }
-        }
-      }
-
-      const res = await fetch('/api/sales', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        alert(data.error || '등록 중 오류가 발생했습니다.')
+      if (!formData.date || !formData.type || !formData.salespersonId) {
+        alert('날짜/거래유형/담당자를 먼저 입력해주세요.')
+        setLoading(false)
         return
       }
 
-      alert('매입매출이 등록되었습니다.')
-      router.push('/sales')
+      const invalidIndex = bulkLines.findIndex((line) => !line.productId || !line.categoryId || !line.quantity || !line.unitPrice)
+      if (invalidIndex >= 0) {
+        setLineErrors([{ lineNo: invalidIndex + 1, message: '품목/카테고리/수량/단가를 모두 입력해주세요.' }])
+        alert(`${invalidIndex + 1}행 입력을 확인해주세요.`)
+        setLoading(false)
+        return
+      }
+
+        const res = await fetch('/api/sales/bulk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            header: {
+              date: formData.date,
+              type: formData.type,
+              salespersonId: formData.salespersonId,
+              vendorId: formData.vendorId,
+              customer: formData.customer,
+              autoCreatePurchaseDefault: formData.autoCreatePurchase,
+            },
+            lines: bulkLines.map((line, idx) => ({
+              lineNo: idx + 1,
+              productId: line.productId,
+              categoryId: line.categoryId,
+              itemName: line.itemName,
+              quantity: line.quantity,
+              unitPrice: line.unitPrice,
+              cost: line.cost,
+              purchasePriceOverride: line.purchasePriceOverride,
+              autoCreatePurchase: line.autoCreatePurchase,
+              notes: line.notes,
+            })),
+          }),
+        })
+
+        const data = await res.json()
+        if (!res.ok) {
+          const parsedLineErrors = Array.isArray(data?.lineErrors)
+            ? data.lineErrors.map((e: { lineNo?: number; message?: string }) => ({
+                lineNo: typeof e.lineNo === 'number' ? e.lineNo : null,
+                message: e.message || '라인 오류',
+              }))
+            : []
+
+          if (parsedLineErrors.length > 0) {
+            setLineErrors(parsedLineErrors)
+            alert(`${parsedLineErrors[0].lineNo}행 오류: ${parsedLineErrors[0].message}`)
+          } else {
+            setLineErrors([{ lineNo: null, message: data.error || '품목 등록 중 오류가 발생했습니다.' }])
+            alert(data.error || '품목 등록 중 오류가 발생했습니다.')
+          }
+          setLoading(false)
+          return
+        }
+
+        alert(`품목 등록 완료 (매출 ${data.summary?.createdSales || 0}건)`)
+        router.push('/sales')
+        return
     } catch (error) {
       console.error('Error creating sales record:', error)
       alert('등록 중 오류가 발생했습니다.')
@@ -369,41 +437,9 @@ export default function NewSalesPage() {
     }
   }
 
-  const calculateAmount = () => {
-    const quantity = parseFloat(formData.quantity) || 0
-    const unitPrice = parseFloat(formData.unitPrice) || 0
-    return quantity * unitPrice
-  }
+  const totalLineCount = bulkLines.length
+  const autoPurchaseLineCount = bulkLines.filter((line) => line.autoCreatePurchase).length
 
-  const calculateMargin = () => {
-    if (formData.type !== 'SALES') return 0
-    const amount = calculateAmount()
-    const unitCost = parseFloat(formData.cost) || 0
-    const quantity = parseFloat(formData.quantity) || 0
-    const totalCost = unitCost * quantity
-    return amount - totalCost
-  }
-
-  const calculateMarginRate = () => {
-    const amount = calculateAmount()
-    if (amount === 0) return 0
-    const margin = calculateMargin()
-    return (margin / amount) * 100
-  }
-
-  const getCommissionRate = () => {
-    const selectedSalesperson = salespersons.find(
-      (sp) => sp.id === parseInt(formData.salespersonId)
-    )
-    return selectedSalesperson?.commissionRate || 0
-  }
-
-  const calculateCommission = () => {
-    if (formData.type !== 'SALES') return 0
-    const margin = calculateMargin()
-    const commissionRate = getCommissionRate()
-    return margin * commissionRate
-  }
 
   return (
     <div>
@@ -470,6 +506,7 @@ export default function NewSalesPage() {
                 ))}
               </select>
             </div>
+
           </div>
 
           {/* 거래처/고객 - 거래처 먼저 선택하도록 순서 변경 */}
@@ -504,193 +541,109 @@ export default function NewSalesPage() {
             </div>
           </div>
 
-          {/* 품목 정보 */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Phase 4: Autocomplete for product */}
-            <Autocomplete
-              label="품목 선택 (선택한 거래처의 품목만 표시)"
-              options={availableProducts.map(p => ({
-                id: p.id,
-                label: p.name,
-                sublabel: p.unit
-              }))}
-              value={formData.productId}
-              onChange={(value) => handleProductChange(value)}
-              placeholder={formData.vendorId ? '품목을 검색하세요' : '거래처를 먼저 선택하세요'}
-              disabled={!formData.vendorId}
-            />
-
-            <div>
-              <label className="block text-sm font-medium mb-1 text-gray-700">
-                카테고리 * {formData.productId && <span className="text-xs text-blue-600">(품목에서 자동 설정됨)</span>}
-              </label>
-              <select
-                required
-                value={formData.categoryId}
-                onChange={(e) =>
-                  setFormData({ ...formData, categoryId: e.target.value })
-                }
-                className="w-full px-3 py-2 border rounded-lg text-gray-900"
-                disabled={!!formData.productId}
-              >
-                <option value="">선택하세요</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.nameKo}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1 text-gray-700">
-              품목명 *
-            </label>
-            <input
-              type="text"
-              required
-              value={formData.itemName}
-              onChange={(e) =>
-                setFormData({ ...formData, itemName: e.target.value })
-              }
-              className="w-full px-3 py-2 border rounded-lg text-gray-900"
-              placeholder="품목명을 입력하세요 (또는 위에서 품목 선택)"
-              disabled={!!formData.productId}
-            />
-          </div>
-
-          {/* 금액 정보 */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1 text-gray-700">
-                수량 *
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                required
-                value={formData.quantity}
-                onChange={(e) =>
-                  setFormData({ ...formData, quantity: e.target.value })
-                }
-                className="w-full px-3 py-2 border rounded-lg text-gray-900"
-                placeholder="0"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1 text-gray-700">
-                {formData.type === 'PURCHASE' ? '매입단가' : '매출단가'} * {formData.productId && <span className="text-xs text-blue-600">(품목 단가 자동 적용됨)</span>}
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                required
-                value={formData.unitPrice}
-                onChange={(e) =>
-                  setFormData({ ...formData, unitPrice: e.target.value })
-                }
-                className="w-full px-3 py-2 border rounded-lg text-gray-900"
-                placeholder="0"
-              />
-            </div>
-
-            {formData.type === 'SALES' && (
-              <div>
-                <label className="block text-sm font-medium mb-1 text-gray-700">
-                  원가 {formData.productId && <span className="text-xs text-blue-600">(품목에서 자동 설정됨, 수정 가능)</span>}
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.cost}
-                  onChange={(e) =>
-                    setFormData({ ...formData, cost: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border rounded-lg text-gray-900"
-                  placeholder="0"
-                />
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-blue-900">품목 입력</h3>
+                <button type="button" onClick={addBulkLine} className="px-3 py-1 text-sm bg-blue-600 text-white rounded">+ 행 추가</button>
               </div>
-            )}
-
-            {formData.type === 'SALES' && formData.productId && (
-              <div>
-                <label className="block text-sm font-medium mb-1 text-gray-700">
-                  매입가 (자동 매입 등록용) {' '}
-                  <span className="text-xs text-blue-600">(품목 기본 매입가 자동 설정, 수정 가능)</span>
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.purchasePriceOverride}
-                  onChange={(e) =>
-                    setFormData({ ...formData, purchasePriceOverride: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border rounded-lg text-gray-900"
-                  placeholder="0"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  매출 등록 시 이 매입가로 매입 레코드가 자동 생성됩니다
-                </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
+                <div className="bg-white border rounded px-3 py-2">총 라인: <span className="font-semibold">{totalLineCount}</span></div>
+                <div className="bg-white border rounded px-3 py-2">자동매입 예정: <span className="font-semibold">{autoPurchaseLineCount}</span></div>
+                <div className="bg-white border rounded px-3 py-2">수동매입 예정: <span className="font-semibold">{Math.max(totalLineCount - autoPurchaseLineCount, 0)}</span></div>
               </div>
-            )}
-          </div>
-
-          {/* 계산 결과 표시 */}
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <h3 className="font-medium mb-3 text-gray-900">계산 결과</h3>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div>
-                <div className="text-sm text-gray-600">공급가액</div>
-                <div className="text-lg font-bold text-gray-900">
-                  ₩{calculateAmount().toLocaleString()}
+              {lineErrors.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded p-3 text-sm text-red-700">
+                  <div className="font-semibold mb-1">저장 오류</div>
+                  <ul className="list-disc pl-5 space-y-1">
+                    {lineErrors.map((err, idx) => (
+                      <li key={`${err.lineNo ?? 'global'}-${idx}`}>{err.lineNo ? `${err.lineNo}행` : '공통'}: {err.message}</li>
+                    ))}
+                  </ul>
                 </div>
-              </div>
-              {formData.type === 'SALES' && (
-                <>
-                  <div>
-                    <div className="text-sm text-gray-600">마진</div>
-                    <div className="text-lg font-bold text-green-600">
-                      ₩{calculateMargin().toLocaleString()}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-gray-600">마진율</div>
-                    <div className="text-lg font-bold text-purple-600">
-                      {calculateMarginRate().toFixed(1)}%
-                    </div>
-                  </div>
-                  {getCommissionRate() > 0 && (
-                    <div>
-                      <div className="text-sm text-gray-600">
-                        커미션 ({getCommissionRate() * 100}%)
-                      </div>
-                      <div className="text-lg font-bold text-blue-600">
-                        ₩{calculateCommission().toLocaleString()}
-                      </div>
-                    </div>
-                  )}
-                </>
               )}
+              <div className="overflow-x-auto">
+                <table className="min-w-full table-fixed text-sm">
+                  <colgroup>
+                    <col className="w-[20%]" />
+                    <col className="w-[12%]" />
+                    <col className="w-[9%]" />
+                    <col className="w-[11%]" />
+                    <col className="w-[11%]" />
+                    <col className="w-[11%]" />
+                    <col className="w-[16%]" />
+                    <col className="w-[5%]" />
+                    <col className="w-[5%]" />
+                  </colgroup>
+                  <thead>
+                    <tr className="border-b">
+                      <th className="px-2 py-1 text-left">품목</th>
+                      <th className="px-2 py-1 text-left">카테고리</th>
+                      <th className="px-2 py-1 text-right">수량</th>
+                      <th className="px-2 py-1 text-right">단가</th>
+                      <th className="px-2 py-1 text-right">원가</th>
+                      <th className="px-2 py-1 text-right">매입가(자동)</th>
+                      <th className="px-2 py-1 text-left">비고</th>
+                      <th className="px-2 py-1 text-center">자동매입</th>
+                      <th className="px-2 py-1 text-center">작업</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bulkLines.map((line, index) => (
+                      <tr key={index} className="border-b">
+                        <td className="px-2 py-1">
+                          <input
+                            list={`product-options-${index}`}
+                            value={line.productSearchText}
+                            onChange={(e) => handleBulkProductInputChange(index, e.target.value)}
+                            className="w-full border rounded px-2 py-1 text-gray-900"
+                            placeholder="품목명 검색 또는 선택"
+                          />
+                          <datalist id={`product-options-${index}`}>
+                            {getProductOptions().map((p) => (
+                              <option key={p.id} value={p.name} />
+                            ))}
+                          </datalist>
+                        </td>
+                        <td className="px-2 py-1">
+                          <select
+                            value={line.categoryId}
+                            onChange={(e) => updateBulkLine(index, { categoryId: e.target.value })}
+                            className="w-full border rounded px-2 py-1 text-gray-900"
+                          >
+                            <option value="">선택</option>
+                            {categories.map((cat) => (
+                              <option key={cat.id} value={cat.id}>{cat.nameKo}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-2 py-1">
+                          <input type="number" step="1" min="1" value={line.quantity} onChange={(e) => updateBulkLine(index, { quantity: e.target.value })} className="w-full border rounded px-2 py-1 text-right text-gray-900" />
+                        </td>
+                        <td className="px-2 py-1">
+                          <input type="number" step="0.01" value={line.unitPrice} onChange={(e) => updateBulkLine(index, { unitPrice: e.target.value })} className="w-full border rounded px-2 py-1 text-right text-gray-900" />
+                        </td>
+                        <td className="px-2 py-1">
+                          <input type="number" step="0.01" value={line.cost} onChange={(e) => updateBulkLine(index, { cost: e.target.value })} className="w-full border rounded px-2 py-1 text-right text-gray-900" />
+                        </td>
+                        <td className="px-2 py-1">
+                          <input type="number" step="0.01" value={line.purchasePriceOverride} onChange={(e) => updateBulkLine(index, { purchasePriceOverride: e.target.value })} className="w-full border rounded px-2 py-1 text-right text-gray-900" placeholder="자동매입 단가" />
+                        </td>
+                        <td className="px-2 py-1">
+                          <input type="text" value={line.notes} onChange={(e) => updateBulkLine(index, { notes: e.target.value })} className="w-full border rounded px-2 py-1 text-gray-900" placeholder="비고" />
+                        </td>
+                        <td className="px-2 py-1 text-center">
+                          <input type="checkbox" checked={line.autoCreatePurchase} onChange={(e) => updateBulkLine(index, { autoCreatePurchase: e.target.checked })} />
+                        </td>
+                        <td className="px-2 py-1 text-center">
+                          <button type="button" onClick={() => removeBulkLine(index)} className="text-red-600 text-xs" disabled={bulkLines.length === 1}>삭제</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
 
-          {/* 비고 */}
-          <div>
-            <label className="block text-sm font-medium mb-1 text-gray-700">
-              비고
-            </label>
-            <textarea
-              value={formData.notes}
-              onChange={(e) =>
-                setFormData({ ...formData, notes: e.target.value })
-              }
-              className="w-full px-3 py-2 border rounded-lg text-gray-900"
-              rows={3}
-              placeholder="비고 사항을 입력하세요"
-            />
-          </div>
 
           {/* 버튼 */}
           <div className="flex gap-2">
